@@ -1,0 +1,37 @@
+# --- Secrets / env (never commit) ---
+.env
+.env.*
+*.env
+*.pem
+*.key
+secrets*
+
+# --- Generated data dir (DBs, registry, CSVs, spill tmp; all large/derived) ---
+# Everything under data/ is generated or scp'd in at deploy time. Keep the dir.
+/data/*
+!/data/.gitkeep
+
+# --- Raw data exports & API scratch dumps at repo root (large / not source) ---
+/tbia_*.csv
+/tbia_*.zip
+/response_*.csv
+/response_*.json
+*.zip
+
+# --- Intermediate dataset-selection working files (not needed to run/serve) ---
+/dataset-selected13.json
+/selected-13-dataset-ids.txt
+
+# --- Agent / editor local state ---
+.claude/
+.DS_Store
+
+# --- Python ---
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- Node ---
+frontend/node_modules/
+frontend/dist/
