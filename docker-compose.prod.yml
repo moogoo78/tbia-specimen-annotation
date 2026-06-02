@@ -37,12 +37,18 @@ services:
     restart: always
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      # Behind a Cloudflare proxy, set this to use a Cloudflare Origin cert
+      # (ACME can't complete through the proxy). Unset -> automatic Let's Encrypt.
+      CADDY_TLS: ${CADDY_TLS:-}
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+      # Cloudflare Origin cert/key (only used when CADDY_TLS is set). Harmless
+      # empty mount otherwise. Create the files per DEPLOY.md's Cloudflare section.
+      - /etc/caddy/certs:/etc/caddy/certs:ro
     depends_on:
       - backend
 

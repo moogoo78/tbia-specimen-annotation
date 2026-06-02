@@ -118,6 +118,43 @@ curl -s http://127.0.0.1/api/health
 > them: `docker save <img> | ssh ubuntu@<ip> docker load`, then `up -d` without
 > `--build`.
 
+### TLS modes — direct vs Cloudflare
+
+Caddy obtains TLS automatically, but **how** depends on whether a Cloudflare
+proxy sits in front.
+
+**Direct / "DNS only" (grey cloud):** nothing extra. Leave `CADDY_TLS` unset and
+Caddy gets a Let's Encrypt cert for `SITE_ADDRESS`. Requires a real domain (not
+a raw IP or `*.compute.amazonaws.com`) resolving to the box, with ports 80/443
+reachable.
+
+**Behind a Cloudflare proxy (orange cloud):** ACME challenges are intercepted by
+Cloudflare's edge, so Caddy can't get a Let's Encrypt cert — you'd get a
+Cloudflare **525 "SSL handshake failed"**. Use a Cloudflare **Origin
+Certificate** instead:
+
+1. Cloudflare dashboard → **SSL/TLS → Origin Server → Create Certificate**
+   (free, 15-year). Save the two PEM blocks on the box:
+   ```bash
+   sudo mkdir -p /etc/caddy/certs
+   sudo tee /etc/caddy/certs/cf-origin.pem >/dev/null   # paste the certificate, Ctrl-D
+   sudo tee /etc/caddy/certs/cf-origin.key >/dev/null   # paste the private key, Ctrl-D
+   sudo chmod 600 /etc/caddy/certs/cf-origin.key
+   ```
+2. Cloudflare → **SSL/TLS → Overview → set encryption mode to "Full (strict)"**.
+   Do **not** use "Flexible" — it causes a redirect loop with Caddy.
+3. Bring up with `CADDY_TLS` pointing at the cert (it's mounted read-only into
+   the `web` container at `/etc/caddy/certs`):
+   ```bash
+   export SITE_ADDRESS=https://your-domain.org
+   export CADDY_TLS="tls /etc/caddy/certs/cf-origin.pem /etc/caddy/certs/cf-origin.key"
+   docker compose -f docker-compose.prod.yml up -d --build
+   ```
+
+Keep your security group allowing 443 (from `0.0.0.0/0`, or restrict to
+[Cloudflare's IP ranges](https://www.cloudflare.com/ips/) to force traffic
+through the proxy).
+
 ## 6. Lock down the public demo accounts (required)
 
 The seeded `demo1234` users (`admin@tbia.test`, etc.) are public in this repo.
@@ -166,6 +203,10 @@ DuckDB is rebuilt from scratch by ingest. Re-run `make ingest` on your laptop,
   missing `data/occurrences.duckdb` (the backend raises on startup).
 - **TLS not issued** — `SITE_ADDRESS` must be a real domain resolving to this
   box; Let's Encrypt rejects IPs and `*.compute.amazonaws.com`.
+- **Cloudflare 525 "SSL handshake failed"** — the domain is proxied (orange
+  cloud), so ACME can't reach Caddy. Use a Cloudflare Origin Certificate +
+  `CADDY_TLS` + "Full (strict)" mode (see *TLS modes* above), or grey-cloud the
+  record to go direct.
 - **OOM / container killed** — confirm swap is on (`free -h`) and that only the
   Docker path is running (not also a systemd uvicorn).
 - **`database is locked`** — keep the backend at `--workers 1` (already set);
