@@ -1,0 +1,14 @@
+# Multi-stage production image: build the static SPA, then serve it from Caddy
+# (which also reverse-proxies /api to the backend, giving same-origin so the
+# frontend's relative `/api` calls work without CORS). Multi-arch: builds on
+# arm64 (t4g) and x86 unchanged.
+FROM node:20-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY --from=build /app/dist /srv
+COPY Caddyfile /etc/caddy/Caddyfile

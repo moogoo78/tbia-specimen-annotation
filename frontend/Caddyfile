@@ -1,0 +1,17 @@
+# Served by the `web` container (frontend/Dockerfile.prod).
+# SITE_ADDRESS = your domain (e.g. tbia.example.org) -> automatic Let's Encrypt
+# TLS, or ":80" for plain HTTP (testing / IP-only; logins go in cleartext).
+{$SITE_ADDRESS} {
+	root * /srv
+
+	# API -> backend container. Same origin, so the SPA's relative /api works.
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# SPA: serve the file if it exists, else fall back to index.html (client routing).
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

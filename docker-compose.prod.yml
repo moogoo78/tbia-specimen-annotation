@@ -1,0 +1,51 @@
+# Production compose. Differs from docker-compose.yml (dev): builds the frontend
+# to static files served by Caddy (no Vite dev server), no source bind-mounts,
+# resource caps for a small instance (e.g. t4g.small, 2 GB).
+#
+# Prereqs on the host:
+#   - data/occurrences.duckdb + data/annotations.sqlite scp'd into ./data
+#   - mkdir -p data/duck-tmp            (DuckDB spill dir)
+#   - backend/.env with NDB_JWT_SECRET  (generate: openssl rand -hex 32; chmod 600)
+#   - export SITE_ADDRESS=https://your-domain   (or leave unset -> :80 plain HTTP)
+#
+# Deploy:  docker compose -f docker-compose.prod.yml up -d --build
+#
+# NOTE: building images on a 2 GB box is tight — enable swap first, or build
+# off-box and load the images.
+services:
+  backend:
+    build: ./backend
+    restart: always
+    env_file: ./backend/.env
+    environment:
+      NDB_DUCKDB_PATH: /data/occurrences.duckdb
+      NDB_SQLITE_PATH: /data/annotations.sqlite
+      NDB_DUCK_TEMP_DIR: /data/duck-tmp
+      NDB_DUCK_THREADS: "2"
+      NDB_DUCK_MEMORY_LIMIT: 1GB
+    volumes:
+      - ./data:/data
+    mem_limit: 1400m
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+    expose:
+      - "8000"
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: always
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:
