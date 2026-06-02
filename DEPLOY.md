@@ -37,9 +37,22 @@ so Caddy must serve the SPA and proxy `/api` on the **same origin**.
 ## 2. Install Docker + enable swap
 
 ```bash
-# Docker engine + compose plugin (Ubuntu)
-sudo apt update && sudo apt install -y docker.io docker-compose-v2
+# Docker engine + compose v2 plugin, from Docker's official repo.
+# Works on Debian (bookworm/bullseye) and Ubuntu, arm64 or x86.
+# NOTE: Debian has no `docker-compose-v2` package — use the repo below.
+# (On Ubuntu only, the shortcut `apt install docker.io docker-compose-v2` also works.)
+sudo apt-get update && sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+DISTRO=$(. /etc/os-release && echo "$ID")   # debian or ubuntu
+sudo curl -fsSL "https://download.docker.com/linux/$DISTRO/gpg" -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+https://download.docker.com/linux/$DISTRO $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+| sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker $USER && newgrp docker
+docker compose version   # verify v2
 
 # Swap — REQUIRED on a 2 GB box (the in-image `npm run build` spikes memory)
 sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
