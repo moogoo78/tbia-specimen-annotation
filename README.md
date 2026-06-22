@@ -8,6 +8,9 @@ identification, coordinates, or collection date) by completeness and holding ins
 **aggregated, reviewed annotations back to the original data providers** — a trackable
 feedback loop. (TDWG 2026 abstract: *Closing Gaps in Specimen Metadata*.)
 
+See [`docs/build-summary.md`](docs/build-summary.md) for the story of how the platform was
+built — the concept, the design decisions, and the development history.
+
 ## Architecture
 
 | Concern | Choice |
