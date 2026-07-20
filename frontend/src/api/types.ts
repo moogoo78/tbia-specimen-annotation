@@ -97,7 +97,7 @@ export interface ExtractResponse {
   fields: ExtractedField[];
 }
 
-export interface User { id: number; email: string; display_name: string; role: string; }
+export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; }
 
 export interface Collector {
   id: number;

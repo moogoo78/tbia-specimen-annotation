@@ -95,6 +95,15 @@ def client():
 
 
 def auth_header(client, email: str) -> dict:
-    res = client.post("/api/auth/login", json={"email": email, "password": "demo1234"})
-    assert res.status_code == 200, res.text
-    return {"Authorization": f"Bearer {res.json()['access_token']}"}
+    """Mint a JWT for a seeded user directly (sign-in is ORCID-only, so there is
+    no password endpoint to exercise here)."""
+    from sqlalchemy import select
+
+    from app import auth
+    from app.db import SessionLocal
+    from app.models import User
+
+    with SessionLocal() as db:
+        user = db.execute(select(User).where(User.email == email)).scalar_one()
+        token = auth.create_token(user)
+    return {"Authorization": f"Bearer {token}"}

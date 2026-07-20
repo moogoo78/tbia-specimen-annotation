@@ -56,9 +56,14 @@ export function filtersToParams(f: Filters): URLSearchParams {
 }
 
 export const api = {
-  login: (email: string, password: string) =>
-    request<{ access_token: string; user: import("./types").User }>("/auth/login", {
-      method: "POST", body: JSON.stringify({ email, password }),
+  // ORCID-only sign-in. `orcidConfig` returns the public params for building the
+  // authorize URL; `orcidCallback` exchanges the returned code for our JWT.
+  orcidConfig: () =>
+    request<{ authorize_endpoint: string; client_id: string; redirect_uri: string; scope: string }>(
+      "/auth/orcid/config"),
+  orcidCallback: (code: string) =>
+    request<{ access_token: string; user: import("./types").User }>("/auth/orcid/callback", {
+      method: "POST", body: JSON.stringify({ code }),
     }),
   me: () => request<import("./types").User>("/auth/me"),
 

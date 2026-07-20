@@ -1,5 +1,6 @@
 import os
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +26,24 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7
 
+    # ── ORCID OAuth (sign-in is ORCID-only) ─────────────────────────────────
+    # These read plain ORCID_* env vars (no NDB_ prefix) via validation_alias.
+    # Register a client at https://orcid.org/developer-tools (any ORCID member),
+    # request scope `/authenticate`, and set the redirect URI to
+    # `<frontend>/auth/orcid/callback`. Swapping in an official org client later
+    # is just a change of these two values (see docs) — user iDs are unaffected.
+    orcid_base: str = Field(default="https://orcid.org", validation_alias="ORCID_BASE")
+    orcid_client_id: str = Field(default="", validation_alias="ORCID_CLIENT_ID")
+    orcid_client_secret: str = Field(default="", validation_alias="ORCID_CLIENT_SECRET")
+    orcid_redirect_uri: str = Field(
+        default="http://localhost:5173/auth/orcid/callback",
+        validation_alias="ORCID_REDIRECT_URI",
+    )
+    orcid_scope: str = Field(default="/authenticate", validation_alias="ORCID_SCOPE")
+    # Comma-separated ORCID iDs (0000-0000-0000-0000) granted `admin` on first
+    # sign-in. Everyone else defaults to `contributor`.
+    orcid_admin_ids: str = Field(default="", validation_alias="ORCID_ADMIN_IDS")
+
     # Comma-separated origins allowed by CORS (the Vite dev server).
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
@@ -35,6 +54,18 @@ class Settings(BaseSettings):
     @property
     def cors_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def orcid_admin_list(self) -> list[str]:
+        return [o.strip() for o in self.orcid_admin_ids.split(",") if o.strip()]
+
+    @property
+    def orcid_authorize_endpoint(self) -> str:
+        return f"{self.orcid_base}/oauth/authorize"
+
+    @property
+    def orcid_token_endpoint(self) -> str:
+        return f"{self.orcid_base}/oauth/token"
 
 
 settings = Settings()

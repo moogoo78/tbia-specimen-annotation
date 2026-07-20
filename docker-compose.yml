@@ -12,6 +12,14 @@ services:
     environment:
       NDB_DUCKDB_PATH: /data/occurrences.duckdb
       NDB_SQLITE_PATH: /data/annotations.sqlite
+      # ORCID sign-in — values interpolated from the project-root .env
+      # (see .env.example). Empty client id => sign-in returns 503.
+      ORCID_BASE: ${ORCID_BASE:-https://orcid.org}
+      ORCID_CLIENT_ID: ${ORCID_CLIENT_ID:-}
+      ORCID_CLIENT_SECRET: ${ORCID_CLIENT_SECRET:-}
+      ORCID_REDIRECT_URI: ${ORCID_REDIRECT_URI:-http://localhost:5173/auth/orcid/callback}
+      ORCID_ADMIN_IDS: ${ORCID_ADMIN_IDS:-}
+      NDB_JWT_SECRET: ${NDB_JWT_SECRET:-dev-secret-change-me}
 
   frontend:
     build: ./frontend

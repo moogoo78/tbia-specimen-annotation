@@ -29,10 +29,14 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    # ORCID iD (0000-0000-0000-0000) — the stable identity for sign-in.
+    orcid: Mapped[str | None] = mapped_column(String(32), unique=True, index=True)
+    # ORCID's /authenticate scope doesn't return an email, and ORCID users have
+    # no local password — both are nullable (only legacy/seed rows may set them).
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="contributor")
-    pw_hash: Mapped[str] = mapped_column(String(255))
+    pw_hash: Mapped[str | None] = mapped_column(String(255))
     created: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     annotations: Mapped[list["Annotation"]] = relationship(
