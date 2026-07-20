@@ -5,15 +5,11 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    email: str
+    orcid: str | None = None
+    email: str | None = None
     display_name: str
     role: str
 
@@ -22,6 +18,20 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+# ── ORCID OAuth ────────────────────────────────────────────────────────────
+class OrcidConfig(BaseModel):
+    """Public parameters the frontend needs to build the ORCID authorize URL.
+    The client *secret* never leaves the backend."""
+    authorize_endpoint: str
+    client_id: str
+    redirect_uri: str
+    scope: str
+
+
+class OrcidCallback(BaseModel):
+    code: str
 
 
 class AnnotationCreate(BaseModel):

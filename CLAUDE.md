@@ -39,8 +39,17 @@ make build          # frontend production build (also typechecks)
 Backend runs from `backend/` using `backend/.venv`. Typecheck frontend with
 `cd frontend && npx tsc -b`.
 
-Demo accounts (pw `demo1234`): `curator@tbia.test` (contributor),
-`reviewer@tbia.test` (reviewer), `admin@tbia.test` (admin).
+**Auth is ORCID-only** (OAuth Authorization Code). There is no password login. The
+backend never sees a password: `GET /api/auth/orcid/config` hands the frontend the
+authorize params, the browser round-trips through ORCID, and `POST /api/auth/orcid/callback`
+exchanges the `code` for the iD+name (from the `/authenticate` token response) → upserts a
+`User` keyed on `orcid` → issues our JWT. Config via plain `ORCID_*` env vars — no `NDB_` prefix (per-field `validation_alias` in
+`config.py`); see `.env.example`. `ORCID_ADMIN_IDS` grants `admin` on first sign-in, else
+`contributor`. `seed.py` still
+creates the three demo `User` *rows* (`curator/reviewer/admin@tbia.test`, no password) so
+local dev + tests have deterministic users; tests mint JWTs directly via `auth.create_token`
+(`conftest.auth_header`). Switching ORCID client id later (personal→official) is just an
+`.env` change — users are keyed on iD, so sessions and data survive.
 
 ## Layout
 

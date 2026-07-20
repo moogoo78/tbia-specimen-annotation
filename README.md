@@ -39,8 +39,12 @@ make web            # terminal 2: Vite dev server on :5173
 
 Open http://localhost:5173. Use `make ingest-sample` for a fast 50k-row slice during dev.
 
-**Demo accounts** (password `demo1234`):
-`curator@tbia.test` (contributor) · `reviewer@tbia.test` (reviewer) · `admin@tbia.test` (admin)
+**Sign-in is ORCID-only.** Copy `.env.example` to `.env` and fill in
+`ORCID_CLIENT_ID` / `ORCID_CLIENT_SECRET` (register a client at
+[orcid.org/developer-tools](https://orcid.org/developer-tools), scope `/authenticate`,
+redirect URI `http://localhost:5173/auth/orcid/callback`). List your own ORCID iD in
+`ORCID_ADMIN_IDS` to get the `admin` role on first sign-in. New users default to
+`contributor`. Until a client id is set, `/api/auth/orcid/*` returns 503.
 
 ### Docker (alternative)
 `make ingest && make seed` on the host, then `docker compose up` (serves API on :8000 and

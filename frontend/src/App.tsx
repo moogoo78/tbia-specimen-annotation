@@ -6,6 +6,7 @@ import { Institutions } from "./pages/Institutions";
 import { RecordDetail } from "./pages/RecordDetail";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
+import { OrcidCallback } from "./pages/OrcidCallback";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/record/:id" element={<RecordDetail />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/auth/orcid/callback" element={<OrcidCallback />} />
       </Routes>
     </div>
   );

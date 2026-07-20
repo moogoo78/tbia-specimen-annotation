@@ -53,7 +53,15 @@ const en = {
     completeness: "Avg completeness", export: "Export deltas", exported: "deltas ready to return",
     pending: "Pending review", mine: "My annotations", all: "All annotations",
   },
-  login: { title: "Sign in", email: "Email", password: "Password", submit: "Sign in", demo: "Demo accounts" },
+  login: {
+    title: "Sign in",
+    orcidBlurb: "Sign in with your ORCID iD to contribute and review specimen metadata.",
+    orcidSignIn: "Sign in with ORCID",
+    orcidRedirecting: "Redirecting to ORCID…",
+    orcidCompleting: "Completing sign-in…",
+    orcidRetry: "Try again",
+    orcidHelp: "No ORCID iD? Register free at",
+  },
   fields: {
     scientificName: "Scientific name", eventDate: "Event date",
     decimalLatitude: "Latitude", decimalLongitude: "Longitude", locality: "Locality",
@@ -113,7 +121,15 @@ const zh: typeof en = {
     completeness: "平均完整度", export: "匯出補遺", exported: "筆補遺可回饋",
     pending: "待審核", mine: "我的標註", all: "所有標註",
   },
-  login: { title: "登入", email: "電子郵件", password: "密碼", submit: "登入", demo: "示範帳號" },
+  login: {
+    title: "登入",
+    orcidBlurb: "使用您的 ORCID iD 登入，即可協作標註與審核標本資料。",
+    orcidSignIn: "使用 ORCID 登入",
+    orcidRedirecting: "正在前往 ORCID…",
+    orcidCompleting: "正在完成登入…",
+    orcidRetry: "重試",
+    orcidHelp: "還沒有 ORCID iD？免費註冊：",
+  },
   fields: {
     scientificName: "學名", eventDate: "採集日期",
     decimalLatitude: "緯度", decimalLongitude: "經度", locality: "地點",
