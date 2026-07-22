@@ -41,6 +41,13 @@ const en = {
     confidence: "confidence", accept: "Accept", reject: "Reject", merge: "Mark merged",
     loginToAnnotate: "Sign in to annotate", history: "Annotation history",
     apply: "Use", model: "Model",
+    aiPrompt: "AI transcribe (copy-paste)",
+    aiPromptHint: "Open the image in your own AI chat, paste the prompt below, then paste the JSON reply back here — no API cost.",
+    openImage: "Open specimen image",
+    noImageWarn: "This record has no image — attach your own photo of the label in your AI chat.",
+    copyPrompt: "Copy prompt", copied: "Copied!",
+    pasteHint: "Paste the AI's JSON reply here:",
+    pasteBack: "Paste JSON here…", parse: "Parse reply",
   },
   status: {
     draft: "Draft", submitted: "Submitted", accepted: "Accepted",
@@ -61,6 +68,8 @@ const en = {
     orcidCompleting: "Completing sign-in…",
     orcidRetry: "Try again",
     orcidHelp: "No ORCID iD? Register free at",
+    devTitle: "Developer sign-in",
+    devHint: "ORCID can't round-trip on localhost. Pick a demo role to test (local dev only).",
   },
   fields: {
     scientificName: "Scientific name", eventDate: "Event date",
@@ -70,7 +79,7 @@ const en = {
 };
 
 const zh: typeof en = {
-  app: { title: "TBIA 標本資料補遺平台", short: "TBIA 補遺" },
+  app: { title: "TBIA自然史標註平台", short: "TBIA自然史標註平台" },
   nav: { explore: "探索", institutions: "典藏機構", dashboard: "貢獻儀表板", login: "登入", logout: "登出" },
   inst: { title: "典藏機構", datasets: "個資料集", records: "筆紀錄", viewAll: "查看全部紀錄" },
   search: {
@@ -109,6 +118,13 @@ const zh: typeof en = {
     confidence: "信心值", accept: "採納", reject: "退回", merge: "標記為已合併",
     loginToAnnotate: "登入後即可標註", history: "標註紀錄",
     apply: "套用", model: "模型",
+    aiPrompt: "AI 辨識（複製貼上）",
+    aiPromptHint: "在你自己的 AI 對話中開啟影像，貼上下方提示詞，再把 AI 回覆的 JSON 貼回此處 — 不需 API 費用。",
+    openImage: "開啟標本影像",
+    noImageWarn: "此紀錄沒有影像 — 請在 AI 對話中自行附上標籤照片。",
+    copyPrompt: "複製提示詞", copied: "已複製！",
+    pasteHint: "將 AI 回覆的 JSON 貼在此處：",
+    pasteBack: "在此貼上 JSON…", parse: "解析回覆",
   },
   status: {
     draft: "草稿", submitted: "已送出", accepted: "已採納",
@@ -129,6 +145,8 @@ const zh: typeof en = {
     orcidCompleting: "正在完成登入…",
     orcidRetry: "重試",
     orcidHelp: "還沒有 ORCID iD？免費註冊：",
+    devTitle: "開發者登入",
+    devHint: "ORCID 無法在 localhost 完成流程。選擇一個示範角色進行測試（僅限本機開發）。",
   },
   fields: {
     scientificName: "學名", eventDate: "採集日期",

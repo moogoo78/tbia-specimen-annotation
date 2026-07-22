@@ -34,6 +34,22 @@ class OrcidCallback(BaseModel):
     code: str
 
 
+# ── Dev-only sign-in (NDB_DEV_LOGIN) ───────────────────────────────────────
+class DevUser(BaseModel):
+    email: str
+    display_name: str
+    role: str
+
+
+class DevLoginConfig(BaseModel):
+    enabled: bool
+    users: list[DevUser]
+
+
+class DevLoginRequest(BaseModel):
+    email: str
+
+
 class AnnotationCreate(BaseModel):
     field: str
     proposed_value: str | None = None
@@ -71,7 +87,7 @@ class AnnotationOut(BaseModel):
     modified: datetime
 
 
-# ── AI extraction stub ─────────────────────────────────────────────────────
+# ── AI extraction ──────────────────────────────────────────────────────────
 class ExtractedField(BaseModel):
     field: str
     value: str
@@ -83,3 +99,17 @@ class ExtractResponse(BaseModel):
     image_url: str | None
     model: str
     fields: list[ExtractedField]
+
+
+# ── AI copy-paste flow ─────────────────────────────────────────────────────
+# The platform hands the user a ready prompt (+ image URL) to paste into their
+# own AI chat, then parses the JSON they paste back into an ExtractResponse.
+class ExtractPromptResponse(BaseModel):
+    occurrence_id: str
+    image_url: str | None
+    target_fields: list[str]
+    prompt: str
+
+
+class ExtractPaste(BaseModel):
+    raw: str

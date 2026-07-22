@@ -22,7 +22,15 @@ from .. import auth
 from ..config import settings
 from ..db import get_session
 from ..models import User
-from ..schemas import OrcidCallback, OrcidConfig, TokenResponse, UserOut
+from ..schemas import (
+    DevLoginConfig,
+    DevLoginRequest,
+    DevUser,
+    OrcidCallback,
+    OrcidConfig,
+    TokenResponse,
+    UserOut,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -91,3 +99,32 @@ def _upsert_orcid_user(db: Session, orcid_id: str, name: str) -> User:
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(auth.current_user)):
     return UserOut.model_validate(user)
+
+
+# ── Dev-only sign-in ────────────────────────────────────────────────────────
+# Gated by settings.dev_login (NDB_DEV_LOGIN). Lets local dev sign in as a
+# seeded demo user without ORCID, which cannot round-trip on localhost. Never
+# enable in a deployed environment — it is an authentication bypass.
+@router.get("/dev-login/config", response_model=DevLoginConfig)
+def dev_login_config(db: Session = Depends(get_session)):
+    """Tell the frontend whether dev sign-in is available and list demo users."""
+    if not settings.dev_login:
+        return DevLoginConfig(enabled=False, users=[])
+    # Only seeded demo users have an email (ORCID users are keyed on iD).
+    rows = db.execute(select(User).where(User.email.isnot(None))).scalars().all()
+    return DevLoginConfig(
+        enabled=True,
+        users=[DevUser(email=u.email, display_name=u.display_name, role=u.role) for u in rows],
+    )
+
+
+@router.post("/dev-login", response_model=TokenResponse)
+def dev_login(body: DevLoginRequest, db: Session = Depends(get_session)):
+    if not settings.dev_login:
+        raise HTTPException(status_code=404, detail="Not found")
+    user = db.execute(
+        select(User).where(User.email == body.email, User.email.isnot(None))
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Unknown dev user")
+    return TokenResponse(access_token=auth.create_token(user), user=UserOut.model_validate(user))

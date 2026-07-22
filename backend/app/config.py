@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     # sign-in. Everyone else defaults to `contributor`.
     orcid_admin_ids: str = Field(default="", validation_alias="ORCID_ADMIN_IDS")
 
+    # DEV-ONLY password-less sign-in for the seeded demo users. ORCID OAuth
+    # cannot round-trip on localhost, so this lets local dev pick a role without
+    # ORCID. It mints tokens ONLY for existing seeded demo users (email set) and
+    # is gated everywhere by this flag. MUST stay false in any shared/deployed
+    # environment — enabling it there is a full auth bypass.
+    dev_login: bool = False
+
     # Comma-separated origins allowed by CORS (the Vite dev server).
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
