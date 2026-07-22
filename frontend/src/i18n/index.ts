@@ -74,7 +74,7 @@ const en = {
   fields: {
     scientificName: "Scientific name", eventDate: "Event date",
     decimalLatitude: "Latitude", decimalLongitude: "Longitude", locality: "Locality",
-    taxonRank: "Taxon rank",
+    taxonRank: "Taxon rank", full_text: "Full label text", other: "Other / notes",
   },
 };
 
@@ -151,7 +151,7 @@ const zh: typeof en = {
   fields: {
     scientificName: "學名", eventDate: "採集日期",
     decimalLatitude: "緯度", decimalLongitude: "經度", locality: "地點",
-    taxonRank: "分類階層",
+    taxonRank: "分類階層", full_text: "標籤全文", other: "其他／備註",
   },
 };
 

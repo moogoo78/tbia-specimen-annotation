@@ -9,7 +9,7 @@ import type { ExtractedField, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
 
-const ANNOTATABLE = ["scientificName", "taxonRank", "eventDate", "decimalLatitude", "decimalLongitude", "locality"];
+const ANNOTATABLE = ["scientificName", "taxonRank", "eventDate", "decimalLatitude", "decimalLongitude", "locality", "full_text", "other"];
 
 // Route wrapper: /record/:id
 export function RecordDetail() {
@@ -308,7 +308,13 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
           <select value={field} onChange={(e) => setField(e.target.value)} style={inputStyle}>
             {ANNOTATABLE.map((f) => <option key={f} value={f}>{tr(`fields.${f}`, f)}</option>)}
           </select>
-          <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={tr("annotate.proposed")} style={{ ...inputStyle, marginTop: 6 }} />
+          {field === "full_text" ? (
+            <textarea value={value} onChange={(e) => setValue(e.target.value)}
+              placeholder={tr("annotate.proposed")} style={{ ...textareaStyle, marginTop: 6, height: 110 }} />
+          ) : (
+            <input value={value} onChange={(e) => setValue(e.target.value)}
+              placeholder={tr("annotate.proposed")} style={{ ...inputStyle, marginTop: 6 }} />
+          )}
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tr("annotate.note")} style={{ ...inputStyle, marginTop: 6 }} />
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
             <Button primary small disabled={!value || createMut.isPending} onClick={() => createMut.mutate("submitted")}>{tr("annotate.submit")}</Button>

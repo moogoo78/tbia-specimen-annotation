@@ -79,23 +79,31 @@ PROMPTABLE_FIELDS: dict[str, str] = {
     "decimalLatitude": "Latitude in decimal degrees",
     "decimalLongitude": "Longitude in decimal degrees",
     "locality": "Locality / place description exactly as written on the label",
+    "full_text": (
+        "The ENTIRE label transcribed verbatim as one block of text — every "
+        "line in reading order, including content that also maps to the fields "
+        "above. Preserve the original language and line order."
+    ),
 }
+# Requested on every prompt regardless of which gaps a record has.
+ALWAYS_FIELDS = ("full_text",)
 PASTE_MODEL = "external (copy-paste)"
 MAX_PASTE_FIELDS = 20
 MAX_VALUE_LEN = 2000
 
 
 def _target_fields(record: dict) -> list[str]:
-    """Which fields to ask for — the record's gaps, or all promptable fields
-    when nothing is flagged missing (so the button is always useful)."""
-    fields: list[str] = []
+    """The record's gap fields (or all source fields when nothing is missing),
+    always followed by the always-on fields (e.g. the full label transcription)."""
+    gaps: list[str] = []
     if not record.get("has_identification"):
-        fields += ["scientificName", "taxonRank"]
+        gaps += ["scientificName", "taxonRank"]
     if not record.get("has_date"):
-        fields.append("eventDate")
+        gaps.append("eventDate")
     if not record.get("has_coordinates"):
-        fields += ["decimalLatitude", "decimalLongitude", "locality"]
-    return fields or list(PROMPTABLE_FIELDS)
+        gaps += ["decimalLatitude", "decimalLongitude", "locality"]
+    source = gaps or [f for f in PROMPTABLE_FIELDS if f not in ALWAYS_FIELDS]
+    return source + [f for f in ALWAYS_FIELDS if f not in source]
 
 
 def build_prompt(record: dict) -> ExtractPromptResponse:
