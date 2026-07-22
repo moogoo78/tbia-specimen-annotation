@@ -96,6 +96,15 @@ export interface ExtractResponse {
   model: string;
   fields: ExtractedField[];
 }
+export interface ExtractPromptResponse {
+  occurrence_id: string;
+  image_url: string | null;
+  target_fields: string[];
+  prompt: string;
+}
+
+export interface DevUser { email: string; display_name: string; role: string; }
+export interface DevLoginConfig { enabled: boolean; users: DevUser[]; }
 
 export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; }
 

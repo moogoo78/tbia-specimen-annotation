@@ -8,7 +8,13 @@ from .. import auth, duck, extract, search
 from ..annotations_store import _serialize
 from ..db import get_session
 from ..models import Annotation, User
-from ..schemas import AnnotationCreate, AnnotationUpdate, ExtractResponse
+from ..schemas import (
+    AnnotationCreate,
+    AnnotationUpdate,
+    ExtractPaste,
+    ExtractPromptResponse,
+    ExtractResponse,
+)
 
 router = APIRouter(prefix="/api", tags=["annotations"])
 
@@ -27,6 +33,26 @@ async def ai_extract(occ_id: str, user: User = Depends(auth.current_user)):
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")
     return extract.extract(record)
+
+
+@router.get("/occurrences/{occ_id}/extract-prompt", response_model=ExtractPromptResponse)
+async def ai_extract_prompt(occ_id: str, user: User = Depends(auth.current_user)):
+    """Build a ready-to-paste prompt (+ image URL) for the user's own AI chat."""
+    record = await search.get_detail(occ_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Occurrence not found")
+    return extract.build_prompt(record)
+
+
+@router.post("/occurrences/{occ_id}/extract-paste", response_model=ExtractResponse)
+async def ai_extract_paste(
+    occ_id: str, body: ExtractPaste, user: User = Depends(auth.current_user)
+):
+    """Parse the JSON the user pastes back into AI-draft fields."""
+    try:
+        return extract.parse_pasted(occ_id, body.raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/occurrences/{occ_id}/annotations")

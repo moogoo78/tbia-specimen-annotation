@@ -67,6 +67,14 @@ export const api = {
     }),
   me: () => request<import("./types").User>("/auth/me"),
 
+  // Dev-only sign-in (backend NDB_DEV_LOGIN). config.enabled is false in prod.
+  devLoginConfig: () =>
+    request<import("./types").DevLoginConfig>("/auth/dev-login/config"),
+  devLogin: (email: string) =>
+    request<{ access_token: string; user: import("./types").User }>("/auth/dev-login", {
+      method: "POST", body: JSON.stringify({ email }),
+    }),
+
   search: (f: Filters, sort: string, order: string, limit: number, offset: number) => {
     const p = filtersToParams(f);
     p.set("sort", sort); p.set("order", order);
@@ -90,6 +98,12 @@ export const api = {
 
   extract: (id: string) =>
     request<import("./types").ExtractResponse>(`/occurrences/${id}/extract`, { method: "POST" }),
+  extractPrompt: (id: string) =>
+    request<import("./types").ExtractPromptResponse>(`/occurrences/${id}/extract-prompt`),
+  extractPaste: (id: string, raw: string) =>
+    request<import("./types").ExtractResponse>(`/occurrences/${id}/extract-paste`, {
+      method: "POST", body: JSON.stringify({ raw }),
+    }),
   createAnnotation: (id: string, body: Record<string, unknown>) =>
     request<import("./types").Annotation>(`/occurrences/${id}/annotations`, {
       method: "POST", body: JSON.stringify(body),

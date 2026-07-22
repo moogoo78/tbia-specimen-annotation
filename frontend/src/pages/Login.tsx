@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { t } from "../design/tokens";
+import { api } from "../api/client";
 import { useAuth } from "../auth";
 
 // ORCID brand mark (green circle + "iD"), inlined so it works offline.
@@ -19,15 +21,30 @@ function OrcidMark() {
 
 export function Login() {
   const { t: tr } = useTranslation();
-  const { startOrcidLogin } = useAuth();
+  const { startOrcidLogin, devLogin } = useAuth();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Dev-only sign-in (backend NDB_DEV_LOGIN); enabled is false in production.
+  const dev = useQuery({ queryKey: ["dev-login-config"], queryFn: () => api.devLoginConfig() });
 
   const signIn = async () => {
     setError("");
     setBusy(true);
     try {
       await startOrcidLogin(); // redirects away on success
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign-in failed");
+      setBusy(false);
+    }
+  };
+
+  const signInAs = async (email: string) => {
+    setError("");
+    setBusy(true);
+    try {
+      await devLogin(email);
+      window.location.assign("/"); // land on Explore, signed in
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed");
       setBusy(false);
@@ -57,6 +74,35 @@ export function Login() {
         </button>
 
         {error && <div style={{ color: t.danger, fontSize: 11, marginTop: 12 }}>{error}</div>}
+
+        {dev.data?.enabled && dev.data.users.length > 0 && (
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px dashed ${t.warn}` }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: t.warn, marginBottom: 2 }}>
+              {tr("login.devTitle")}
+            </div>
+            <div style={{ fontSize: 11, color: t.fgMuted, marginBottom: 10, lineHeight: 1.5 }}>
+              {tr("login.devHint")}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {dev.data.users.map((u) => (
+                <button
+                  key={u.email}
+                  onClick={() => signInAs(u.email)}
+                  disabled={busy}
+                  style={{
+                    width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center",
+                    justifyContent: "space-between", gap: 8, padding: "7px 10px", fontSize: 12,
+                    cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1,
+                    border: `1px solid ${t.border}`, background: t.panel, color: t.fg,
+                  }}
+                >
+                  <span>{u.display_name}</span>
+                  <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted }}>{u.role}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${t.borderSoft}`, fontSize: 11, color: t.fgSubtle, lineHeight: 1.6 }}>
           {tr("login.orcidHelp")}{" "}

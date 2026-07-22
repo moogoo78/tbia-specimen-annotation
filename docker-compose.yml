@@ -20,6 +20,10 @@ services:
       ORCID_REDIRECT_URI: ${ORCID_REDIRECT_URI:-http://localhost:5173/auth/orcid/callback}
       ORCID_ADMIN_IDS: ${ORCID_ADMIN_IDS:-}
       NDB_JWT_SECRET: ${NDB_JWT_SECRET:-dev-secret-change-me}
+      # DEV-ONLY password-less sign-in for the seeded demo users (ORCID can't
+      # round-trip on localhost). Defaults off; set NDB_DEV_LOGIN=true in .env
+      # for local testing. MUST stay false in any deployed environment.
+      NDB_DEV_LOGIN: ${NDB_DEV_LOGIN:-false}
 
   frontend:
     build: ./frontend

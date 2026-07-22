@@ -192,13 +192,32 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   const [note, setNote] = useState("");
   const [drafts, setDrafts] = useState<ExtractedField[]>([]);
   const [model, setModel] = useState<string | null>(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [pasteRaw, setPasteRaw] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["detail", record.id] });
 
-  const extractMut = useMutation({
-    mutationFn: () => api.extract(record.id),
-    onSuccess: (res) => { setDrafts(res.fields); setModel(res.model); },
+  // AI transcribe via copy-paste: fetch a ready prompt (lazy), then parse the
+  // JSON the user pastes back from their own AI chat — no platform API cost.
+  const promptQuery = useQuery({
+    queryKey: ["extract-prompt", record.id],
+    queryFn: () => api.extractPrompt(record.id),
+    enabled: showPrompt,
   });
+  const pasteMut = useMutation({
+    mutationFn: () => api.extractPaste(record.id, pasteRaw),
+    onSuccess: (res) => {
+      setDrafts(res.fields); setModel(res.model); setShowPrompt(false); setPasteRaw("");
+    },
+  });
+  const copyPrompt = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  };
   const createMut = useMutation({
     mutationFn: (status: string) => api.createAnnotation(record.id, {
       field, proposed_value: value, original_value: originalFor(record, field),
@@ -231,10 +250,45 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
         <Icon name="spark" size={11} />{tr("annotate.title")}
       </div>
       <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-        {/* AI extract */}
-        <Button small onClick={() => extractMut.mutate()} disabled={extractMut.isPending}>
-          <Icon name="spark" size={11} />{extractMut.isPending ? "…" : tr("annotate.aiExtract")}
+        {/* AI transcribe — copy-paste flow (no platform API cost) */}
+        <Button small onClick={() => setShowPrompt((s) => !s)}>
+          <Icon name="spark" size={11} />{tr("annotate.aiPrompt")}
         </Button>
+        {showPrompt && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: 8, background: t.panelAlt, border: `1px solid ${t.borderSoft}` }}>
+            <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.5 }}>{tr("annotate.aiPromptHint")}</div>
+            {promptQuery.isLoading && <Spinner />}
+            {promptQuery.data && (
+              <>
+                {promptQuery.data.image_url ? (
+                  <a href={promptQuery.data.image_url} target="_blank" rel="noreferrer"
+                    style={{ color: t.accent, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <Icon name="img" size={11} />{tr("annotate.openImage")} ↗
+                  </a>
+                ) : (
+                  <div style={{ fontSize: 10, color: t.warn }}>{tr("annotate.noImageWarn")}</div>
+                )}
+                <textarea readOnly value={promptQuery.data.prompt}
+                  onFocus={(e) => e.currentTarget.select()}
+                  style={{ ...textareaStyle, height: 130 }} />
+                <Button small onClick={() => copyPrompt(promptQuery.data!.prompt)}>
+                  <Icon name={copied ? "check" : "down"} size={11} />
+                  {copied ? tr("annotate.copied") : tr("annotate.copyPrompt")}
+                </Button>
+                <div style={{ fontSize: 10, color: t.fgMuted, marginTop: 2 }}>{tr("annotate.pasteHint")}</div>
+                <textarea value={pasteRaw} onChange={(e) => setPasteRaw(e.target.value)}
+                  placeholder={tr("annotate.pasteBack")} style={{ ...textareaStyle, height: 90 }} />
+                {pasteMut.isError && (
+                  <div style={{ fontSize: 10, color: t.danger }}>{(pasteMut.error as Error).message}</div>
+                )}
+                <Button primary small disabled={!pasteRaw.trim() || pasteMut.isPending}
+                  onClick={() => pasteMut.mutate()}>
+                  {pasteMut.isPending ? "…" : tr("annotate.parse")}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
         {model && (
           <div style={{ fontSize: 10, color: t.fgSubtle }}>
             {tr("annotate.aiHint")} <span style={{ fontFamily: t.mono }}>({model})</span>
@@ -321,4 +375,8 @@ function originalFor(r: OccurrenceDetail, field: string): string | null {
 const inputStyle: React.CSSProperties = {
   width: "100%", boxSizing: "border-box", padding: "5px 7px", fontSize: 12,
   border: `1px solid ${t.border}`, background: t.panelAlt, outline: "none", fontFamily: t.sans,
+};
+
+const textareaStyle: React.CSSProperties = {
+  ...inputStyle, resize: "vertical", fontFamily: t.mono, fontSize: 11, lineHeight: 1.4,
 };
