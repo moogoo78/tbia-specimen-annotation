@@ -9,7 +9,13 @@ import type { ExtractedField, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
 
-const ANNOTATABLE = ["scientificName", "taxonRank", "eventDate", "decimalLatitude", "decimalLongitude", "locality", "full_text", "other"];
+// Annotatable fields grouped by annotation.md schema section (rendered as <optgroup>s).
+const ANNOTATABLE_GROUPS: { labelKey: string; fields: string[] }[] = [
+  { labelKey: "annotate.grpEvent", fields: ["eventDate"] },
+  { labelKey: "annotate.grpTaxonomy", fields: ["scientificName", "taxonRank"] },
+  { labelKey: "annotate.grpLocality", fields: ["decimalLatitude", "decimalLongitude", "locality"] },
+  { labelKey: "annotate.grpOther", fields: ["full_text", "other"] },
+];
 
 // Route wrapper: /record/:id
 export function RecordDetail() {
@@ -306,7 +312,11 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
         {/* manual form */}
         <div style={{ borderTop: `1px solid ${t.borderSoft}`, paddingTop: 8 }}>
           <select value={field} onChange={(e) => setField(e.target.value)} style={inputStyle}>
-            {ANNOTATABLE.map((f) => <option key={f} value={f}>{tr(`fields.${f}`, f)}</option>)}
+            {ANNOTATABLE_GROUPS.map((g) => (
+              <optgroup key={g.labelKey} label={tr(g.labelKey)}>
+                {g.fields.map((f) => <option key={f} value={f}>{tr(`fields.${f}`, f)}</option>)}
+              </optgroup>
+            ))}
           </select>
           {field === "full_text" ? (
             <textarea value={value} onChange={(e) => setValue(e.target.value)}
