@@ -9,13 +9,88 @@ import type { ExtractedField, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
 
-// Annotatable fields grouped by annotation.md schema section (rendered as <optgroup>s).
-const ANNOTATABLE_GROUPS: { labelKey: string; fields: string[] }[] = [
-  { labelKey: "annotate.grpEvent", fields: ["eventDate"] },
-  { labelKey: "annotate.grpTaxonomy", fields: ["scientificName", "taxonRank"] },
-  { labelKey: "annotate.grpLocality", fields: ["decimalLatitude", "decimalLongitude", "locality"] },
-  { labelKey: "annotate.grpOther", fields: ["full_text", "other"] },
+// Annotatable form, mirroring docs/annotation-schema.md (parts + widgets).
+type Widget = "input" | "textarea" | "select" | "date" | "dms";
+type FieldDef = {
+  name: string;               // tbia annotation field name (submitted as-is)
+  widget: Widget;
+  options?: string[];         // select
+  hemis?: [string, string];   // dms: [positive, negative] hemisphere labels
+  degMax?: number;            // dms: max degrees (lat 90 / lon 180)
+  decimalField?: string;      // dms: sibling field auto-filled with the decimal value
+};
+
+// Controlled vocabularies (see annotation-schema.md).
+const TYPE_STATUS_OPTIONS = [
+  "HOLOTYPE", "ISOTYPE", "LECTOTYPE", "ISOLECTOTYPE", "SYNTYPE",
+  "PARATYPE", "PARALECTOTYPE", "NEOTYPE", "EPITYPE", "ALLOTYPE", "COTYPE", "TOPOTYPE",
 ];
+const COORD_SYS_OPTIONS = ["TWD67", "TWD97"];
+const TAXON_RANK_OPTIONS = [
+  "kingdom", "phylum", "class", "order", "family",
+  "genus", "species", "subspecies", "variety", "form",
+];
+
+const ANNOTATABLE_GROUPS: { labelKey: string; fields: FieldDef[] }[] = [
+  { labelKey: "annotate.grpCollection", fields: [
+    { name: "catalogNumber", widget: "input" },
+    { name: "typeStatus", widget: "select", options: TYPE_STATUS_OPTIONS },
+  ] },
+  { labelKey: "annotate.grpEvent", fields: [
+    { name: "recordedBy", widget: "input" },
+    { name: "recordNumber", widget: "input" },
+    { name: "eventDate", widget: "date" },
+  ] },
+  { labelKey: "annotate.grpTaxonomy", fields: [
+    { name: "annotationScientificName", widget: "input" },
+    { name: "annotationVernacularName", widget: "input" },
+    { name: "taxonRank", widget: "select", options: TAXON_RANK_OPTIONS },
+  ] },
+  { labelKey: "annotate.grpLocality", fields: [
+    { name: "locality", widget: "input" },
+    { name: "verbatimCoordinateSystem", widget: "select", options: COORD_SYS_OPTIONS },
+    { name: "verbatimLatitude", widget: "input" },
+    { name: "verbatimLongitude", widget: "input" },
+    { name: "annotationLongitudeDMS", widget: "dms", hemis: ["東經", "西經"], degMax: 180, decimalField: "annotationLongitudeDecimal" },
+    { name: "annotationLatitudeDMS", widget: "dms", hemis: ["北緯", "南緯"], degMax: 90, decimalField: "annotationLatitudeDecimal" },
+    { name: "annotationLongitudeDecimal", widget: "input" },
+    { name: "annotationLatitudeDecimal", widget: "input" },
+    { name: "annotationCounty", widget: "input" },
+    { name: "annotationMunicipality", widget: "input" },
+  ] },
+  { labelKey: "annotate.grpOther", fields: [
+    { name: "full_text", widget: "textarea" },
+    { name: "other", widget: "textarea" },
+  ] },
+];
+const ALL_FIELDS: FieldDef[] = ANNOTATABLE_GROUPS.flatMap((g) => g.fields);
+
+// Composite widgets keep their parts under dotted sub-keys in the values map;
+// these turn the sub-keys into the single string that gets submitted.
+function serializeField(fd: FieldDef, values: Record<string, string>): string {
+  if (fd.widget === "date") {
+    const y = values["eventDate.y"] ?? "", mo = values["eventDate.mo"] ?? "", d = values["eventDate.d"] ?? "";
+    if (!y && !mo && !d) return "";
+    return `${y.padStart(4, "0")}-${(mo || "").padStart(2, "0")}-${(d || "").padStart(2, "0")}`;
+  }
+  if (fd.widget === "dms") {
+    const deg = values[`${fd.name}.deg`] ?? "", min = values[`${fd.name}.min`] ?? "", sec = values[`${fd.name}.sec`] ?? "";
+    if (!deg && !min && !sec) return "";
+    const hemi = values[`${fd.name}.hemi`] ?? fd.hemis![0];
+    return `${hemi} ${deg || 0}°${min || 0}'${sec || 0}"`;
+  }
+  return (values[fd.name] ?? "").trim();
+}
+
+// DMS -> signed decimal degrees (negative for the second/negative hemisphere).
+function dmsToDecimal(fd: FieldDef, values: Record<string, string>): string {
+  const deg = parseFloat(values[`${fd.name}.deg`] ?? "");
+  if (!Number.isFinite(deg)) return "";
+  const min = parseFloat(values[`${fd.name}.min`] ?? "") || 0;
+  const sec = parseFloat(values[`${fd.name}.sec`] ?? "") || 0;
+  const sign = (values[`${fd.name}.hemi`] ?? fd.hemis![0]) === fd.hemis![1] ? -1 : 1;
+  return (sign * (deg + min / 60 + sec / 3600)).toFixed(6);
+}
 
 // Route wrapper: /record/:id
 export function RecordDetail() {
@@ -189,12 +264,14 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   const { t: tr } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [field, setField] = useState(
-    !record.has_identification ? "scientificName" :
-    !record.has_coordinates ? "decimalLatitude" :
-    !record.has_date ? "eventDate" : "scientificName"
+  // Start on the class most likely to have a gap to fill.
+  const [activeGroup, setActiveGroup] = useState(
+    !record.has_identification ? "annotate.grpTaxonomy" :
+    !record.has_coordinates ? "annotate.grpLocality" :
+    !record.has_date ? "annotate.grpEvent" : "annotate.grpTaxonomy"
   );
-  const [value, setValue] = useState("");
+  // Proposed values keyed by field — many fields can be edited at once.
+  const [values, setValues] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [drafts, setDrafts] = useState<ExtractedField[]>([]);
   const [model, setModel] = useState<string | null>(null);
@@ -224,13 +301,30 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
       setTimeout(() => setCopied(false), 1500);
     } catch { /* clipboard unavailable */ }
   };
+  // Fields (across every class) that currently hold a proposed value.
+  const filled = ALL_FIELDS
+    .map((fd) => ({ fd, value: serializeField(fd, values) }))
+    .filter((x) => x.value !== "");
+  const setVal = (f: string, v: string) => setValues((s) => ({ ...s, [f]: v }));
+  const groupOf = (name: string) =>
+    ANNOTATABLE_GROUPS.find((g) => g.fields.some((f) => f.name === name))?.labelKey;
+  // A DMS sub-part changed: store it and keep the sibling decimal field in sync.
+  const setDms = (fd: FieldDef, part: "hemi" | "deg" | "min" | "sec", v: string) =>
+    setValues((s) => {
+      const next = { ...s, [`${fd.name}.${part}`]: v };
+      if (fd.decimalField) next[fd.decimalField] = dmsToDecimal(fd, next);
+      return next;
+    });
+
   const createMut = useMutation({
-    mutationFn: (status: string) => api.createAnnotation(record.id, {
-      field, proposed_value: value, original_value: originalFor(record, field),
-      note: note || null, source: drafts.some((d) => d.field === field && d.value === value) ? "ai" : "manual",
-      status,
-    }),
-    onSuccess: () => { setValue(""); setNote(""); refresh(); },
+    mutationFn: (status: string) => Promise.all(filled.map(({ fd, value }) =>
+      api.createAnnotation(record.id, {
+        field: fd.name, proposed_value: value, original_value: originalFor(record, fd.name),
+        note: note || null,
+        source: drafts.some((d) => d.field === fd.name && d.value === value) ? "ai" : "manual",
+        status,
+      }))),
+    onSuccess: () => { setValues({}); setNote(""); refresh(); },
   });
   const reviewMut = useMutation({
     mutationFn: ({ annId, status }: { annId: number; status: string }) => api.updateAnnotation(annId, { status }),
@@ -305,30 +399,95 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
             <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted, width: 90, flexShrink: 0 }}>{d.field}</span>
             <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.value}</span>
             <span style={{ fontSize: 9, color: t.ok, fontFamily: t.mono }}>{Math.round(d.confidence * 100)}%</span>
-            <Button small onClick={() => { setField(d.field); setValue(d.value); }}>{tr("annotate.apply")}</Button>
+            <Button small onClick={() => { setVal(d.field, d.value); const g = groupOf(d.field); if (g) setActiveGroup(g); }}>{tr("annotate.apply")}</Button>
           </div>
         ))}
+        {drafts.length > 1 && (
+          <Button small onClick={() => setValues((s) => {
+            const next = { ...s };
+            for (const d of drafts) next[d.field] = d.value;
+            return next;
+          })}>{tr("annotate.applyAll")}</Button>
+        )}
 
-        {/* manual form */}
+        {/* manual form — class tabs, each editing all its fields at once */}
         <div style={{ borderTop: `1px solid ${t.borderSoft}`, paddingTop: 8 }}>
-          <select value={field} onChange={(e) => setField(e.target.value)} style={inputStyle}>
-            {ANNOTATABLE_GROUPS.map((g) => (
-              <optgroup key={g.labelKey} label={tr(g.labelKey)}>
-                {g.fields.map((f) => <option key={f} value={f}>{tr(`fields.${f}`, f)}</option>)}
-              </optgroup>
-            ))}
-          </select>
-          {field === "full_text" ? (
-            <textarea value={value} onChange={(e) => setValue(e.target.value)}
-              placeholder={tr("annotate.proposed")} style={{ ...textareaStyle, marginTop: 6, height: 110 }} />
-          ) : (
-            <input value={value} onChange={(e) => setValue(e.target.value)}
-              placeholder={tr("annotate.proposed")} style={{ ...inputStyle, marginTop: 6 }} />
-          )}
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tr("annotate.note")} style={{ ...inputStyle, marginTop: 6 }} />
-          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-            <Button primary small disabled={!value || createMut.isPending} onClick={() => createMut.mutate("submitted")}>{tr("annotate.submit")}</Button>
-            <Button small disabled={!value || createMut.isPending} onClick={() => createMut.mutate("draft")}>{tr("annotate.saveDraft")}</Button>
+          {/* class tab nav */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 2, borderBottom: `1px solid ${t.borderSoft}`, marginBottom: 8 }}>
+            {ANNOTATABLE_GROUPS.map((g) => {
+              const active = activeGroup === g.labelKey;
+              const n = g.fields.filter((f) => serializeField(f, values) !== "").length;
+              return (
+                <button key={g.labelKey} onClick={() => setActiveGroup(g.labelKey)} style={{
+                  padding: "4px 9px", fontSize: 11, fontFamily: t.sans, cursor: "pointer",
+                  border: "none", background: "transparent",
+                  color: active ? t.fg : t.fgMuted, fontWeight: active ? 600 : 400,
+                  borderBottom: active ? `2px solid ${t.accent}` : "2px solid transparent", marginBottom: -1,
+                  display: "flex", alignItems: "center", gap: 4,
+                }}>
+                  {tr(g.labelKey)}
+                  {n > 0 && <span style={{ fontSize: 9, fontFamily: t.mono, color: t.accent }}>·{n}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* every field in the active class */}
+          {ANNOTATABLE_GROUPS.find((g) => g.labelKey === activeGroup)!.fields.map((fd) => {
+            const orig = originalFor(record, fd.name);
+            return (
+              <div key={fd.name} style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: t.fgMuted }}>{tr(`fields.${fd.name}`, fd.name)}</span>
+                  {orig != null && (
+                    <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      title={orig}>{tr("annotate.current")}: {orig}</span>
+                  )}
+                </div>
+                {fd.widget === "textarea" ? (
+                  <textarea value={values[fd.name] ?? ""} onChange={(e) => setVal(fd.name, e.target.value)}
+                    placeholder={tr("annotate.proposed")} style={{ ...textareaStyle, height: fd.name === "full_text" ? 110 : 70 }} />
+                ) : fd.widget === "select" ? (
+                  <select value={values[fd.name] ?? ""} onChange={(e) => setVal(fd.name, e.target.value)} style={inputStyle}>
+                    <option value="">—</option>
+                    {fd.options!.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                ) : fd.widget === "date" ? (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <input inputMode="numeric" value={values["eventDate.y"] ?? ""} onChange={(e) => setVal("eventDate.y", e.target.value)}
+                      placeholder="YYYY" style={{ ...inputStyle, width: 64 }} />
+                    <select value={values["eventDate.mo"] ?? ""} onChange={(e) => setVal("eventDate.mo", e.target.value)} style={{ ...inputStyle, width: 60 }}>
+                      <option value="">MM</option>
+                      {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <input inputMode="numeric" value={values["eventDate.d"] ?? ""} onChange={(e) => setVal("eventDate.d", e.target.value)}
+                      placeholder="DD" style={{ ...inputStyle, width: 52 }} />
+                  </div>
+                ) : fd.widget === "dms" ? (
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <select value={values[`${fd.name}.hemi`] ?? fd.hemis![0]} onChange={(e) => setDms(fd, "hemi", e.target.value)} style={{ ...inputStyle, width: 62 }}>
+                      {fd.hemis!.map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                    <input inputMode="numeric" value={values[`${fd.name}.deg`] ?? ""} onChange={(e) => setDms(fd, "deg", e.target.value)}
+                      placeholder="0" style={{ ...inputStyle, width: 52 }} /><span style={{ fontSize: 11, color: t.fgSubtle }}>°</span>
+                    <input inputMode="numeric" value={values[`${fd.name}.min`] ?? ""} onChange={(e) => setDms(fd, "min", e.target.value)}
+                      placeholder="0" style={{ ...inputStyle, width: 44 }} /><span style={{ fontSize: 11, color: t.fgSubtle }}>′</span>
+                    <input inputMode="numeric" value={values[`${fd.name}.sec`] ?? ""} onChange={(e) => setDms(fd, "sec", e.target.value)}
+                      placeholder="0" style={{ ...inputStyle, width: 44 }} /><span style={{ fontSize: 11, color: t.fgSubtle }}>″</span>
+                  </div>
+                ) : (
+                  <input value={values[fd.name] ?? ""} onChange={(e) => setVal(fd.name, e.target.value)}
+                    placeholder={tr("annotate.proposed")} style={inputStyle} />
+                )}
+              </div>
+            );
+          })}
+
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tr("annotate.note")} style={inputStyle} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+            <Button primary small disabled={filled.length === 0 || createMut.isPending} onClick={() => createMut.mutate("submitted")}>{tr("annotate.submit")}</Button>
+            <Button small disabled={filled.length === 0 || createMut.isPending} onClick={() => createMut.mutate("draft")}>{tr("annotate.saveDraft")}</Button>
+            {filled.length > 0 && <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>{filled.length} {tr("annotate.fieldsFilled")}</span>}
           </div>
         </div>
 
@@ -379,10 +538,13 @@ function History({ annotations, isReviewer, onReview }: {
   );
 }
 
+// Current occurrence value shown as reference. `annotation*` fields are ones
+// TBIA doesn't hold (annotation-schema.md), so they have no original value.
 function originalFor(r: OccurrenceDetail, field: string): string | null {
   const map: Record<string, unknown> = {
-    scientificName: r.scientific_name, taxonRank: r.taxon_rank, eventDate: r.std_date,
-    decimalLatitude: r.std_lat, decimalLongitude: r.std_lon, locality: r.locality,
+    catalogNumber: r.catalog_number, typeStatus: r.type_status,
+    recordedBy: r.recorded_by, recordNumber: r.record_number,
+    taxonRank: r.taxon_rank, eventDate: r.std_date, locality: r.locality,
   };
   const v = map[field];
   return v == null ? null : String(v);
