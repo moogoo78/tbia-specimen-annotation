@@ -57,7 +57,7 @@ class Annotation(Base):
     original_value: Mapped[str | None] = mapped_column(Text)
     proposed_value: Mapped[str | None] = mapped_column(Text)
 
-    source: Mapped[str] = mapped_column(String(16), default="manual")  # manual | ai
+    source: Mapped[str] = mapped_column(String(16), default="manual")  # manual | ai | mixed
     ai_confidence: Mapped[float | None] = mapped_column(Float)
     ai_raw: Mapped[str | None] = mapped_column(Text)  # JSON payload from extractor
 

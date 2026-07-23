@@ -272,6 +272,9 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   );
   // Proposed values keyed by field — many fields can be edited at once.
   const [values, setValues] = useState<Record<string, string>>({});
+  // AI value that was applied into a field (from a draft). Lets submit tell
+  // apart ai (kept verbatim), mixed (AI value then edited), manual (typed).
+  const [aiSeed, setAiSeed] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [drafts, setDrafts] = useState<ExtractedField[]>([]);
   // Provenance of the last pasted AI draft: service · model (date).
@@ -318,15 +321,25 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
       return next;
     });
 
+  // ai = kept the AI value verbatim; mixed = AI value the human edited;
+  // manual = typed with no AI seed for this field.
+  const sourceFor = (name: string, value: string): string => {
+    const seed = aiSeed[name];
+    if (seed === undefined) return "manual";
+    return value === seed ? "ai" : "mixed";
+  };
+  // Record that a field was seeded from an AI draft (used by sourceFor).
+  const seed = (name: string, value: string) => setAiSeed((s) => ({ ...s, [name]: value }));
+
   const createMut = useMutation({
     mutationFn: (status: string) => Promise.all(filled.map(({ fd, value }) =>
       api.createAnnotation(record.id, {
         field: fd.name, proposed_value: value, original_value: originalFor(record, fd.name),
         note: note || null,
-        source: drafts.some((d) => d.field === fd.name && d.value === value) ? "ai" : "manual",
+        source: sourceFor(fd.name, value),
         status,
       }))),
-    onSuccess: () => { setValues({}); setNote(""); refresh(); },
+    onSuccess: () => { setValues({}); setAiSeed({}); setNote(""); refresh(); },
   });
   const reviewMut = useMutation({
     mutationFn: ({ annId, status }: { annId: number; status: string }) => api.updateAnnotation(annId, { status }),
@@ -403,15 +416,14 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
             <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted, width: 90, flexShrink: 0 }}>{d.field}</span>
             <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.value}</span>
             <span style={{ fontSize: 9, color: t.ok, fontFamily: t.mono }}>{Math.round(d.confidence * 100)}%</span>
-            <Button small onClick={() => { setVal(d.field, d.value); const g = groupOf(d.field); if (g) setActiveGroup(g); }}>{tr("annotate.apply")}</Button>
+            <Button small onClick={() => { setVal(d.field, d.value); seed(d.field, d.value); const g = groupOf(d.field); if (g) setActiveGroup(g); }}>{tr("annotate.apply")}</Button>
           </div>
         ))}
         {drafts.length > 1 && (
-          <Button small onClick={() => setValues((s) => {
-            const next = { ...s };
-            for (const d of drafts) next[d.field] = d.value;
-            return next;
-          })}>{tr("annotate.applyAll")}</Button>
+          <Button small onClick={() => {
+            setValues((s) => { const next = { ...s }; for (const d of drafts) next[d.field] = d.value; return next; });
+            setAiSeed((s) => { const next = { ...s }; for (const d of drafts) next[d.field] = d.value; return next; });
+          }}>{tr("annotate.applyAll")}</Button>
         )}
 
         {/* manual form — class tabs, each editing all its fields at once */}
@@ -443,6 +455,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
               <div key={fd.name} style={{ marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 3 }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: t.fgMuted }}>{tr(`fields.${fd.name}`, fd.name)}</span>
+                  {serializeField(fd, values) !== "" && <SourceTag source={sourceFor(fd.name, serializeField(fd, values))} />}
                   {orig != null && (
                     <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                       title={orig}>{tr("annotate.current")}: {orig}</span>
@@ -502,6 +515,22 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   );
 }
 
+// Value provenance: ai (kept verbatim) · mixed (AI, then human-edited) ·
+// manual (typed). Legacy rows may be blank → treated as manual (no tag).
+function SourceTag({ source }: { source: string }) {
+  const { t: tr } = useTranslation();
+  if (source !== "ai" && source !== "mixed") return null;
+  const tone = source === "ai" ? t.accent : t.warn;
+  return (
+    <span title={tr(`annotate.src_${source}`)} style={{
+      display: "inline-flex", alignItems: "center", gap: 2, fontSize: 9,
+      fontFamily: t.mono, color: tone, border: `1px solid ${tone}`, padding: "0 3px",
+    }}>
+      <Icon name="spark" size={8} />{tr(`annotate.src_${source}`)}
+    </span>
+  );
+}
+
 function History({ annotations, isReviewer, onReview }: {
   annotations: OccurrenceDetail["annotations"]; isReviewer: boolean;
   onReview: (annId: number, status: string) => void;
@@ -516,7 +545,7 @@ function History({ annotations, isReviewer, onReview }: {
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted }}>{a.field}</span>
             <span style={{ flex: 1 }} />
-            {a.source === "ai" && <Icon name="spark" size={10} />}
+            <SourceTag source={a.source} />
             <StatusPill status={a.status} />
           </div>
           <div style={{ marginTop: 1 }}>
