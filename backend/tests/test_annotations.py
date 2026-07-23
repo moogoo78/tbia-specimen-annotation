@@ -9,9 +9,9 @@ def test_ai_extract_stub(client):
     res = client.post("/api/occurrences/r2/extract", headers=h)
     assert res.status_code == 200
     data = res.json()
-    # r2 lacks identification -> stub proposes scientificName from source name
+    # r2 lacks identification -> stub proposes annotationScientificName from source name
     fields = {f["field"] for f in data["fields"]}
-    assert "scientificName" in fields
+    assert "annotationScientificName" in fields
     assert data["model"]
 
 

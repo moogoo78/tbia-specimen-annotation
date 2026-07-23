@@ -94,6 +94,8 @@ export interface ExtractResponse {
   occurrence_id: string;
   image_url: string | null;
   model: string;
+  service?: string | null;
+  extracted_at?: string | null;
   fields: ExtractedField[];
 }
 export interface ExtractPromptResponse {

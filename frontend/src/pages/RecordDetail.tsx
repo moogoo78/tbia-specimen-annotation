@@ -274,7 +274,8 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [drafts, setDrafts] = useState<ExtractedField[]>([]);
-  const [model, setModel] = useState<string | null>(null);
+  // Provenance of the last pasted AI draft: service · model (date).
+  const [prov, setProv] = useState<{ model: string; service?: string | null; extracted_at?: string | null } | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [pasteRaw, setPasteRaw] = useState("");
   const [copied, setCopied] = useState(false);
@@ -291,7 +292,8 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   const pasteMut = useMutation({
     mutationFn: () => api.extractPaste(record.id, pasteRaw),
     onSuccess: (res) => {
-      setDrafts(res.fields); setModel(res.model); setShowPrompt(false); setPasteRaw("");
+      setDrafts(res.fields); setProv({ model: res.model, service: res.service, extracted_at: res.extracted_at });
+      setShowPrompt(false); setPasteRaw("");
     },
   });
   const copyPrompt = async (text: string) => {
@@ -389,9 +391,11 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
             )}
           </div>
         )}
-        {model && (
+        {prov && (
           <div style={{ fontSize: 10, color: t.fgSubtle }}>
-            {tr("annotate.aiHint")} <span style={{ fontFamily: t.mono }}>({model})</span>
+            {tr("annotate.aiHint")} <span style={{ fontFamily: t.mono }}>
+              ({[prov.service, prov.model].filter(Boolean).join(" · ")}{prov.extracted_at ? `, ${prov.extracted_at}` : ""})
+            </span>
           </div>
         )}
         {drafts.map((d, i) => (

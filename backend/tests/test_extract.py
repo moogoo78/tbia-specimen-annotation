@@ -13,8 +13,8 @@ def _fields(raw: str) -> dict[str, tuple[str, float]]:
 
 
 def test_parse_plain_json():
-    out = _fields('{"fields":[{"field":"scientificName","value":"Rana latouchii","confidence":0.9}]}')
-    assert out == {"scientificName": ("Rana latouchii", 0.9)}
+    out = _fields('{"fields":[{"field":"annotationScientificName","value":"Rana latouchii","confidence":0.9}]}')
+    assert out == {"annotationScientificName": ("Rana latouchii", 0.9)}
 
 
 def test_parse_strips_markdown_fence():
@@ -29,22 +29,22 @@ def test_parse_recovers_json_from_surrounding_prose():
 
 def test_parse_accepts_bare_list_and_scales_0_100_confidence():
     # value coerced to string; confidence 95 (0–100 scale) → 0.95
-    assert _fields('[{"field":"decimalLatitude","value":25.03,"confidence":95}]') == {
-        "decimalLatitude": ("25.03", 0.95)
+    assert _fields('[{"field":"verbatimLatitude","value":25.03,"confidence":95}]') == {
+        "verbatimLatitude": ("25.03", 0.95)
     }
 
 
 def test_parse_accepts_flat_object_with_default_confidence():
-    out = _fields('{"scientificName":"Bufo bankorensis","eventDate":"2020-01-01"}')
-    assert out == {"scientificName": ("Bufo bankorensis", 0.0), "eventDate": ("2020-01-01", 0.0)}
+    out = _fields('{"annotationScientificName":"Bufo bankorensis","eventDate":"2020-01-01"}')
+    assert out == {"annotationScientificName": ("Bufo bankorensis", 0.0), "eventDate": ("2020-01-01", 0.0)}
 
 
 def test_parse_drops_unknown_fields_and_duplicates():
-    # recordedBy is not annotatable; the first scientificName wins over the dup
-    raw = ('{"fields":[{"field":"recordedBy","value":"X"},'
-           '{"field":"scientificName","value":"A"},'
-           '{"field":"scientificName","value":"B"}]}')
-    assert _fields(raw) == {"scientificName": ("A", 0.0)}
+    # kingdom is not annotatable; the first annotationScientificName wins over the dup
+    raw = ('{"fields":[{"field":"kingdom","value":"X"},'
+           '{"field":"annotationScientificName","value":"A"},'
+           '{"field":"annotationScientificName","value":"B"}]}')
+    assert _fields(raw) == {"annotationScientificName": ("A", 0.0)}
 
 
 def test_parse_skips_empty_and_null_values():
@@ -65,8 +65,8 @@ def test_extract_prompt_targets_gap_fields(client):
     res = client.get("/api/occurrences/r2/extract-prompt", headers=auth_header(client, CURATOR))
     assert res.status_code == 200
     data = res.json()
-    assert "scientificName" in data["target_fields"]
-    assert "scientificName" in data["prompt"]
+    assert "annotationScientificName" in data["target_fields"]
+    assert "annotationScientificName" in data["prompt"]
     assert data["image_url"] is None  # r2 has no media
 
 
@@ -76,12 +76,12 @@ def test_extract_prompt_404_for_unknown_record(client):
 
 
 def test_extract_paste_happy_path(client):
-    body = {"raw": '{"fields":[{"field":"scientificName","value":"Chilodontia laevis","confidence":0.88}]}'}
+    body = {"raw": '{"fields":[{"field":"annotationScientificName","value":"Chilodontia laevis","confidence":0.88}]}'}
     res = client.post("/api/occurrences/r2/extract-paste", headers=auth_header(client, CURATOR), json=body)
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["fields"] == [
-        {"field": "scientificName", "value": "Chilodontia laevis", "confidence": 0.88}
+        {"field": "annotationScientificName", "value": "Chilodontia laevis", "confidence": 0.88}
     ]
     assert data["model"]
 

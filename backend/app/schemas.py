@@ -98,6 +98,8 @@ class ExtractResponse(BaseModel):
     occurrence_id: str
     image_url: str | None
     model: str
+    service: str | None = None       # AI service the contributor used (e.g. ChatGPT)
+    extracted_at: str | None = None  # date of the extraction (YYYY-MM-DD)
     fields: list[ExtractedField]
 
 
