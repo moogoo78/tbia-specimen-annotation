@@ -25,6 +25,8 @@ export function Explore() {
   const [qInput, setQInput] = useState("");
   const [view, setView] = useState<View>("table");
   const [showFacets, setShowFacets] = useState(true);
+  // Split view: collapse the record list so the detail pane gets the full width.
+  const [splitListOpen, setSplitListOpen] = useState(true);
   const [sort, setSort] = useState("completeness_score");
   const [offset, setOffset] = useState(0);
   const [activeId, setActiveId] = useState<string | undefined>();
@@ -246,12 +248,26 @@ export function Explore() {
         {view === "split" ? (
           /* split-pane: dense list column + record detail (design variation B) */
           <>
-            <div style={{ width: 380, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.panel, display: "flex", flexDirection: "column", minHeight: 0 }}>
-              {search.isLoading && !search.data
-                ? <Spinner />
-                : <SplitList rows={rows} activeId={activeRowId} onSelect={setActiveId} />}
-              {pager}
-            </div>
+            {splitListOpen ? (
+              <div style={{ width: 380, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.panel, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", padding: "3px 6px", borderBottom: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>
+                  <div style={{ flex: 1 }} />
+                  <button onClick={() => setSplitListOpen(false)} title={tr("view.collapseList")} style={collapseBtn}>
+                    <Icon name="back" size={12} />
+                  </button>
+                </div>
+                {search.isLoading && !search.data
+                  ? <Spinner />
+                  : <SplitList rows={rows} activeId={activeRowId} onSelect={setActiveId} />}
+                {pager}
+              </div>
+            ) : (
+              <div style={{ width: 26, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.panelAlt, display: "flex", justifyContent: "center", paddingTop: 4 }}>
+                <button onClick={() => setSplitListOpen(true)} title={tr("view.expandList")} style={collapseBtn}>
+                  <Icon name="caretR" size={12} />
+                </button>
+              </div>
+            )}
             {activeRowId
               ? <RecordDetailView key={activeRowId} id={activeRowId} embedded />
               : <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: t.fgSubtle, fontSize: 12, background: t.panelAlt }}>{tr("search.results")}: 0</div>}
@@ -275,3 +291,8 @@ const pgBtn = (disabled: boolean): React.CSSProperties => ({
   border: `1px solid ${t.border}`, background: t.panel, padding: "2px 8px",
   cursor: disabled ? "not-allowed" : "pointer", color: disabled ? t.fgSubtle : t.fg, display: "flex",
 });
+
+const collapseBtn: React.CSSProperties = {
+  border: "none", background: "transparent", cursor: "pointer",
+  color: t.fgMuted, display: "flex", padding: 2,
+};

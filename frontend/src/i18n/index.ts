@@ -30,7 +30,7 @@ const en = {
     search: "Search collector…", none: "No matching collectors",
     filterBy: "Show all {{n}} records by this collector",
   },
-  view: { table: "Table", grid: "Grid", split: "Split", map: "Map" },
+  view: { table: "Table", grid: "Grid", split: "Split", map: "Map", collapseList: "Hide list", expandList: "Show list" },
   col: {
     catalog: "Catalog #", record_number: "Record #", sciname: "Scientific name", common: "Common", family: "Family",
     group: "Group", county: "County", locality: "Locality", date: "Collected",
@@ -126,7 +126,7 @@ const zh: typeof en = {
     search: "搜尋採集者…", none: "查無符合的採集者",
     filterBy: "顯示此採集者的全部 {{n}} 筆紀錄",
   },
-  view: { table: "表格", grid: "圖卡", split: "分割", map: "地圖" },
+  view: { table: "表格", grid: "圖卡", split: "分割", map: "地圖", collapseList: "隱藏清單", expandList: "顯示清單" },
   col: {
     catalog: "館號", record_number: "採集號", sciname: "學名", common: "俗名", family: "科",
     group: "類群", county: "縣市", locality: "地點", date: "採集日期",
