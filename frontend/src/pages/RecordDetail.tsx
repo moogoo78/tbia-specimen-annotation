@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -103,6 +103,37 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
   const { t: tr } = useTranslation();
   const q = useQuery({ queryKey: ["detail", id], queryFn: () => api.detail(id) });
 
+  // Draggable divider between the read-only fields (left) and the media +
+  // annotation column (right). Width persists across records/sessions.
+  const ANNOT_MIN = 320, ANNOT_MAX = 820;
+  const [annotW, setAnnotW] = useState(() => {
+    const s = Number(localStorage.getItem("tbia_annot_w"));
+    return Number.isFinite(s) && s >= ANNOT_MIN ? Math.min(s, ANNOT_MAX) : 360;
+  });
+  const drag = useRef<{ x: number; w: number } | null>(null);
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!drag.current) return;
+      const next = drag.current.w - (e.clientX - drag.current.x);  // right column grows as you drag left
+      setAnnotW(Math.max(ANNOT_MIN, Math.min(ANNOT_MAX, next)));
+    };
+    const onUp = () => {
+      if (!drag.current) return;
+      drag.current = null;
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
+  useEffect(() => { localStorage.setItem("tbia_annot_w", String(annotW)); }, [annotW]);
+  const startDrag = (e: React.MouseEvent) => {
+    drag.current = { x: e.clientX, w: annotW };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+  };
+
   if (q.isLoading || !q.data) return <Spinner />;
   const r = q.data;
 
@@ -129,9 +160,9 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 12, padding: 12, flex: 1, overflow: "auto", minHeight: 0 }}>
+      <div style={{ display: "flex", padding: 12, flex: 1, overflow: "auto", minHeight: 0 }}>
         {/* left column: record fields */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10, paddingRight: 12 }}>
           <Section title={tr("detail.taxonomy")}><Taxonomy r={r} /></Section>
           <Section title={tr("detail.event")}>
             <CollectorField recordedBy={r.recorded_by as string} />
@@ -150,8 +181,16 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
           </Section>
         </div>
 
+        {/* draggable divider — drag left to widen the annotation column */}
+        <div onMouseDown={startDrag} title={tr("detail.resize")} style={{
+          width: 8, flexShrink: 0, cursor: "col-resize", alignSelf: "stretch",
+          display: "flex", justifyContent: "center", position: "relative",
+        }}>
+          <div style={{ width: 2, background: t.border }} />
+        </div>
+
         {/* right column: media + annotation */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ width: annotW, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, paddingLeft: 12 }}>
           <Section title={`${tr("detail.media")} · ${r.media.length}`}>
             <MediaGallery urls={r.media} references={r.references_url as string} />
           </Section>
