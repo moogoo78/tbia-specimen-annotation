@@ -331,6 +331,19 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   // Record that a field was seeded from an AI draft (used by sourceFor).
   const seed = (name: string, value: string) => setAiSeed((s) => ({ ...s, [name]: value }));
 
+  // Apply an AI draft into the form. Most fields are a plain string, but the
+  // eventDate composite must be split into its year/month/day sub-inputs;
+  // seed the serialized (padded) form so sourceFor still classifies it "ai".
+  const applyDraft = (name: string, value: string) => {
+    if (name !== "eventDate") { setVal(name, value); seed(name, value); return; }
+    const m = value.trim().match(/^(\d{4})(?:[-/.](\d{1,2}))?(?:[-/.](\d{1,2}))?/);
+    const y = m?.[1] ?? "";
+    const mo = m?.[2] ? String(parseInt(m[2], 10)) : "";
+    const d = m?.[3] ? String(parseInt(m[3], 10)) : "";
+    setValues((s) => ({ ...s, "eventDate.y": y, "eventDate.mo": mo, "eventDate.d": d }));
+    seed(name, y ? `${y.padStart(4, "0")}-${(mo || "").padStart(2, "0")}-${(d || "").padStart(2, "0")}` : "");
+  };
+
   const createMut = useMutation({
     mutationFn: (status: string) => Promise.all(filled.map(({ fd, value }) =>
       api.createAnnotation(record.id, {
@@ -416,14 +429,11 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
             <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted, width: 90, flexShrink: 0 }}>{d.field}</span>
             <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.value}</span>
             <span style={{ fontSize: 9, color: t.ok, fontFamily: t.mono }}>{Math.round(d.confidence * 100)}%</span>
-            <Button small onClick={() => { setVal(d.field, d.value); seed(d.field, d.value); const g = groupOf(d.field); if (g) setActiveGroup(g); }}>{tr("annotate.apply")}</Button>
+            <Button small onClick={() => { applyDraft(d.field, d.value); const g = groupOf(d.field); if (g) setActiveGroup(g); }}>{tr("annotate.apply")}</Button>
           </div>
         ))}
         {drafts.length > 1 && (
-          <Button small onClick={() => {
-            setValues((s) => { const next = { ...s }; for (const d of drafts) next[d.field] = d.value; return next; });
-            setAiSeed((s) => { const next = { ...s }; for (const d of drafts) next[d.field] = d.value; return next; });
-          }}>{tr("annotate.applyAll")}</Button>
+          <Button small onClick={() => drafts.forEach((d) => applyDraft(d.field, d.value))}>{tr("annotate.applyAll")}</Button>
         )}
 
         {/* manual form — class tabs, each editing all its fields at once */}
