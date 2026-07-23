@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { t } from "./design/tokens";
 import { AppHeader } from "./components/AppHeader";
+import { Home } from "./pages/Home";
 import { Explore } from "./pages/Explore";
 import { Institutions } from "./pages/Institutions";
 import { RecordDetail } from "./pages/RecordDetail";
@@ -13,7 +14,8 @@ export default function App() {
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: t.bg, color: t.fg, fontFamily: t.sans }}>
       <AppHeader />
       <Routes>
-        <Route path="/" element={<Explore />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/explore" element={<Explore />} />
         <Route path="/institutions" element={<Institutions />} />
         <Route path="/record/:id" element={<RecordDetail />} />
         <Route path="/dashboard" element={<Dashboard />} />

@@ -2,8 +2,16 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
 const en = {
-  app: { title: "TBIA Specimen Annotation Platform", short: "TBIA Annotate" },
-  nav: { explore: "Explore", institutions: "Institutions", dashboard: "Dashboard", login: "Sign in", logout: "Sign out" },
+  app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
+  nav: { home: "Home", explore: "Explore", institutions: "Institutions", dashboard: "Dashboard", login: "Sign in", logout: "Sign out" },
+  home: {
+    tagline: "Closing gaps in specimen metadata",
+    blurb: "A collaborative platform for enriching TBIA natural-history specimen records. Find occurrences missing identification, coordinates, or dates — fill them by hand or with AI-assisted label transcription — and return reviewed enrichments to data providers.",
+    startExploring: "Start exploring",
+    browseByGroup: "Browse by biological group",
+    browseByOrg: "Browse by organization",
+    records: "records", datasets: "datasets",
+  },
   inst: { title: "Collection institutions", datasets: "datasets", records: "records", viewAll: "View all records" },
   search: {
     placeholder: "Search taxon, locality, collector, catalog #…",
@@ -81,8 +89,16 @@ const en = {
 };
 
 const zh: typeof en = {
-  app: { title: "TBIA自然史標註平台", short: "TBIA自然史標註平台" },
-  nav: { explore: "探索", institutions: "典藏機構", dashboard: "貢獻儀表板", login: "登入", logout: "登出" },
+  app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
+  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", dashboard: "貢獻儀表板", login: "登入", logout: "登出" },
+  home: {
+    tagline: "填補標本後設資料的缺口",
+    blurb: "TBIA 自然史標本資料的協作標註平台。找出缺少鑑定、座標或日期的標本紀錄，以人工或 AI 輔助的標籤辨識補齊，並將審核後的補遺回饋給資料提供者。",
+    startExploring: "開始探索",
+    browseByGroup: "依生物類群瀏覽",
+    browseByOrg: "依組織單位瀏覽",
+    records: "筆紀錄", datasets: "個資料集",
+  },
   inst: { title: "典藏機構", datasets: "個資料集", records: "筆紀錄", viewAll: "查看全部紀錄" },
   search: {
     placeholder: "搜尋物種、地點、採集者、館號…",

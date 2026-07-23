@@ -15,7 +15,7 @@ function CollectorLink({ value }: { value: string | null }) {
     e.stopPropagation();
     try {
       const c = await api.resolveCollector(value);
-      if (c) nav("/", { state: { collector: { id: c.id, label: c.label } } });
+      if (c) nav("/explore", { state: { collector: { id: c.id, label: c.label } } });
     } catch { /* unmapped (org/unknown) — no-op */ }
   };
   return (

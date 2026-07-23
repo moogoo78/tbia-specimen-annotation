@@ -151,5 +151,5 @@ export const emptyFilters = (): Filters => ({
   basis_of_record: [], type_status: [], dataset_name: [], tbia_dataset_id: [],
   collector_id: [],
   missing_coordinates: false, missing_date: false,
-  missing_identification: false, has_media: false,
+  missing_identification: false, has_media: true,
 });

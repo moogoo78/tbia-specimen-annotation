@@ -35,7 +35,7 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: t.panelAlt, overflow: "auto" }}>
       {/* header strip */}
       <div style={{ padding: "10px 16px", background: t.panel, borderBottom: `1px solid ${t.border}`, display: "flex", gap: 12, alignItems: "flex-start" }}>
-        {!embedded && <Link to="/" style={{ color: t.fgMuted, display: "flex", alignItems: "center", marginTop: 4 }}><Icon name="back" size={16} /></Link>}
+        {!embedded && <Link to="/explore" style={{ color: t.fgMuted, display: "flex", alignItems: "center", marginTop: 4 }}><Icon name="back" size={16} /></Link>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <GroupTag group={r.bio_group} />
@@ -131,7 +131,7 @@ function CollectorField({ recordedBy }: { recordedBy?: string | null }) {
       <span style={{ flex: 1, fontSize: 12, wordBreak: "break-word" }}>
         {!has ? <span style={{ color: t.danger, fontSize: 11 }}>{tr("detail.missing")}</span>
           : c ? (
-            <Link to="/" state={{ collector: { id: c.id, label: c.label } }}
+            <Link to="/explore" state={{ collector: { id: c.id, label: c.label } }}
               title={tr("collector.filterBy", { n: c.n_records.toLocaleString() })}
               style={{ color: t.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
               <Icon name="user" size={11} />{String(recordedBy)}<Icon name="caretR" size={9} />

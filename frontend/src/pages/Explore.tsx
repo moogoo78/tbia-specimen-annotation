@@ -24,6 +24,7 @@ export function Explore() {
   const [filters, setFilters] = useState<Filters>(emptyFilters());
   const [qInput, setQInput] = useState("");
   const [view, setView] = useState<View>("table");
+  const [showFacets, setShowFacets] = useState(true);
   const [sort, setSort] = useState("completeness_score");
   const [offset, setOffset] = useState(0);
   const [activeId, setActiveId] = useState<string | undefined>();
@@ -50,7 +51,7 @@ export function Explore() {
   const location = useLocation();
   const navigate = useNavigate();
   useEffect(() => {
-    const st = location.state as { collector?: CollectorRef; sources?: string[] } | null;
+    const st = location.state as { collector?: CollectorRef; sources?: string[]; bio_group?: string[] } | null;
     if (!st) return;
     if (st.collector) {
       const c = st.collector;
@@ -59,7 +60,11 @@ export function Explore() {
     if (st.sources?.length) {
       setSources((s) => Array.from(new Set([...s, ...st.sources!])));
     }
-    if (st.collector || st.sources?.length) {
+    if (st.bio_group?.length) {
+      const groups = st.bio_group;
+      setFilters((f) => ({ ...f, bio_group: Array.from(new Set([...f.bio_group, ...groups])) }));
+    }
+    if (st.collector || st.sources?.length || st.bio_group?.length) {
       setOffset(0);
       navigate(location.pathname, { replace: true, state: null });
     }
@@ -75,9 +80,16 @@ export function Explore() {
   }, [qInput]);
 
   const order = sort === "scientific_name" || sort === "catalog_number" ? "asc" : "asc";
+  // The map can only plot georeferenced records; without this the gaps-first
+  // sort surfaces the least-complete rows (mostly missing coordinates) and the
+  // map looks empty. A world bbox constrains the fetch to rows with lat/lon.
+  const mapFilters = useMemo<Filters>(
+    () => (effFilters.bbox ? effFilters : { ...effFilters, bbox: "-180,-90,180,90" }),
+    [effFilters],
+  );
   const search = useQuery({
-    queryKey: ["search", effFilters, sort, offset, view === "map"],
-    queryFn: () => api.search(effFilters, sort, order, view === "map" ? 500 : PAGE, offset),
+    queryKey: ["search", view === "map" ? mapFilters : effFilters, sort, offset, view === "map"],
+    queryFn: () => api.search(view === "map" ? mapFilters : effFilters, sort, order, view === "map" ? 500 : PAGE, offset),
     placeholderData: keepPreviousData,
   });
   const facets = useQuery({ queryKey: ["facets", effFilters], queryFn: () => api.facets(effFilters) });
@@ -174,6 +186,12 @@ export function Explore() {
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
       {/* query bar */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: t.panel, borderBottom: `1px solid ${t.border}` }}>
+        <button onClick={() => setShowFacets((s) => !s)} title={tr("search.filters")} style={{
+          display: "flex", alignItems: "center", height: 26, padding: "0 7px", cursor: "pointer",
+          border: `1px solid ${t.border}`,
+          background: showFacets ? t.accentSoft : t.panel,
+          color: showFacets ? t.accent : t.fgMuted,
+        }}><Icon name="filter" size={13} /></button>
         <div style={{ position: "relative", flex: 1, maxWidth: 460 }}>
           <span style={{ position: "absolute", left: 8, top: 6, color: t.fgSubtle }}><Icon name="search" size={12} /></span>
           <input value={qInput} onChange={(e) => setQInput(e.target.value)} placeholder={tr("search.placeholder")} style={{
@@ -218,10 +236,12 @@ export function Explore() {
       )}
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        <FacetPanel facets={facets.data} filters={filters} onToggle={toggle} onToggleFlag={toggleFlag} onClear={clear}
-          registry={registry.data} selectedSources={sources} onToggleSource={toggleSource}
-          selectedCollectors={collectors} onToggleCollector={toggleCollector}
-          onRecordRange={setRecordRange} />
+        {showFacets && (
+          <FacetPanel facets={facets.data} filters={filters} onToggle={toggle} onToggleFlag={toggleFlag} onClear={clear}
+            registry={registry.data} selectedSources={sources} onToggleSource={toggleSource}
+            selectedCollectors={collectors} onToggleCollector={toggleCollector}
+            onRecordRange={setRecordRange} />
+        )}
 
         {view === "split" ? (
           /* split-pane: dense list column + record detail (design variation B) */
