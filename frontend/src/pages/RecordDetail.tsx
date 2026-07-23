@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -324,6 +324,19 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["detail", record.id] });
 
+  // The record's holding-institution code (from registry.json, keyed by the
+  // record's tbia_dataset_id) — shown as a read-only prefix on catalogNumber.
+  const registry = useQuery({ queryKey: ["registry"], queryFn: () => api.registry(), staleTime: Infinity });
+  const institutionCode = useMemo(() => {
+    const dsid = record.tbia_dataset_id as string | undefined;
+    const insts = registry.data?.institutions;
+    if (!dsid || !insts) return null;
+    for (const [code, ent] of Object.entries(insts)) {
+      if (ent.datasets && dsid in ent.datasets) return code;
+    }
+    return null;
+  }, [registry.data, record.tbia_dataset_id]);
+
   // AI transcribe via copy-paste: fetch a ready prompt (lazy), then parse the
   // JSON the user pastes back from their own AI chat — no platform API cost.
   const promptQuery = useQuery({
@@ -540,6 +553,16 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
                       placeholder="0" style={{ ...inputStyle, width: 44 }} /><span style={{ fontSize: 11, color: t.fgSubtle }}>′</span>
                     <input inputMode="numeric" value={values[`${fd.name}.sec`] ?? ""} onChange={(e) => setDms(fd, "sec", e.target.value)}
                       placeholder="0" style={{ ...inputStyle, width: 44 }} /><span style={{ fontSize: 11, color: t.fgSubtle }}>″</span>
+                  </div>
+                ) : fd.name === "catalogNumber" && institutionCode ? (
+                  <div style={{ display: "flex", alignItems: "stretch" }}>
+                    <span title="institutionCode" style={{
+                      display: "flex", alignItems: "center", padding: "0 7px", fontSize: 12,
+                      fontFamily: t.mono, color: t.fgMuted, background: t.panelAlt,
+                      border: `1px solid ${t.border}`, borderRight: "none", whiteSpace: "nowrap",
+                    }}>{institutionCode}</span>
+                    <input value={values[fd.name] ?? ""} onChange={(e) => setVal(fd.name, e.target.value)}
+                      placeholder={tr("annotate.proposed")} style={{ ...inputStyle, width: "auto", flex: 1, minWidth: 0, borderLeft: "none" }} />
                   </div>
                 ) : (
                   <input value={values[fd.name] ?? ""} onChange={(e) => setVal(fd.name, e.target.value)}
