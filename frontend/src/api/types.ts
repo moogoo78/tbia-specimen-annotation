@@ -105,6 +105,14 @@ export interface ExtractPromptResponse {
   prompt: string;
 }
 
+export interface TranscribeRequest {
+  id: number;
+  occurrence_id: string;
+  contributor_id: number;
+  created: string;
+  notified: boolean;
+}
+
 export interface DevUser { email: string; display_name: string; role: string; }
 export interface DevLoginConfig { enabled: boolean; users: DevUser[]; }
 

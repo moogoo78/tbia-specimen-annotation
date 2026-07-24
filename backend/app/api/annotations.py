@@ -4,16 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import auth, duck, extract, search
+from .. import auth, duck, extract, notify, search
 from ..annotations_store import _serialize
 from ..db import get_session
-from ..models import Annotation, User
+from ..models import Annotation, TranscribeRequest, User
 from ..schemas import (
     AnnotationCreate,
     AnnotationUpdate,
     ExtractPaste,
     ExtractPromptResponse,
     ExtractResponse,
+    TranscribeRequestOut,
 )
 
 router = APIRouter(prefix="/api", tags=["annotations"])
@@ -53,6 +54,30 @@ async def ai_extract_paste(
         return extract.parse_pasted(occ_id, body.raw)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/occurrences/{occ_id}/transcribe-request", response_model=TranscribeRequestOut)
+async def schedule_transcribe(
+    occ_id: str,
+    user: User = Depends(auth.current_user),
+    db: Session = Depends(get_session),
+):
+    """Schedule a record for transcription: persist a minimal request (occurrence
+    id + who scheduled it) and ping Discord. The Discord ping is best-effort and
+    never blocks the request."""
+    record = await duck.query_one("SELECT id FROM occurrences WHERE id = ?", [occ_id])
+    if record is None:
+        raise HTTPException(status_code=404, detail="Occurrence not found")
+
+    req = TranscribeRequest(occurrence_id=occ_id, contributor_id=user.id)
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+
+    notified = notify.transcribe_scheduled(occ_id, user.display_name)
+    out = TranscribeRequestOut.model_validate(req)
+    out.notified = notified
+    return out
 
 
 @router.post("/occurrences/{occ_id}/annotations")

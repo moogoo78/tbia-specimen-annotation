@@ -79,6 +79,18 @@ class Annotation(Base):
 Index("idx_ann_occ_status", Annotation.occurrence_id, Annotation.status)
 
 
+class TranscribeRequest(Base):
+    """A contributor scheduling a record for (AI) transcription. Deliberately
+    minimal — just the TBIA occurrence id and who scheduled it (+ when)."""
+
+    __tablename__ = "transcribe_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    occurrence_id: Mapped[str] = mapped_column(String(64), index=True)
+    contributor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
 class Collector(Base):
     """A canonical collector (person). Enrichment over the read-only occurrence
     store: occurrences map in via ``CollectorAlias.recorded_by`` (the raw string),

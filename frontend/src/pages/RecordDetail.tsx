@@ -321,6 +321,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   const [showPrompt, setShowPrompt] = useState(false);
   const [pasteRaw, setPasteRaw] = useState("");
   const [copied, setCopied] = useState(false);
+  const [scheduled, setScheduled] = useState(false);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["detail", record.id] });
 
@@ -410,6 +411,12 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
     mutationFn: ({ annId, status }: { annId: number; status: string }) => api.updateAnnotation(annId, { status }),
     onSuccess: refresh,
   });
+  // Schedule this record for transcription (persists occ id + user id, then
+  // best-effort Discord notification). Independent of submitting annotations.
+  const scheduleReq = useMutation({
+    mutationFn: () => api.scheduleTranscribe(record.id),
+    onSuccess: () => { setScheduled(true); setTimeout(() => setScheduled(false), 5000); },
+  });
 
   const isReviewer = user?.role === "reviewer" || user?.role === "admin";
 
@@ -428,8 +435,21 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
     <div style={{ background: t.panel, border: `1px solid ${t.border}` }}>
       <div style={{ padding: "4px 8px", background: t.accentSoft, borderBottom: `1px solid ${t.borderSoft}`, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: t.accent, display: "flex", alignItems: "center", gap: 5 }}>
         <Icon name="spark" size={11} />{tr("annotate.title")}
+        <div style={{ flex: 1 }} />
+        <button onClick={() => scheduleReq.mutate()} disabled={scheduleReq.isPending || scheduled}
+          title={tr("annotate.scheduleTranscribeHint")}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 7px",
+            fontSize: 10, fontWeight: 600, letterSpacing: 0.2, cursor: scheduled ? "default" : "pointer",
+            border: `1px solid ${scheduled ? t.ok : t.accent}`, background: t.panel,
+            color: scheduled ? t.ok : t.accent, textTransform: "none",
+          }}>
+          <Icon name={scheduled ? "check" : "alert"} size={10} />
+          {scheduleReq.isPending ? "…" : scheduled ? tr("annotate.scheduled") : tr("annotate.scheduleTranscribe")}
+        </button>
       </div>
       <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+        {scheduleReq.isError && <div style={{ fontSize: 10, color: t.danger }}>{(scheduleReq.error as Error).message}</div>}
         {/* AI transcribe — copy-paste flow (no platform API cost) */}
         <Button small onClick={() => setShowPrompt((s) => !s)}>
           <Icon name="spark" size={11} />{tr("annotate.aiPrompt")}

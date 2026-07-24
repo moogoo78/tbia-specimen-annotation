@@ -26,6 +26,9 @@ services:
       # round-trip on localhost). Defaults off; set NDB_DEV_LOGIN=true in .env
       # for local testing. MUST stay false in any deployed environment.
       NDB_DEV_LOGIN: ${NDB_DEV_LOGIN:-false}
+      # Review-request Discord ping (plain env vars, no NDB_ prefix)
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
 
   frontend:
     build: ./frontend

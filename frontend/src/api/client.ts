@@ -104,6 +104,10 @@ export const api = {
     request<import("./types").ExtractResponse>(`/occurrences/${id}/extract-paste`, {
       method: "POST", body: JSON.stringify({ raw }),
     }),
+  scheduleTranscribe: (id: string) =>
+    request<import("./types").TranscribeRequest>(`/occurrences/${id}/transcribe-request`, {
+      method: "POST",
+    }),
   createAnnotation: (id: string, body: Record<string, unknown>) =>
     request<import("./types").Annotation>(`/occurrences/${id}/annotations`, {
       method: "POST", body: JSON.stringify(body),

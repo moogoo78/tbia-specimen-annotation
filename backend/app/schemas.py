@@ -115,3 +115,13 @@ class ExtractPromptResponse(BaseModel):
 
 class ExtractPaste(BaseModel):
     raw: str
+
+
+class TranscribeRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    occurrence_id: str
+    contributor_id: int
+    created: datetime
+    notified: bool = False  # whether a Discord ping was actually sent

@@ -54,6 +54,16 @@ class Settings(BaseSettings):
     # Comma-separated origins allowed by CORS (the Vite dev server).
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    # Discord webhook for "request review" pings (empty -> notifications are
+    # skipped; the request is still persisted). Create one in a Discord channel
+    # under Integrations → Webhooks and paste its URL. Plain env vars (no NDB_).
+    discord_webhook_url: str = Field(default="", validation_alias="DISCORD_WEBHOOK_URL")
+    # Public base URL of the frontend, used to build clickable record links in
+    # the Discord message (e.g. https://tbia.example.org).
+    app_base_url: str = Field(
+        default="http://localhost:5173", validation_alias="APP_BASE_URL"
+    )
+
     @property
     def sqlite_url(self) -> str:
         return f"sqlite:///{self.sqlite_path}"
