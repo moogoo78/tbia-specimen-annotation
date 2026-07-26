@@ -26,7 +26,8 @@ ingest-sample:
 seed:
 	cd backend && .venv/bin/python -m app.seed
 
-# Drain pending AI transcription requests (needs ANTHROPIC_API_KEY). Cron this.
+# Drain pending AI transcription requests (needs ANTHROPIC_API_KEY). Run on
+# demand; it processes what's queued and exits (cron it later if you want).
 transcribe:
 	cd backend && .venv/bin/python -m app.worker
 

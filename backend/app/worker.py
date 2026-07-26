@@ -1,5 +1,5 @@
 """Batch transcription worker. Drains pending transcribe_requests once and
-exits — run it from cron (or `make transcribe`) at whatever cadence you want.
+exits — run it on demand (`make transcribe`), or cron it later if you want.
 
     python -m app.worker            # process up to TRANSCRIBE_BATCH pending
     python -m app.worker --limit 5  # process at most 5
