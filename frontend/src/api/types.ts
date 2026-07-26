@@ -113,6 +113,12 @@ export interface TranscribeRequest {
   notified: boolean;
 }
 
+export interface TranscribeOptions {
+  mode?: "single" | "two_stage";
+  ocr_model?: string;
+  field_model?: string;
+}
+
 export interface DevUser { email: string; display_name: string; role: string; }
 export interface DevLoginConfig { enabled: boolean; users: DevUser[]; }
 

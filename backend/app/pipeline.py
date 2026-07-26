@@ -43,23 +43,29 @@ _ORIGINAL_COLUMN = {
 }
 
 
-def transcribe_record(record: dict) -> ExtractResponse:
-    """Read a specimen label into proposed annotation fields. Dispatches on
-    settings.transcribe_mode. Raises ValueError when the record has no image."""
+def transcribe_record(
+    record: dict, *, mode: str | None = None,
+    ocr_model: str | None = None, field_model: str | None = None,
+) -> ExtractResponse:
+    """Read a specimen label into proposed annotation fields. mode/models default
+    to the global settings when not overridden. Raises ValueError when the record
+    has no image."""
     image_url = _image_url(record)
-    if settings.transcribe_mode == "single":
-        return _transcribe_single(record, image_url)
-    return _transcribe_two_stage(record, image_url)
+    mode = mode or settings.transcribe_mode
+    field_model = field_model or (settings.anthropic_model if mode == "single" else settings.field_model)
+    if mode == "single":
+        return _transcribe_single(record, image_url, field_model)
+    return _transcribe_two_stage(record, image_url, ocr_model or settings.ocr_model, field_model)
 
 
-def _transcribe_single(record: dict, image_url: str) -> ExtractResponse:
-    """One Claude vision call: OCR + field extraction together (anthropic_model).
-    The model sees the image while assigning fields, so it can disambiguate
-    hard-to-read values against the pixels."""
+def _transcribe_single(record: dict, image_url: str, model: str) -> ExtractResponse:
+    """One Claude vision call: OCR + field extraction together. The model sees the
+    image while assigning fields, so it can disambiguate hard-to-read values
+    against the pixels."""
     prompt = extract.build_prompt(record).prompt
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
     resp = client.messages.create(
-        model=settings.anthropic_model,
+        model=model,
         max_tokens=4096,
         messages=[{
             "role": "user",
@@ -77,26 +83,26 @@ def _transcribe_single(record: dict, image_url: str) -> ExtractResponse:
     return out
 
 
-def _transcribe_two_stage(record: dict, image_url: str) -> ExtractResponse:
+def _transcribe_two_stage(record: dict, image_url: str, ocr_model: str, field_model: str) -> ExtractResponse:
     """Two calls: ocr_model (vision) transcribes the label to verbatim text, then
     field_model (text-only) structures that text into fields. Cheaper — image
     tokens land on the OCR model — but the field model can't re-read the pixels,
     so OCR errors propagate. The verbatim text itself is kept as full_text."""
     client = anthropic.Anthropic()
-    full_text = _ocr_label(client, image_url)
-    out = _fields_from_text(client, record, full_text)
+    full_text = _ocr_label(client, image_url, ocr_model)
+    out = _fields_from_text(client, record, full_text, field_model)
     if not any(f.field == "full_text" for f in out.fields):
         out.fields.append(ExtractedField(field="full_text", value=full_text, confidence=0.9))
     out.image_url = image_url
     out.service = "anthropic (2-stage)"
-    out.model = f"{settings.ocr_model} + {settings.field_model}"
+    out.model = f"{ocr_model} + {field_model}"
     return out
 
 
-def _ocr_label(client: anthropic.Anthropic, image_url: str) -> str:
+def _ocr_label(client: anthropic.Anthropic, image_url: str, ocr_model: str) -> str:
     """Stage 1 — vision OCR to verbatim label text."""
     resp = client.messages.create(
-        model=settings.ocr_model,
+        model=ocr_model,
         max_tokens=2048,
         messages=[{
             "role": "user",
@@ -112,7 +118,7 @@ def _ocr_label(client: anthropic.Anthropic, image_url: str) -> str:
     return text
 
 
-def _fields_from_text(client: anthropic.Anthropic, record: dict, full_text: str) -> ExtractResponse:
+def _fields_from_text(client: anthropic.Anthropic, record: dict, full_text: str, field_model: str) -> ExtractResponse:
     """Stage 2 — text-only structuring of the OCR transcript into fields."""
     fields = [f for f in extract._target_fields(record) if f != "full_text"]
     field_lines = "\n".join(f"- {f}: {extract.PROMPTABLE_FIELDS[f]}" for f in fields)
@@ -130,7 +136,7 @@ def _fields_from_text(client: anthropic.Anthropic, record: dict, full_text: str)
         f"{field_lines}"
     )
     resp = client.messages.create(
-        model=settings.field_model, max_tokens=2048,
+        model=field_model, max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
     )
     text = "".join(b.text for b in resp.content if b.type == "text")
@@ -153,7 +159,9 @@ async def process_one(db: Session, req: TranscribeRequest) -> int:
         record = await search.get_detail(req.occurrence_id)
         if record is None:
             raise ValueError("occurrence not found")
-        result = transcribe_record(record)
+        result = transcribe_record(
+            record, mode=req.mode, ocr_model=req.ocr_model, field_model=req.field_model,
+        )
 
         n = 0
         for field in result.fields:

@@ -117,6 +117,13 @@ class ExtractPaste(BaseModel):
     raw: str
 
 
+class TranscribeOptions(BaseModel):
+    """Per-request pipeline overrides (all optional -> global settings)."""
+    mode: str | None = None          # "single" | "two_stage"
+    ocr_model: str | None = None     # two_stage stage-1 vision model
+    field_model: str | None = None   # primary field model (both modes)
+
+
 class TranscribeRequestOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

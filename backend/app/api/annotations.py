@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from ..schemas import (
     ExtractPaste,
     ExtractPromptResponse,
     ExtractResponse,
+    TranscribeOptions,
     TranscribeRequestOut,
 )
 
@@ -59,17 +60,25 @@ async def ai_extract_paste(
 @router.post("/occurrences/{occ_id}/transcribe-request", response_model=TranscribeRequestOut)
 async def schedule_transcribe(
     occ_id: str,
+    opts: TranscribeOptions | None = Body(default=None),
     user: User = Depends(auth.current_user),
     db: Session = Depends(get_session),
 ):
-    """Schedule a record for transcription: persist a minimal request (occurrence
-    id + who scheduled it) and ping Discord. The Discord ping is best-effort and
-    never blocks the request."""
+    """Schedule a record for transcription: persist the request (occurrence id +
+    who scheduled it + optional pipeline overrides) and ping Discord. The Discord
+    ping is best-effort and never blocks the request."""
     record = await duck.query_one("SELECT id FROM occurrences WHERE id = ?", [occ_id])
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")
 
-    req = TranscribeRequest(occurrence_id=occ_id, contributor_id=user.id)
+    opts = opts or TranscribeOptions()
+    if opts.mode is not None and opts.mode not in ("single", "two_stage"):
+        raise HTTPException(status_code=400, detail="mode must be 'single' or 'two_stage'")
+
+    req = TranscribeRequest(
+        occurrence_id=occ_id, contributor_id=user.id,
+        mode=opts.mode, ocr_model=opts.ocr_model, field_model=opts.field_model,
+    )
     db.add(req)
     db.commit()
     db.refresh(req)

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
-import type { ExtractedField, OccurrenceDetail } from "../api/types";
+import type { ExtractedField, OccurrenceDetail, TranscribeOptions } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
 
@@ -64,6 +64,15 @@ const ANNOTATABLE_GROUPS: { labelKey: string; fields: FieldDef[] }[] = [
   ] },
 ];
 const ALL_FIELDS: FieldDef[] = ANNOTATABLE_GROUPS.flatMap((g) => g.fields);
+
+// "Schedule" presets for the AI transcription pipeline. `opts` undefined = let
+// the server use its configured default (TRANSCRIBE_MODE / models).
+const TRANSCRIBE_PRESETS: { label: string; opts?: TranscribeOptions }[] = [
+  { label: "Auto" },
+  { label: "Opus", opts: { mode: "single", field_model: "claude-opus-4-8" } },
+  { label: "Sonnet→Opus", opts: { mode: "two_stage", ocr_model: "claude-sonnet-5", field_model: "claude-opus-4-8" } },
+  { label: "Haiku→Opus", opts: { mode: "two_stage", ocr_model: "claude-haiku-4-5", field_model: "claude-opus-4-8" } },
+];
 
 // Composite widgets keep their parts under dotted sub-keys in the values map;
 // these turn the sub-keys into the single string that gets submitted.
@@ -322,6 +331,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   const [pasteRaw, setPasteRaw] = useState("");
   const [copied, setCopied] = useState(false);
   const [scheduled, setScheduled] = useState(false);
+  const [preset, setPreset] = useState(0);  // index into TRANSCRIBE_PRESETS
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["detail", record.id] });
 
@@ -414,7 +424,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   // Schedule this record for transcription (persists occ id + user id, then
   // best-effort Discord notification). Independent of submitting annotations.
   const scheduleReq = useMutation({
-    mutationFn: () => api.scheduleTranscribe(record.id),
+    mutationFn: (opts?: TranscribeOptions) => api.scheduleTranscribe(record.id, opts),
     onSuccess: () => { setScheduled(true); setTimeout(() => setScheduled(false), 5000); },
   });
 
@@ -436,7 +446,16 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
       <div style={{ padding: "4px 8px", background: t.accentSoft, borderBottom: `1px solid ${t.borderSoft}`, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: t.accent, display: "flex", alignItems: "center", gap: 5 }}>
         <Icon name="spark" size={11} />{tr("annotate.title")}
         <div style={{ flex: 1 }} />
-        <button onClick={() => scheduleReq.mutate()} disabled={scheduleReq.isPending || scheduled}
+        <select value={preset} onChange={(e) => setPreset(Number(e.target.value))} disabled={scheduleReq.isPending || scheduled}
+          title={tr("annotate.transcribeModel")} style={{
+            fontSize: 10, fontFamily: t.sans, textTransform: "none", padding: "1px 2px",
+            border: `1px solid ${t.border}`, background: t.panel, color: t.fgMuted,
+          }}>
+          {TRANSCRIBE_PRESETS.map((p, i) => (
+            <option key={i} value={i}>{i === 0 ? tr("annotate.tmAuto") : p.label}</option>
+          ))}
+        </select>
+        <button onClick={() => scheduleReq.mutate(TRANSCRIBE_PRESETS[preset].opts)} disabled={scheduleReq.isPending || scheduled}
           title={tr("annotate.scheduleTranscribeHint")}
           style={{
             display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 7px",
