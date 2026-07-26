@@ -89,6 +89,10 @@ class TranscribeRequest(Base):
     occurrence_id: Mapped[str] = mapped_column(String(64), index=True)
     contributor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     created: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    # Worker lifecycle: pending -> done | failed.
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    error: Mapped[str | None] = mapped_column(Text)
 
 
 class Collector(Base):

@@ -26,6 +26,10 @@ ingest-sample:
 seed:
 	cd backend && .venv/bin/python -m app.seed
 
+# Drain pending AI transcription requests (needs ANTHROPIC_API_KEY). Cron this.
+transcribe:
+	cd backend && .venv/bin/python -m app.worker
+
 # Build the collector table + alias map from recorded_by (run after `make ingest`).
 seed-collectors:
 	cd backend && .venv/bin/python -m app.seed_collectors

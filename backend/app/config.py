@@ -64,6 +64,14 @@ class Settings(BaseSettings):
         default="http://localhost:5173", validation_alias="APP_BASE_URL"
     )
 
+    # AI transcription pipeline (the batch worker that drains transcribe_requests
+    # and calls Claude vision). ANTHROPIC_API_KEY is read by the SDK directly;
+    # without it the worker skips API calls. Plain env vars (no NDB_ prefix).
+    anthropic_model: str = Field(
+        default="claude-opus-4-8", validation_alias="ANTHROPIC_MODEL"
+    )
+    transcribe_batch: int = Field(default=20, validation_alias="TRANSCRIBE_BATCH")
+
     @property
     def sqlite_url(self) -> str:
         return f"sqlite:///{self.sqlite_path}"

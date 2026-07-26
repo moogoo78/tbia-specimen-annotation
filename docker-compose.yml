@@ -29,6 +29,9 @@ services:
       # Review-request Discord ping (plain env vars, no NDB_ prefix)
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+      # AI transcription pipeline (batch worker: `make transcribe` / cron)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-8}
 
   frontend:
     build: ./frontend
