@@ -23,9 +23,16 @@ from sqlalchemy.orm import Session
 from . import extract, search
 from .config import settings
 from .models import Annotation, TranscribeRequest
-from .schemas import ExtractResponse
+from .schemas import ExtractedField, ExtractResponse
 
 log = logging.getLogger("pipeline")
+
+_OCR_PROMPT = (
+    "Transcribe the natural-history specimen label in this image verbatim.\n"
+    "Output ONLY the transcribed text — every line in reading order, preserving "
+    "the original language (Chinese or Latin as written). Do not translate, "
+    "interpret, summarize, or add commentary. Mark unreadable parts as [illegible]."
+)
 
 # tbia annotation field -> occurrence column, for the annotation's original_value
 # (reference/diff). `annotation*`/`verbatim*` fields have no occurrence value.
@@ -37,17 +44,18 @@ _ORIGINAL_COLUMN = {
 
 
 def transcribe_record(record: dict) -> ExtractResponse:
-    """One Claude vision call: read the specimen label into proposed fields.
+    """Read a specimen label into proposed annotation fields. Dispatches on
+    settings.transcribe_mode. Raises ValueError when the record has no image."""
+    image_url = _image_url(record)
+    if settings.transcribe_mode == "single":
+        return _transcribe_single(record, image_url)
+    return _transcribe_two_stage(record, image_url)
 
-    Sends the first media image plus the transcription prompt, then parses the
-    model's JSON reply with the same defensive parser the copy-paste flow uses.
-    Raises ValueError when the record has no image."""
-    occ_id = record.get("id", "")
-    media = record.get("media") or []
-    image_url = media[0] if media else None
-    if not image_url:
-        raise ValueError("record has no image to transcribe")
 
+def _transcribe_single(record: dict, image_url: str) -> ExtractResponse:
+    """One Claude vision call: OCR + field extraction together (anthropic_model).
+    The model sees the image while assigning fields, so it can disambiguate
+    hard-to-read values against the pixels."""
     prompt = extract.build_prompt(record).prompt
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
     resp = client.messages.create(
@@ -62,11 +70,78 @@ def transcribe_record(record: dict) -> ExtractResponse:
         }],
     )
     text = "".join(b.text for b in resp.content if b.type == "text")
-    out = extract.parse_pasted(occ_id, text)  # validates + clamps confidence
+    out = extract.parse_pasted(record.get("id", ""), text)  # validates + clamps
     out.image_url = image_url
     out.model = resp.model
     out.service = "anthropic"
     return out
+
+
+def _transcribe_two_stage(record: dict, image_url: str) -> ExtractResponse:
+    """Two calls: ocr_model (vision) transcribes the label to verbatim text, then
+    field_model (text-only) structures that text into fields. Cheaper — image
+    tokens land on the OCR model — but the field model can't re-read the pixels,
+    so OCR errors propagate. The verbatim text itself is kept as full_text."""
+    client = anthropic.Anthropic()
+    full_text = _ocr_label(client, image_url)
+    out = _fields_from_text(client, record, full_text)
+    if not any(f.field == "full_text" for f in out.fields):
+        out.fields.append(ExtractedField(field="full_text", value=full_text, confidence=0.9))
+    out.image_url = image_url
+    out.service = "anthropic (2-stage)"
+    out.model = f"{settings.ocr_model} + {settings.field_model}"
+    return out
+
+
+def _ocr_label(client: anthropic.Anthropic, image_url: str) -> str:
+    """Stage 1 — vision OCR to verbatim label text."""
+    resp = client.messages.create(
+        model=settings.ocr_model,
+        max_tokens=2048,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "url", "url": image_url}},
+                {"type": "text", "text": _OCR_PROMPT},
+            ],
+        }],
+    )
+    text = "".join(b.text for b in resp.content if b.type == "text").strip()
+    if not text:
+        raise ValueError("OCR stage returned no text")
+    return text
+
+
+def _fields_from_text(client: anthropic.Anthropic, record: dict, full_text: str) -> ExtractResponse:
+    """Stage 2 — text-only structuring of the OCR transcript into fields."""
+    fields = [f for f in extract._target_fields(record) if f != "full_text"]
+    field_lines = "\n".join(f"- {f}: {extract.PROMPTABLE_FIELDS[f]}" for f in fields)
+    prompt = (
+        "You are extracting structured fields from a transcribed natural-history "
+        "specimen label.\n\nVerbatim label text:\n---\n"
+        f"{full_text}\n---\n\n"
+        "Use ONLY what the text supports — do not invent values. Keep taxonomy and "
+        "place names in their original language.\n"
+        "Return STRICT JSON only — no explanation, no markdown code fences — using "
+        "exactly this shape, with a confidence from 0.0 to 1.0 per field, and omit "
+        "any field the text does not support:\n"
+        '{"fields": [{"field": "<name>", "value": "<text>", "confidence": 0.0}]}\n\n'
+        "Fields to extract (use these exact field names):\n"
+        f"{field_lines}"
+    )
+    resp = client.messages.create(
+        model=settings.field_model, max_tokens=2048,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = "".join(b.text for b in resp.content if b.type == "text")
+    return extract.parse_pasted(record.get("id", ""), text)
+
+
+def _image_url(record: dict) -> str:
+    media = record.get("media") or []
+    if not media:
+        raise ValueError("record has no image to transcribe")
+    return media[0]
 
 
 async def process_one(db: Session, req: TranscribeRequest) -> int:

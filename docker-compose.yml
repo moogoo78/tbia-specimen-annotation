@@ -32,6 +32,9 @@ services:
       # AI transcription pipeline (batch worker: `make transcribe` / cron)
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-8}
+      TRANSCRIBE_MODE: ${TRANSCRIBE_MODE:-two_stage}
+      OCR_MODEL: ${OCR_MODEL:-claude-sonnet-5}
+      FIELD_MODEL: ${FIELD_MODEL:-claude-opus-4-8}
 
   frontend:
     build: ./frontend

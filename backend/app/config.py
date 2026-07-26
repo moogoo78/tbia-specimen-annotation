@@ -71,6 +71,12 @@ class Settings(BaseSettings):
         default="claude-opus-4-8", validation_alias="ANTHROPIC_MODEL"
     )
     transcribe_batch: int = Field(default=20, validation_alias="TRANSCRIBE_BATCH")
+    # "single" = one Claude vision call does OCR + fields (uses anthropic_model).
+    # "two_stage" = ocr_model reads the label to verbatim text, then field_model
+    # (text-only) structures it into annotation fields — cheaper image tokens.
+    transcribe_mode: str = Field(default="two_stage", validation_alias="TRANSCRIBE_MODE")
+    ocr_model: str = Field(default="claude-sonnet-5", validation_alias="OCR_MODEL")
+    field_model: str = Field(default="claude-opus-4-8", validation_alias="FIELD_MODEL")
 
     @property
     def sqlite_url(self) -> str:
