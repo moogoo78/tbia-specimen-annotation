@@ -74,10 +74,12 @@ async def occurrence_detail(occ_id: str):
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")
     try:
-        from ..annotations_store import list_for_occurrence
+        from ..annotations_store import latest_transcribe_request, list_for_occurrence
         record["annotations"] = list_for_occurrence(occ_id)
+        record["transcribe"] = latest_transcribe_request(occ_id)
     except Exception:
         record["annotations"] = []
+        record["transcribe"] = None
     return record
 
 

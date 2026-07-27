@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth, duck, extract, notify, search
 from ..annotations_store import _serialize
+from ..config import settings
 from ..db import get_session
 from ..models import Annotation, TranscribeRequest, User
 from ..schemas import (
@@ -14,6 +15,7 @@ from ..schemas import (
     ExtractPaste,
     ExtractPromptResponse,
     ExtractResponse,
+    TranscribeConfig,
     TranscribeOptions,
     TranscribeRequestOut,
 )
@@ -57,6 +59,18 @@ async def ai_extract_paste(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/transcribe/config", response_model=TranscribeConfig)
+async def transcribe_config():
+    """The models the "auto" preset resolves to. Mirrors the fallback logic in
+    pipeline.transcribe_record: single mode uses anthropic_model and no OCR pass;
+    two_stage uses ocr_model -> field_model."""
+    if settings.transcribe_mode == "single":
+        return TranscribeConfig(mode="single", ocr_model=None, field_model=settings.anthropic_model)
+    return TranscribeConfig(
+        mode="two_stage", ocr_model=settings.ocr_model, field_model=settings.field_model,
+    )
+
+
 @router.post("/occurrences/{occ_id}/transcribe-request", response_model=TranscribeRequestOut)
 async def schedule_transcribe(
     occ_id: str,
@@ -83,7 +97,7 @@ async def schedule_transcribe(
     db.commit()
     db.refresh(req)
 
-    notified = notify.transcribe_scheduled(occ_id, user.display_name)
+    notified = notify.transcribe_scheduled(occ_id, user.id)
     out = TranscribeRequestOut.model_validate(req)
     out.notified = notified
     return out

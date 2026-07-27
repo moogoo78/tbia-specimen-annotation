@@ -65,13 +65,14 @@ const ANNOTATABLE_GROUPS: { labelKey: string; fields: FieldDef[] }[] = [
 ];
 const ALL_FIELDS: FieldDef[] = ANNOTATABLE_GROUPS.flatMap((g) => g.fields);
 
-// "Schedule" presets for the AI transcription pipeline. `opts` undefined = let
-// the server use its configured default (TRANSCRIBE_MODE / models).
-const TRANSCRIBE_PRESETS: { label: string; opts?: TranscribeOptions }[] = [
-  { label: "Auto" },
-  { label: "Opus", opts: { mode: "single", field_model: "claude-opus-4-8" } },
-  { label: "Sonnet→Opus", opts: { mode: "two_stage", ocr_model: "claude-sonnet-5", field_model: "claude-opus-4-8" } },
-  { label: "Haiku→Opus", opts: { mode: "two_stage", ocr_model: "claude-haiku-4-5", field_model: "claude-opus-4-8" } },
+// Engine presets for the AI transcription pipeline, named by what the choice
+// means to a curator (cost/accuracy) rather than by model. The model chain is
+// shown as secondary text. `opts` undefined = let the server use its configured
+// default (TRANSCRIBE_MODE / models).
+const TRANSCRIBE_PRESETS: { labelKey: string; detail?: string; opts?: TranscribeOptions }[] = [
+  { labelKey: "annotate.tmAuto" },
+  { labelKey: "annotate.tmAccurate", detail: "Opus", opts: { mode: "single", field_model: "claude-opus-4-8" } },
+  { labelKey: "annotate.tmCheap", detail: "Haiku→Opus", opts: { mode: "two_stage", ocr_model: "claude-haiku-4-5", field_model: "claude-opus-4-8" } },
 ];
 
 // Composite widgets keep their parts under dotted sub-keys in the values map;
@@ -110,7 +111,14 @@ export function RecordDetail() {
 // Reusable record body. `embedded` (split pane) hides the back link.
 export function RecordDetailView({ id, embedded }: { id: string; embedded?: boolean }) {
   const { t: tr } = useTranslation();
-  const q = useQuery({ queryKey: ["detail", id], queryFn: () => api.detail(id) });
+  // While an AI transcription request is queued, poll so the panel flips to
+  // "processed" (and the new AI annotations appear) without a manual reload —
+  // the batch worker runs on demand, so there's no completion event to wait on.
+  const q = useQuery({
+    queryKey: ["detail", id],
+    queryFn: () => api.detail(id),
+    refetchInterval: (query) => (query.state.data?.transcribe?.status === "pending" ? 20_000 : false),
+  });
 
   // Draggable divider between the read-only fields (left) and the media +
   // annotation column (right). Width persists across records/sessions.
@@ -324,14 +332,6 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   // apart ai (kept verbatim), mixed (AI value then edited), manual (typed).
   const [aiSeed, setAiSeed] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
-  const [drafts, setDrafts] = useState<ExtractedField[]>([]);
-  // Provenance of the last pasted AI draft: service · model (date).
-  const [prov, setProv] = useState<{ model: string; service?: string | null; extracted_at?: string | null } | null>(null);
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [pasteRaw, setPasteRaw] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [scheduled, setScheduled] = useState(false);
-  const [preset, setPreset] = useState(0);  // index into TRANSCRIBE_PRESETS
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["detail", record.id] });
 
@@ -348,27 +348,6 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
     return null;
   }, [registry.data, record.tbia_dataset_id]);
 
-  // AI transcribe via copy-paste: fetch a ready prompt (lazy), then parse the
-  // JSON the user pastes back from their own AI chat — no platform API cost.
-  const promptQuery = useQuery({
-    queryKey: ["extract-prompt", record.id],
-    queryFn: () => api.extractPrompt(record.id),
-    enabled: showPrompt,
-  });
-  const pasteMut = useMutation({
-    mutationFn: () => api.extractPaste(record.id, pasteRaw),
-    onSuccess: (res) => {
-      setDrafts(res.fields); setProv({ model: res.model, service: res.service, extracted_at: res.extracted_at });
-      setShowPrompt(false); setPasteRaw("");
-    },
-  });
-  const copyPrompt = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch { /* clipboard unavailable */ }
-  };
   // Fields (across every class) that currently hold a proposed value.
   const filled = ALL_FIELDS
     .map((fd) => ({ fd, value: serializeField(fd, values) }))
@@ -421,12 +400,6 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
     mutationFn: ({ annId, status }: { annId: number; status: string }) => api.updateAnnotation(annId, { status }),
     onSuccess: refresh,
   });
-  // Schedule this record for transcription (persists occ id + user id, then
-  // best-effort Discord notification). Independent of submitting annotations.
-  const scheduleReq = useMutation({
-    mutationFn: (opts?: TranscribeOptions) => api.scheduleTranscribe(record.id, opts),
-    onSuccess: () => { setScheduled(true); setTimeout(() => setScheduled(false), 5000); },
-  });
 
   const isReviewer = user?.role === "reviewer" || user?.role === "admin";
 
@@ -445,87 +418,12 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
     <div style={{ background: t.panel, border: `1px solid ${t.border}` }}>
       <div style={{ padding: "4px 8px", background: t.accentSoft, borderBottom: `1px solid ${t.borderSoft}`, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: t.accent, display: "flex", alignItems: "center", gap: 5 }}>
         <Icon name="spark" size={11} />{tr("annotate.title")}
-        <div style={{ flex: 1 }} />
-        <select value={preset} onChange={(e) => setPreset(Number(e.target.value))} disabled={scheduleReq.isPending || scheduled}
-          title={tr("annotate.transcribeModel")} style={{
-            fontSize: 10, fontFamily: t.sans, textTransform: "none", padding: "1px 2px",
-            border: `1px solid ${t.border}`, background: t.panel, color: t.fgMuted,
-          }}>
-          {TRANSCRIBE_PRESETS.map((p, i) => (
-            <option key={i} value={i}>{i === 0 ? tr("annotate.tmAuto") : p.label}</option>
-          ))}
-        </select>
-        <button onClick={() => scheduleReq.mutate(TRANSCRIBE_PRESETS[preset].opts)} disabled={scheduleReq.isPending || scheduled}
-          title={tr("annotate.scheduleTranscribeHint")}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 7px",
-            fontSize: 10, fontWeight: 600, letterSpacing: 0.2, cursor: scheduled ? "default" : "pointer",
-            border: `1px solid ${scheduled ? t.ok : t.accent}`, background: t.panel,
-            color: scheduled ? t.ok : t.accent, textTransform: "none",
-          }}>
-          <Icon name={scheduled ? "check" : "alert"} size={10} />
-          {scheduleReq.isPending ? "…" : scheduled ? tr("annotate.scheduled") : tr("annotate.scheduleTranscribe")}
-        </button>
       </div>
       <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-        {scheduleReq.isError && <div style={{ fontSize: 10, color: t.danger }}>{(scheduleReq.error as Error).message}</div>}
-        {/* AI transcribe — copy-paste flow (no platform API cost) */}
-        <Button small onClick={() => setShowPrompt((s) => !s)}>
-          <Icon name="spark" size={11} />{tr("annotate.aiPrompt")}
-        </Button>
-        {showPrompt && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: 8, background: t.panelAlt, border: `1px solid ${t.borderSoft}` }}>
-            <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.5 }}>{tr("annotate.aiPromptHint")}</div>
-            {promptQuery.isLoading && <Spinner />}
-            {promptQuery.data && (
-              <>
-                {promptQuery.data.image_url ? (
-                  <a href={promptQuery.data.image_url} target="_blank" rel="noreferrer"
-                    style={{ color: t.accent, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <Icon name="img" size={11} />{tr("annotate.openImage")} ↗
-                  </a>
-                ) : (
-                  <div style={{ fontSize: 10, color: t.warn }}>{tr("annotate.noImageWarn")}</div>
-                )}
-                <textarea readOnly value={promptQuery.data.prompt}
-                  onFocus={(e) => e.currentTarget.select()}
-                  style={{ ...textareaStyle, height: 130 }} />
-                <Button small onClick={() => copyPrompt(promptQuery.data!.prompt)}>
-                  <Icon name={copied ? "check" : "down"} size={11} />
-                  {copied ? tr("annotate.copied") : tr("annotate.copyPrompt")}
-                </Button>
-                <div style={{ fontSize: 10, color: t.fgMuted, marginTop: 2 }}>{tr("annotate.pasteHint")}</div>
-                <textarea value={pasteRaw} onChange={(e) => setPasteRaw(e.target.value)}
-                  placeholder={tr("annotate.pasteBack")} style={{ ...textareaStyle, height: 90 }} />
-                {pasteMut.isError && (
-                  <div style={{ fontSize: 10, color: t.danger }}>{(pasteMut.error as Error).message}</div>
-                )}
-                <Button primary small disabled={!pasteRaw.trim() || pasteMut.isPending}
-                  onClick={() => pasteMut.mutate()}>
-                  {pasteMut.isPending ? "…" : tr("annotate.parse")}
-                </Button>
-              </>
-            )}
-          </div>
-        )}
-        {prov && (
-          <div style={{ fontSize: 10, color: t.fgSubtle }}>
-            {tr("annotate.aiHint")} <span style={{ fontFamily: t.mono }}>
-              ({[prov.service, prov.model].filter(Boolean).join(" · ")}{prov.extracted_at ? `, ${prov.extracted_at}` : ""})
-            </span>
-          </div>
-        )}
-        {drafts.map((d, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", background: t.panelAlt, border: `1px solid ${t.borderSoft}`, fontSize: 11 }}>
-            <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted, width: 90, flexShrink: 0 }}>{d.field}</span>
-            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.value}</span>
-            <span style={{ fontSize: 9, color: t.ok, fontFamily: t.mono }}>{Math.round(d.confidence * 100)}%</span>
-            <Button small onClick={() => { applyDraft(d.field, d.value); const g = groupOf(d.field); if (g) setActiveGroup(g); }}>{tr("annotate.apply")}</Button>
-          </div>
-        ))}
-        {drafts.length > 1 && (
-          <Button small onClick={() => drafts.forEach((d) => applyDraft(d.field, d.value))}>{tr("annotate.applyAll")}</Button>
-        )}
+        <AiAssist record={record} onUse={(field, value) => {
+          applyDraft(field, value);
+          const g = groupOf(field); if (g) setActiveGroup(g);
+        }} />
 
         {/* manual form — class tabs, each editing all its fields at once */}
         <div style={{ borderTop: `1px solid ${t.borderSoft}`, paddingTop: 8 }}>
@@ -621,6 +519,274 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
 
         <History annotations={record.annotations} isReviewer={isReviewer}
           onReview={(annId, status) => reviewMut.mutate({ annId, status })} />
+      </div>
+    </div>
+  );
+}
+
+// ── AI assist ──────────────────────────────────────────────────────────────
+// One block for both AI routes, because they do the same job and the user only
+// needs to pick one:
+//   A. queue it — the server-side batch worker writes the proposals back as
+//      submitted annotations (arrives later, shows up in History).
+//   B. do it yourself — copy the prompt into your own AI chat, paste the JSON
+//      reply back (no platform API cost, results land in the form immediately).
+// `onUse` loads one proposed value into the manual form below.
+function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: string, value: string) => void }) {
+  const { t: tr } = useTranslation();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState<"queue" | "paste" | null>(null);
+  const [preset, setPreset] = useState(0);   // index into TRANSCRIBE_PRESETS
+  const [pasteRaw, setPasteRaw] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [drafts, setDrafts] = useState<ExtractedField[]>([]);
+  // Provenance of the last pasted AI draft: service · model (date).
+  const [prov, setProv] = useState<{ model: string; service?: string | null; extracted_at?: string | null } | null>(null);
+
+  const hasImage = record.media.length > 0;
+  const q = record.transcribe;   // durable queue state (survives reload)
+
+  // "Auto" sends no overrides, so what it runs is whatever the server is
+  // configured for — ask, rather than showing an opaque "Auto".
+  const engineCfg = useQuery({
+    queryKey: ["transcribe-config"],
+    queryFn: () => api.transcribeConfig(),
+    staleTime: 10 * 60_000,
+  });
+  // Model chain for a preset, "sonnet-5→opus-4-8" style (the claude- prefix is
+  // noise at this width; the full ids stay in the title attribute).
+  const chainOf = (i: number): string | undefined => {
+    if (i !== 0) return TRANSCRIBE_PRESETS[i].detail;
+    const c = engineCfg.data;
+    if (!c) return undefined;
+    const short = (m: string) => m.replace(/^claude-/, "");
+    return c.mode === "two_stage" && c.ocr_model
+      ? `${short(c.ocr_model)}→${short(c.field_model)}`
+      : short(c.field_model);
+  };
+
+  // Prompt is fetched lazily — only once the user opens the copy-paste route.
+  const promptQuery = useQuery({
+    queryKey: ["extract-prompt", record.id],
+    queryFn: () => api.extractPrompt(record.id),
+    enabled: open === "paste",
+  });
+  const pasteMut = useMutation({
+    mutationFn: () => api.extractPaste(record.id, pasteRaw),
+    onSuccess: (res) => {
+      setDrafts(res.fields); setProv({ model: res.model, service: res.service, extracted_at: res.extracted_at });
+      setOpen(null); setPasteRaw("");
+    },
+  });
+  // Queue this record for transcription (persists occ id + user id, then
+  // best-effort Discord notification). Independent of submitting annotations.
+  const queueMut = useMutation({
+    mutationFn: (opts?: TranscribeOptions) => api.scheduleTranscribe(record.id, opts),
+    onSuccess: () => { setOpen(null); qc.invalidateQueries({ queryKey: ["detail", record.id] }); },
+  });
+  const copyPrompt = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  };
+
+  return (
+    <div style={{ border: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>
+      <div style={{ padding: "6px 8px", borderBottom: `1px solid ${t.borderSoft}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600 }}>
+          <Icon name="spark" size={12} />{tr("annotate.aiTitle")}
+        </div>
+        <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.6, marginTop: 3 }}>{tr("annotate.aiWhat")}</div>
+        {!hasImage && (
+          <div style={{ fontSize: 10, color: t.warn, lineHeight: 1.5, marginTop: 4, display: "flex", gap: 4 }}>
+            <Icon name="alert" size={11} /><span>{tr("annotate.aiNoImage")}</span>
+          </div>
+        )}
+      </div>
+
+      {/* durable queue state — replaces the old 5-second "已排程" flash */}
+      {q && <QueueStatus q={q} />}
+
+      <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontSize: 10, color: t.fgSubtle }}>{tr("annotate.aiPickHint")}</div>
+
+        {/* route A — hand it to the platform's batch worker */}
+        <OptionCard n={1} title={tr("annotate.optQueueTitle")} what={tr("annotate.optQueueWhat")}
+          open={open === "queue"} onToggle={() => setOpen(open === "queue" ? null : "queue")}
+          cta={q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")} disabled={!hasImage}
+          meta={tr("annotate.engineIs", {
+            name: [tr(TRANSCRIBE_PRESETS[preset].labelKey), chainOf(preset)].filter(Boolean).join(" · "),
+          })}>
+          <div style={{ fontSize: 10, color: t.fgSubtle }}>{tr("annotate.optQueueSlow")}</div>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: t.fgMuted }}>
+            {tr("annotate.aiEngine")}
+            <select value={preset} onChange={(e) => setPreset(Number(e.target.value))} style={{ ...inputStyle, width: "auto", flex: 1, fontSize: 11 }}>
+              {TRANSCRIBE_PRESETS.map((p, i) => {
+                const chain = chainOf(i);
+                return <option key={i} value={i}>{tr(p.labelKey)}{chain ? ` — ${chain}` : ""}</option>;
+              })}
+            </select>
+          </label>
+          {queueMut.isError && <div style={{ fontSize: 10, color: t.danger }}>{(queueMut.error as Error).message}</div>}
+          <Button primary small disabled={!hasImage || queueMut.isPending}
+            onClick={() => queueMut.mutate(TRANSCRIBE_PRESETS[preset].opts)}>
+            {queueMut.isPending ? "…" : <><Icon name="down" size={11} />{q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")}</>}
+          </Button>
+        </OptionCard>
+
+        {/* route B — the user's own AI chat, three explicit steps */}
+        <OptionCard n={2} title={tr("annotate.optPasteTitle")} what={tr("annotate.optPasteWhat")}
+          open={open === "paste"} onToggle={() => setOpen(open === "paste" ? null : "paste")}
+          cta={tr("annotate.optPasteGo")}>
+          {promptQuery.isLoading && <Spinner />}
+          {promptQuery.data && (
+            <>
+              <Step n={1} label={tr("annotate.step1")}>
+                {promptQuery.data.image_url ? (
+                  <>
+                    <a href={promptQuery.data.image_url} target="_blank" rel="noreferrer"
+                      style={{ color: t.accent, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <Icon name="img" size={11} />{tr("annotate.step1")} ↗
+                    </a>
+                    <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 2 }}>{tr("annotate.step1hint")}</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 10, color: t.warn }}>{tr("annotate.step1none")}</div>
+                )}
+              </Step>
+              <Step n={2} label={tr("annotate.step2")}>
+                <textarea readOnly value={promptQuery.data.prompt}
+                  onFocus={(e) => e.currentTarget.select()}
+                  style={{ ...textareaStyle, height: 110 }} />
+                <div style={{ marginTop: 4 }}>
+                  <Button small onClick={() => copyPrompt(promptQuery.data!.prompt)}>
+                    <Icon name={copied ? "check" : "down"} size={11} />
+                    {copied ? tr("annotate.copied") : tr("annotate.copyPrompt")}
+                  </Button>
+                </div>
+              </Step>
+              <Step n={3} label={tr("annotate.step3")}>
+                <textarea value={pasteRaw} onChange={(e) => setPasteRaw(e.target.value)}
+                  placeholder={tr("annotate.pasteBack")} style={{ ...textareaStyle, height: 80 }} />
+                {pasteMut.isError && (
+                  <div style={{ fontSize: 10, color: t.danger, marginTop: 2 }}>{(pasteMut.error as Error).message}</div>
+                )}
+                <div style={{ marginTop: 4 }}>
+                  <Button primary small disabled={!pasteRaw.trim() || pasteMut.isPending} onClick={() => pasteMut.mutate()}>
+                    {pasteMut.isPending ? "…" : tr("annotate.parse")}
+                  </Button>
+                </div>
+              </Step>
+            </>
+          )}
+        </OptionCard>
+      </div>
+
+      {/* proposals from route B — route A's land in History instead */}
+      {drafts.length > 0 && (
+        <div style={{ borderTop: `1px solid ${t.borderSoft}`, padding: 8, background: t.panel }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <span style={{ fontSize: 11, fontWeight: 600 }}>{tr("annotate.draftsTitle")} · {drafts.length}</span>
+            <div style={{ flex: 1 }} />
+            {drafts.length > 1 && (
+              <Button small onClick={() => drafts.forEach((d) => onUse(d.field, d.value))}>{tr("annotate.applyAll")}</Button>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.5, marginBottom: 6 }}>{tr("annotate.draftsHint")}</div>
+          {prov && (
+            <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginBottom: 4 }}>
+              {[prov.service, prov.model].filter(Boolean).join(" · ")}{prov.extracted_at ? `, ${prov.extracted_at}` : ""}
+            </div>
+          )}
+          {drafts.map((d, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", marginBottom: 3, background: t.panelAlt, border: `1px solid ${t.borderSoft}`, fontSize: 11 }}>
+              <span style={{ fontSize: 10, color: t.fgMuted, width: 78, flexShrink: 0 }} title={d.field}>{tr(`fields.${d.field}`, d.field)}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.value}>{d.value}</span>
+              <span style={{ fontSize: 9, color: t.ok, fontFamily: t.mono }} title={tr("annotate.confidence")}>{Math.round(d.confidence * 100)}%</span>
+              <Button small onClick={() => onUse(d.field, d.value)}>{tr("annotate.apply")}</Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Collapsed: a numbered row you can read in one glance, plus `meta` — the
+// current value of a setting that lives inside, so it's discoverable without
+// opening the card. Expanded: its controls (meta hides, the real control shows).
+function OptionCard({ n, title, what, cta, open, onToggle, disabled, meta, children }: {
+  n: number; title: string; what: string; cta: string; open: boolean;
+  onToggle: () => void; disabled?: boolean; meta?: string; children: React.ReactNode;
+}) {
+  return (
+    <div style={{ border: `1px solid ${open ? t.accent : t.borderSoft}`, background: t.panel, opacity: disabled && !open ? 0.55 : 1 }}>
+      <button onClick={onToggle} style={{
+        width: "100%", textAlign: "left", display: "flex", gap: 7, padding: "7px 8px",
+        border: "none", background: "transparent", cursor: "pointer", fontFamily: t.sans,
+      }}>
+        <span style={{
+          flexShrink: 0, width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 10, fontFamily: t.mono, color: open ? t.bg : t.fgMuted,
+          background: open ? t.accent : t.panelAlt, border: `1px solid ${open ? t.accent : t.border}`,
+        }}>{n}</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: t.fg }}>
+            {title}
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 10, fontWeight: 400, color: t.accent }}>{open ? "" : cta} </span>
+            <Icon name={open ? "caretD" : "caretR"} size={10} />
+          </span>
+          <span style={{ display: "block", fontSize: 10, color: t.fgMuted, lineHeight: 1.6, marginTop: 3 }}>{what}</span>
+          {meta && !open && (
+            <span style={{ display: "inline-block", fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginTop: 4, padding: "0 4px", border: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>{meta}</span>
+          )}
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 8px 8px 31px", display: "flex", flexDirection: "column", gap: 6 }}>{children}</div>
+      )}
+    </div>
+  );
+}
+
+function Step({ n, label, children }: { n: number; label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: t.fgMuted, marginBottom: 3 }}>
+        <span style={{ fontFamily: t.mono, color: t.accent }}>{n}.</span> {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// What happened to the queued request — and, since the batch worker is run
+// on demand (no ETA to promise), what the contributor can do instead of wait.
+function QueueStatus({ q }: { q: NonNullable<OccurrenceDetail["transcribe"]> }) {
+  const { t: tr } = useTranslation();
+  const tone = q.status === "failed" ? t.danger : q.status === "done" ? t.ok : t.warn;
+  const label = q.status === "failed" ? tr("annotate.qFailed")
+    : q.status === "done" ? tr("annotate.qDone") : tr("annotate.qPending");
+  const what = q.status === "failed" ? tr("annotate.qFailedWhat")
+    : q.status === "done" ? tr("annotate.qDoneWhat") : tr("annotate.qPendingWhat");
+  const when = (q.processed_at || q.created || "").slice(0, 16).replace("T", " ");
+  return (
+    <div style={{ padding: "6px 8px", borderBottom: `1px solid ${t.borderSoft}`, background: t.panel, borderLeft: `2px solid ${tone}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: tone, fontWeight: 600 }}>
+        <Icon name={q.status === "failed" ? "alert" : q.status === "done" ? "check" : "cog"} size={11} />{label}
+      </div>
+      <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.6, marginTop: 3 }}>{what}</div>
+      {q.status === "pending" && (
+        <div style={{ fontSize: 10, color: t.fgSubtle, lineHeight: 1.6, marginTop: 3 }}>{tr("annotate.qPendingAlt")}</div>
+      )}
+      {q.status === "failed" && q.error && (
+        <div style={{ fontSize: 10, color: t.danger, marginTop: 3, wordBreak: "break-word" }}>{q.error}</div>
+      )}
+      <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginTop: 3 }}>
+        {when}{q.requested_by ? ` · ${tr("annotate.qBy", { who: q.requested_by })}` : ""}
       </div>
     </div>
   );

@@ -46,24 +46,54 @@ const en = {
   annotate: {
     title: "Fill the gaps", field: "Field", proposed: "Proposed value",
     note: "Note (optional)", submit: "Submit annotation", saveDraft: "Save draft",
-    aiExtract: "AI extract from image", aiHint: "Review the AI draft, then edit and submit.",
     confidence: "confidence", accept: "Accept", reject: "Reject", merge: "Mark merged",
     loginToAnnotate: "Sign in to annotate", history: "Annotation history",
-    apply: "Use", applyAll: "Apply all", model: "Model",
+    apply: "Use", applyAll: "Use all", model: "Model",
     src_ai: "AI", src_mixed: "AI·edited",
-    scheduleTranscribe: "Schedule processing", scheduled: "Scheduled",
-    scheduleTranscribeHint: "Let AI schedule automatic processing",
-    tmAuto: "Auto", transcribeModel: "AI model / pipeline",
     current: "now", fieldsFilled: "fields to submit",
     grpCollection: "Collection", grpEvent: "Collection event", grpTaxonomy: "Taxonomy",
     grpLocality: "Locality", grpOther: "Annotation-only",
-    aiPrompt: "AI transcribe (copy-paste)",
-    aiPromptHint: "Open the image in your own AI chat, paste the prompt below, then paste the JSON reply back here — no API cost.",
-    openImage: "Open specimen image",
-    noImageWarn: "This record has no image — attach your own photo of the label in your AI chat.",
+
+    // AI assist block
+    aiTitle: "Read the label with AI",
+    aiWhat: "AI reads the text off the specimen image and proposes values for the form below. Nothing is submitted until you review it.",
+    aiPickHint: "Two ways to do it — pick either:",
+    aiNoImage: "This record has no image, so AI has no label to read. You can still fill the form by hand.",
+
+    // Option A — server-side queue
+    optQueueTitle: "Let the platform do it",
+    optQueueWhat: "Adds this record to the processing queue. You don't have to wait — when it finishes, the proposed values appear below under \"Annotation history\" as submitted annotations for you to review.",
+    optQueueGo: "Add to queue",
+    optQueueSlow: "Processing is run in batches, so this usually is not instant.",
+    aiEngine: "Engine", engineIs: "Engine: {{name}}",
+    tmAuto: "Automatic (recommended)", tmAccurate: "Most accurate", tmCheap: "Lowest cost",
+
+    // Queue status strip
+    qPending: "Queued — waiting to be processed",
+    qPendingWhat: "Batches are run by the platform team, so there is no fixed wait. You don't have to stay here: this page updates itself while it's open, and the proposals will be waiting under \"Annotation history\" whenever you come back.",
+    qPendingAlt: "Don't want to wait? Run it yourself with option 2 below, or just fill the form in by hand — queuing doesn't block either.",
+    qDone: "Processed — see the proposed values below",
+    qDoneWhat: "The proposals are in \"Annotation history\" below, marked AI and awaiting review.",
+    qFailed: "Processing failed",
+    qFailedWhat: "Nothing was written. You can queue it again, or use option 2 below.",
+    qBy: "queued by {{who}}",
+    qAgain: "Queue again",
+
+    // Option B — bring your own AI chat
+    optPasteTitle: "Use your own AI chat",
+    optPasteWhat: "Free — you run it in ChatGPT / Claude / etc. and paste the answer back. Takes about a minute.",
+    optPasteGo: "Start",
+    step1: "Open the specimen image",
+    step1hint: "Open it, then drag or upload it into your AI chat.",
+    step1none: "No image on this record — attach your own photo of the label instead.",
+    step2: "Copy this prompt into the same chat",
+    step3: "Paste the AI's reply back here",
     copyPrompt: "Copy prompt", copied: "Copied!",
-    pasteHint: "Paste the AI's JSON reply here:",
-    pasteBack: "Paste JSON here…", parse: "Parse reply",
+    pasteBack: "Paste the JSON reply here…", parse: "Read the reply",
+
+    // Draft results
+    draftsTitle: "AI proposals",
+    draftsHint: "Check each value, then \"Use\" it to load it into the form below. You still have to submit.",
   },
   status: {
     draft: "Draft", submitted: "Submitted", accepted: "Accepted",
@@ -147,24 +177,54 @@ const zh: typeof en = {
   annotate: {
     title: "補齊缺漏資料", field: "欄位", proposed: "建議值",
     note: "備註（選填）", submit: "送出標註", saveDraft: "儲存草稿",
-    aiExtract: "以 AI 辨識影像", aiHint: "檢視 AI 草稿，編輯後送出。",
     confidence: "信心值", accept: "採納", reject: "退回", merge: "標記為已合併",
     loginToAnnotate: "登入後即可標註", history: "標註紀錄",
-    apply: "套用", applyAll: "全部套用", model: "模型",
+    apply: "填入", applyAll: "全部填入", model: "模型",
     src_ai: "AI", src_mixed: "AI·修改",
-    scheduleTranscribe: "排程處理", scheduled: "已排程",
-    scheduleTranscribeHint: "按此讓 AI 排程自動處理",
-    tmAuto: "自動", transcribeModel: "AI 模型／流程",
     current: "現值", fieldsFilled: "個欄位待送出",
     grpCollection: "典藏資訊", grpEvent: "採集事件", grpTaxonomy: "生物分類",
     grpLocality: "地點", grpOther: "標註專用",
-    aiPrompt: "AI 辨識（複製貼上）",
-    aiPromptHint: "在你自己的 AI 對話中開啟影像，貼上下方提示詞，再把 AI 回覆的 JSON 貼回此處 — 不需 API 費用。",
-    openImage: "開啟標本影像",
-    noImageWarn: "此紀錄沒有影像 — 請在 AI 對話中自行附上標籤照片。",
+
+    // AI assist block
+    aiTitle: "用 AI 辨識標籤",
+    aiWhat: "由 AI 讀取標本影像上的標籤文字，替下方表單提出建議值。建議值一定要你檢查過、按下送出才會成立。",
+    aiPickHint: "兩種做法，擇一即可：",
+    aiNoImage: "此紀錄沒有影像，AI 沒有標籤可讀。你仍然可以手動填寫下方表單。",
+
+    // Option A — server-side queue
+    optQueueTitle: "交給平台處理",
+    optQueueWhat: "把這筆紀錄排入處理佇列。你不需要等待 — 處理完成後，建議值會以「已送出」的標註出現在下方「標註紀錄」，再由你檢查。",
+    optQueueGo: "排入佇列",
+    optQueueSlow: "採批次處理，通常不會立即完成。",
+    aiEngine: "引擎", engineIs: "引擎：{{name}}",
+    tmAuto: "自動（建議）", tmAccurate: "最精確", tmCheap: "最省成本",
+
+    // Queue status strip
+    qPending: "已排入佇列 — 等待處理中",
+    qPendingWhat: "由平台人員分批執行，沒有固定的等待時間。你不需要留在這頁：本頁開著時會自動更新；離開後再回來，建議值也會留在下方「標註紀錄」等你。",
+    qPendingAlt: "不想等？可用下方第 2 種做法自己跑，或直接手動填寫表單 — 排入佇列不會擋住這兩件事。",
+    qDone: "已處理完成 — 建議值請見下方",
+    qDoneWhat: "建議值已在下方「標註紀錄」，標示為 AI，等待審核。",
+    qFailed: "處理失敗",
+    qFailedWhat: "沒有寫入任何資料。你可以重新排入佇列，或改用下方第 2 種做法。",
+    qBy: "由 {{who}} 排入",
+    qAgain: "重新排入佇列",
+
+    // Option B — bring your own AI chat
+    optPasteTitle: "用你自己的 AI 對話",
+    optPasteWhat: "免費 — 你在 ChatGPT／Claude 等自行執行，再把答案貼回來。大約需要一分鐘。",
+    optPasteGo: "開始",
+    step1: "開啟標本影像",
+    step1hint: "開啟後，把影像拖曳或上傳到你的 AI 對話中。",
+    step1none: "此紀錄沒有影像 — 請改為自行附上標籤照片。",
+    step2: "複製這段提示詞，貼到同一個對話",
+    step3: "把 AI 的回覆貼回這裡",
     copyPrompt: "複製提示詞", copied: "已複製！",
-    pasteHint: "將 AI 回覆的 JSON 貼在此處：",
-    pasteBack: "在此貼上 JSON…", parse: "解析回覆",
+    pasteBack: "在此貼上 JSON 回覆…", parse: "讀取回覆",
+
+    // Draft results
+    draftsTitle: "AI 建議值",
+    draftsHint: "逐項確認後按「填入」，值會帶進下方表單；仍需按送出才算完成。",
   },
   status: {
     draft: "草稿", submitted: "已送出", accepted: "已採納",

@@ -13,18 +13,18 @@ from .config import settings
 log = logging.getLogger("notify")
 
 
-def transcribe_scheduled(occ_id: str, requester: str) -> bool:
+def transcribe_scheduled(occ_id: str, user_id: int) -> bool:
     """Post a 'scheduled for transcription' message to Discord. Returns True if a
-    webhook is configured and the post succeeded, else False (caller ignores it)."""
+    webhook is configured and the post succeeded, else False (caller ignores it).
+
+    Identifies the requester by our internal user id, not by name or ORCID iD:
+    Discord is outside the platform's trust boundary, so the message carries only
+    opaque keys that need DB access to resolve to a person."""
     url = settings.discord_webhook_url.strip()
     if not url:
         return False
 
-    record_url = f"{settings.app_base_url.rstrip('/')}/record/{occ_id}"
-    content = (
-        f"🗒️ **Scheduled for transcription** by **{requester}**\n"
-        f"Record `{occ_id}` — {record_url}"
-    )
+    content = f"🗒️ **Scheduled for transcription** by user `{user_id}`\nRecord `{occ_id}`"
     try:
         resp = httpx.post(url, json={"content": content}, timeout=5.0)
         resp.raise_for_status()

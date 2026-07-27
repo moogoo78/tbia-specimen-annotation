@@ -31,6 +31,17 @@ export interface OccurrenceDetail extends OccurrenceRow {
   [key: string]: unknown;
   media: string[];
   annotations: Annotation[];
+  /** Most recent AI transcription request for this record (null = never queued). */
+  transcribe: TranscribeState | null;
+}
+
+export interface TranscribeState {
+  id: number;
+  status: "pending" | "done" | "failed" | string;
+  requested_by: string | null;
+  created: string | null;
+  processed_at: string | null;
+  error: string | null;
 }
 
 export interface SearchResult {
@@ -117,6 +128,13 @@ export interface TranscribeOptions {
   mode?: "single" | "two_stage";
   ocr_model?: string;
   field_model?: string;
+}
+
+/** What the server's "auto" preset resolves to (GET /api/transcribe/config). */
+export interface TranscribeConfig {
+  mode: "single" | "two_stage" | string;
+  ocr_model: string | null;
+  field_model: string;
 }
 
 export interface DevUser { email: string; display_name: string; role: string; }

@@ -58,11 +58,6 @@ class Settings(BaseSettings):
     # skipped; the request is still persisted). Create one in a Discord channel
     # under Integrations → Webhooks and paste its URL. Plain env vars (no NDB_).
     discord_webhook_url: str = Field(default="", validation_alias="DISCORD_WEBHOOK_URL")
-    # Public base URL of the frontend, used to build clickable record links in
-    # the Discord message (e.g. https://tbia.example.org).
-    app_base_url: str = Field(
-        default="http://localhost:5173", validation_alias="APP_BASE_URL"
-    )
 
     # AI transcription pipeline (the batch worker that drains transcribe_requests
     # and calls Claude vision). ANTHROPIC_API_KEY is read by the SDK directly;

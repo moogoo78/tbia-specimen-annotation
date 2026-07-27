@@ -104,6 +104,8 @@ export const api = {
     request<import("./types").ExtractResponse>(`/occurrences/${id}/extract-paste`, {
       method: "POST", body: JSON.stringify({ raw }),
     }),
+  transcribeConfig: () =>
+    request<import("./types").TranscribeConfig>("/transcribe/config"),
   scheduleTranscribe: (id: string, opts?: import("./types").TranscribeOptions) =>
     request<import("./types").TranscribeRequest>(`/occurrences/${id}/transcribe-request`, {
       method: "POST",

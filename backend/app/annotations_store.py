@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 
 from .db import SessionLocal
-from .models import Annotation, User
+from .models import Annotation, TranscribeRequest, User
 
 
 def _serialize(a: Annotation, name: str | None) -> dict[str, Any]:
@@ -41,3 +41,28 @@ def list_for_occurrence(occ_id: str) -> list[dict[str, Any]]:
             .order_by(Annotation.created.desc())
         ).all()
         return [_serialize(a, name) for a, name in rows]
+
+
+def latest_transcribe_request(occ_id: str) -> dict[str, Any] | None:
+    """The record's most recent AI transcription request, so the detail view can
+    show a durable "queued / done / failed" state instead of the client's
+    short-lived post-click flash."""
+    with SessionLocal() as db:
+        row = db.execute(
+            select(TranscribeRequest, User.display_name)
+            .join(User, TranscribeRequest.contributor_id == User.id)
+            .where(TranscribeRequest.occurrence_id == occ_id)
+            .order_by(TranscribeRequest.created.desc())
+            .limit(1)
+        ).first()
+        if row is None:
+            return None
+        req, name = row
+        return {
+            "id": req.id,
+            "status": req.status,
+            "requested_by": name,
+            "created": req.created.isoformat() if req.created else None,
+            "processed_at": req.processed_at.isoformat() if req.processed_at else None,
+            "error": req.error,
+        }

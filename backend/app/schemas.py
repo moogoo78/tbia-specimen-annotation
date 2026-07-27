@@ -124,6 +124,17 @@ class TranscribeOptions(BaseModel):
     field_model: str | None = None   # primary field model (both modes)
 
 
+class TranscribeConfig(BaseModel):
+    """What the server's "auto" preset actually resolves to, so the UI can name
+    the models instead of showing an opaque "Auto". Resolved from the settings at
+    request time — a queued request with no overrides picks up whatever these are
+    when the worker eventually runs it, not when it was queued."""
+
+    mode: str                  # "single" | "two_stage"
+    ocr_model: str | None      # stage-1 vision model (two_stage only)
+    field_model: str           # primary field model (both modes)
+
+
 class TranscribeRequestOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
