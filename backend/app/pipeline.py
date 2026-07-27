@@ -61,12 +61,18 @@ def transcribe_record(
 def _transcribe_single(record: dict, image_url: str, model: str) -> ExtractResponse:
     """One Claude vision call: OCR + field extraction together. The model sees the
     image while assigning fields, so it can disambiguate hard-to-read values
-    against the pixels."""
+    against the pixels.
+
+    Unlike the OCR stage, thinking is left on (the default on current models):
+    reading a hard label and mapping it onto Darwin Core fields is the judgement
+    this mode exists for. max_tokens is sized to cover thinking *plus* the JSON,
+    and effort is capped so that headroom doesn't become the usual spend."""
     prompt = extract.build_prompt(record).prompt
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
     resp = client.messages.create(
         model=model,
-        max_tokens=4096,
+        max_tokens=8192,
+        output_config={"effort": "medium"},
         messages=[{
             "role": "user",
             "content": [
@@ -100,10 +106,18 @@ def _transcribe_two_stage(record: dict, image_url: str, ocr_model: str, field_mo
 
 
 def _ocr_label(client: anthropic.Anthropic, image_url: str, ocr_model: str) -> str:
-    """Stage 1 — vision OCR to verbatim label text."""
+    """Stage 1 — vision OCR to verbatim label text.
+
+    Thinking is disabled explicitly: this stage only transcribes what is on the
+    label, so reasoning buys nothing but billed output tokens — and since
+    max_tokens caps thinking *plus* text, a chatty thinking pass on a dense
+    bilingual label can crowd out the transcript itself (empty/truncated text ->
+    the ValueError below). Some models default to adaptive thinking when the
+    parameter is omitted, so leaving it off is not the same as not setting it."""
     resp = client.messages.create(
         model=ocr_model,
         max_tokens=2048,
+        thinking={"type": "disabled"},
         messages=[{
             "role": "user",
             "content": [
@@ -119,7 +133,13 @@ def _ocr_label(client: anthropic.Anthropic, image_url: str, ocr_model: str) -> s
 
 
 def _fields_from_text(client: anthropic.Anthropic, record: dict, full_text: str, field_model: str) -> ExtractResponse:
-    """Stage 2 — text-only structuring of the OCR transcript into fields."""
+    """Stage 2 — text-only structuring of the OCR transcript into fields.
+
+    Thinking stays on here rather than being disabled as in stage 1: the reply is
+    parsed as JSON, and on some models turning thinking off makes stray
+    `<thinking>` tags leak into the visible text, which `parse_pasted` would
+    choke on. Cost is controlled with low effort instead — the transcript is
+    already extracted by this point, so this stage is mostly mapping."""
     fields = [f for f in extract._target_fields(record) if f != "full_text"]
     field_lines = "\n".join(f"- {f}: {extract.PROMPTABLE_FIELDS[f]}" for f in fields)
     prompt = (
@@ -136,7 +156,8 @@ def _fields_from_text(client: anthropic.Anthropic, record: dict, full_text: str,
         f"{field_lines}"
     )
     resp = client.messages.create(
-        model=field_model, max_tokens=2048,
+        model=field_model, max_tokens=6144,
+        output_config={"effort": "low"},
         messages=[{"role": "user", "content": prompt}],
     )
     text = "".join(b.text for b in resp.content if b.type == "text")
