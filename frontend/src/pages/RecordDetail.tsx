@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
-import type { ExtractedField, OccurrenceDetail, TranscribeOptions } from "../api/types";
+import type { ExtractedField, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
 
@@ -65,15 +65,6 @@ const ANNOTATABLE_GROUPS: { labelKey: string; fields: FieldDef[] }[] = [
 ];
 const ALL_FIELDS: FieldDef[] = ANNOTATABLE_GROUPS.flatMap((g) => g.fields);
 
-// Engine presets for the AI transcription pipeline, named by what the choice
-// means to a curator (cost/accuracy) rather than by model. The model chain is
-// shown as secondary text. `opts` undefined = let the server use its configured
-// default (TRANSCRIBE_MODE / models).
-const TRANSCRIBE_PRESETS: { labelKey: string; detail?: string; opts?: TranscribeOptions }[] = [
-  { labelKey: "annotate.tmAuto" },
-  { labelKey: "annotate.tmAccurate", detail: "Opus", opts: { mode: "single", field_model: "claude-opus-4-8" } },
-  { labelKey: "annotate.tmCheap", detail: "Haiku→Opus", opts: { mode: "two_stage", ocr_model: "claude-haiku-4-5", field_model: "claude-opus-4-8" } },
-];
 
 // Composite widgets keep their parts under dotted sub-keys in the values map;
 // these turn the sub-keys into the single string that gets submitted.
@@ -536,7 +527,6 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
   const [open, setOpen] = useState<"queue" | "paste" | null>(null);
-  const [preset, setPreset] = useState(0);   // index into TRANSCRIBE_PRESETS
   const [pasteRaw, setPasteRaw] = useState("");
   const [copied, setCopied] = useState(false);
   const [drafts, setDrafts] = useState<ExtractedField[]>([]);
@@ -553,17 +543,16 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
     queryFn: () => api.transcribeConfig(),
     staleTime: 10 * 60_000,
   });
-  // Model chain for a preset, "sonnet-5→opus-4-8" style (the claude- prefix is
-  // noise at this width; the full ids stay in the title attribute).
-  const chainOf = (i: number): string | undefined => {
-    if (i !== 0) return TRANSCRIBE_PRESETS[i].detail;
+  // The server's model chain as "sonnet-5→opus-4-8" (the claude- prefix is noise
+  // at this width). Read-only: the contributor doesn't pick an engine.
+  const engineChain = (() => {
     const c = engineCfg.data;
     if (!c) return undefined;
     const short = (m: string) => m.replace(/^claude-/, "");
     return c.mode === "two_stage" && c.ocr_model
       ? `${short(c.ocr_model)}→${short(c.field_model)}`
       : short(c.field_model);
-  };
+  })();
 
   // Prompt is fetched lazily — only once the user opens the copy-paste route.
   const promptQuery = useQuery({
@@ -581,7 +570,7 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
   // Queue this record for transcription (persists occ id + user id, then
   // best-effort Discord notification). Independent of submitting annotations.
   const queueMut = useMutation({
-    mutationFn: (opts?: TranscribeOptions) => api.scheduleTranscribe(record.id, opts),
+    mutationFn: () => api.scheduleTranscribe(record.id),
     onSuccess: () => { setOpen(null); qc.invalidateQueries({ queryKey: ["detail", record.id] }); },
   });
   const copyPrompt = async (text: string) => {
@@ -616,22 +605,16 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
         <OptionCard n={1} title={tr("annotate.optQueueTitle")} what={tr("annotate.optQueueWhat")}
           open={open === "queue"} onToggle={() => setOpen(open === "queue" ? null : "queue")}
           cta={q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")} disabled={!hasImage}
-          meta={tr("annotate.engineIs", {
-            name: [tr(TRANSCRIBE_PRESETS[preset].labelKey), chainOf(preset)].filter(Boolean).join(" · "),
-          })}>
+          meta={engineChain ? tr("annotate.engineIs", { name: engineChain }) : undefined}>
           <div style={{ fontSize: 10, color: t.fgSubtle }}>{tr("annotate.optQueueSlow")}</div>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: t.fgMuted }}>
-            {tr("annotate.aiEngine")}
-            <select value={preset} onChange={(e) => setPreset(Number(e.target.value))} style={{ ...inputStyle, width: "auto", flex: 1, fontSize: 11 }}>
-              {TRANSCRIBE_PRESETS.map((p, i) => {
-                const chain = chainOf(i);
-                return <option key={i} value={i}>{tr(p.labelKey)}{chain ? ` — ${chain}` : ""}</option>;
-              })}
-            </select>
-          </label>
+          {engineChain && (
+            <div style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>
+              {tr("annotate.engineIs", { name: engineChain })}
+            </div>
+          )}
           {queueMut.isError && <div style={{ fontSize: 10, color: t.danger }}>{(queueMut.error as Error).message}</div>}
           <Button primary small disabled={!hasImage || queueMut.isPending}
-            onClick={() => queueMut.mutate(TRANSCRIBE_PRESETS[preset].opts)}>
+            onClick={() => queueMut.mutate()}>
             {queueMut.isPending ? "…" : <><Icon name="down" size={11} />{q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")}</>}
           </Button>
         </OptionCard>

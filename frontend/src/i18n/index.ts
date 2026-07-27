@@ -65,8 +65,7 @@ const en = {
     optQueueWhat: "Adds this record to the processing queue. You don't have to wait — when it finishes, the proposed values appear below under \"Annotation history\" as submitted annotations for you to review.",
     optQueueGo: "Add to queue",
     optQueueSlow: "Processing is run in batches, so this usually is not instant.",
-    aiEngine: "Engine", engineIs: "Engine: {{name}}",
-    tmAuto: "Automatic (recommended)", tmAccurate: "Most accurate", tmCheap: "Lowest cost",
+    engineIs: "Engine: {{name}}",
 
     // Queue status strip
     qPending: "Queued — waiting to be processed",
@@ -196,8 +195,7 @@ const zh: typeof en = {
     optQueueWhat: "把這筆紀錄排入處理佇列。你不需要等待 — 處理完成後，建議值會以「已送出」的標註出現在下方「標註紀錄」，再由你檢查。",
     optQueueGo: "排入佇列",
     optQueueSlow: "採批次處理，通常不會立即完成。",
-    aiEngine: "引擎", engineIs: "引擎：{{name}}",
-    tmAuto: "自動（建議）", tmAccurate: "最精確", tmCheap: "最省成本",
+    engineIs: "引擎：{{name}}",
 
     // Queue status strip
     qPending: "已排入佇列 — 等待處理中",
