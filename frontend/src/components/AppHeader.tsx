@@ -44,7 +44,8 @@ export function AppHeader() {
       </Link>
 
       <div style={{ display: "flex", alignItems: "stretch" }}>
-        {tab("/", tr("nav.explore"))}
+        {tab("/", tr("nav.home"))}
+        {tab("/explore", tr("nav.explore"))}
         {tab("/institutions", tr("nav.institutions"))}
         {tab("/dashboard", tr("nav.dashboard"))}
       </div>

@@ -9,9 +9,9 @@ def test_ai_extract_stub(client):
     res = client.post("/api/occurrences/r2/extract", headers=h)
     assert res.status_code == 200
     data = res.json()
-    # r2 lacks identification -> stub proposes scientificName from source name
+    # r2 lacks identification -> stub proposes annotationScientificName from source name
     fields = {f["field"] for f in data["fields"]}
-    assert "scientificName" in fields
+    assert "annotationScientificName" in fields
     assert data["model"]
 
 
@@ -41,6 +41,33 @@ def test_annotation_lifecycle_and_role_gating(client):
     # appears on the occurrence detail
     detail = client.get("/api/occurrences/r2").json()
     assert any(a["id"] == ann_id and a["status"] == "accepted" for a in detail["annotations"])
+
+
+def test_transcribe_config_reports_resolved_models(client):
+    """The "auto" preset sends no overrides, so the UI reads the resolved models
+    from here rather than showing an opaque "Auto"."""
+    cfg = client.get("/api/transcribe/config")
+    assert cfg.status_code == 200, cfg.text
+    body = cfg.json()
+    assert body["mode"] in ("single", "two_stage")
+    assert body["field_model"]
+    # two_stage runs an OCR pass first; single does the whole job in one call.
+    assert (body["ocr_model"] is not None) == (body["mode"] == "two_stage")
+
+
+def test_transcribe_request_shows_on_detail(client):
+    """The record detail carries the latest queue state, so the UI can show
+    "queued / done / failed" after a reload instead of nothing."""
+    cur = auth_header(client, CURATOR)
+    assert client.get("/api/occurrences/r2").json()["transcribe"] is None
+
+    req = client.post("/api/occurrences/r2/transcribe-request", headers=cur)
+    assert req.status_code == 200, req.text
+
+    state = client.get("/api/occurrences/r2").json()["transcribe"]
+    assert state["status"] == "pending"
+    assert state["requested_by"]
+    assert state["processed_at"] is None
 
 
 def test_anonymous_cannot_annotate(client):

@@ -11,9 +11,9 @@ export interface OccurrenceRow {
   kingdom_c: string | null;
   county: string | null;
   locality: string | null;
-  std_lat: number | null;
-  std_lon: number | null;
-  std_date: string | null;
+  standard_latitude: number | null;
+  standard_longitude: number | null;
+  standard_date: string | null;
   year: number | null;
   type_status: string | null;
   dataset_name: string | null;
@@ -31,6 +31,17 @@ export interface OccurrenceDetail extends OccurrenceRow {
   [key: string]: unknown;
   media: string[];
   annotations: Annotation[];
+  /** Most recent AI transcription request for this record (null = never queued). */
+  transcribe: TranscribeState | null;
+}
+
+export interface TranscribeState {
+  id: number;
+  status: "pending" | "done" | "failed" | string;
+  requested_by: string | null;
+  created: string | null;
+  processed_at: string | null;
+  error: string | null;
 }
 
 export interface SearchResult {
@@ -62,6 +73,7 @@ export interface Dataset {
   dataset_name: string;
   tbia_dataset_id: string | null;
   rights_holder: string | null;
+  institution_code: string | null;
   n_records: number;
   n_identified: number;
   n_georeferenced: number;
@@ -94,8 +106,40 @@ export interface ExtractResponse {
   occurrence_id: string;
   image_url: string | null;
   model: string;
+  service?: string | null;
+  extracted_at?: string | null;
   fields: ExtractedField[];
 }
+export interface ExtractPromptResponse {
+  occurrence_id: string;
+  image_url: string | null;
+  target_fields: string[];
+  prompt: string;
+}
+
+export interface TranscribeRequest {
+  id: number;
+  occurrence_id: string;
+  contributor_id: number;
+  created: string;
+  notified: boolean;
+}
+
+export interface TranscribeOptions {
+  mode?: "single" | "two_stage";
+  ocr_model?: string;
+  field_model?: string;
+}
+
+/** What the server's "auto" preset resolves to (GET /api/transcribe/config). */
+export interface TranscribeConfig {
+  mode: "single" | "two_stage" | string;
+  ocr_model: string | null;
+  field_model: string;
+}
+
+export interface DevUser { email: string; display_name: string; role: string; }
+export interface DevLoginConfig { enabled: boolean; users: DevUser[]; }
 
 export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; }
 
@@ -142,5 +186,5 @@ export const emptyFilters = (): Filters => ({
   basis_of_record: [], type_status: [], dataset_name: [], tbia_dataset_id: [],
   collector_id: [],
   missing_coordinates: false, missing_date: false,
-  missing_identification: false, has_media: false,
+  missing_identification: false, has_media: true,
 });

@@ -9,6 +9,8 @@ interface AuthState {
   startOrcidLogin: () => Promise<void>;
   /** Complete sign-in after ORCID redirects back with a code. */
   finishOrcidLogin: (code: string) => Promise<void>;
+  /** Dev-only: sign in as a seeded demo user by email (localhost testing). */
+  devLogin: (email: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -58,10 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user);
   };
 
+  const devLogin = async (email: string) => {
+    const res = await api.devLogin(email);
+    setToken(res.access_token);
+    setUser(res.user);
+  };
+
   const logout = () => { setToken(null); setUser(null); };
 
   return (
-    <AuthContext.Provider value={{ user, loading, startOrcidLogin, finishOrcidLogin, logout }}>
+    <AuthContext.Provider value={{ user, loading, startOrcidLogin, finishOrcidLogin, devLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );

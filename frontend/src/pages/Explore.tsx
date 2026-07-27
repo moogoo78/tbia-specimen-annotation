@@ -24,6 +24,9 @@ export function Explore() {
   const [filters, setFilters] = useState<Filters>(emptyFilters());
   const [qInput, setQInput] = useState("");
   const [view, setView] = useState<View>("table");
+  const [showFacets, setShowFacets] = useState(true);
+  // Split view: collapse the record list so the detail pane gets the full width.
+  const [splitListOpen, setSplitListOpen] = useState(true);
   const [sort, setSort] = useState("completeness_score");
   const [offset, setOffset] = useState(0);
   const [activeId, setActiveId] = useState<string | undefined>();
@@ -50,7 +53,7 @@ export function Explore() {
   const location = useLocation();
   const navigate = useNavigate();
   useEffect(() => {
-    const st = location.state as { collector?: CollectorRef; sources?: string[] } | null;
+    const st = location.state as { collector?: CollectorRef; sources?: string[]; bio_group?: string[] } | null;
     if (!st) return;
     if (st.collector) {
       const c = st.collector;
@@ -59,7 +62,11 @@ export function Explore() {
     if (st.sources?.length) {
       setSources((s) => Array.from(new Set([...s, ...st.sources!])));
     }
-    if (st.collector || st.sources?.length) {
+    if (st.bio_group?.length) {
+      const groups = st.bio_group;
+      setFilters((f) => ({ ...f, bio_group: Array.from(new Set([...f.bio_group, ...groups])) }));
+    }
+    if (st.collector || st.sources?.length || st.bio_group?.length) {
       setOffset(0);
       navigate(location.pathname, { replace: true, state: null });
     }
@@ -75,9 +82,16 @@ export function Explore() {
   }, [qInput]);
 
   const order = sort === "scientific_name" || sort === "catalog_number" ? "asc" : "asc";
+  // The map can only plot georeferenced records; without this the gaps-first
+  // sort surfaces the least-complete rows (mostly missing coordinates) and the
+  // map looks empty. A world bbox constrains the fetch to rows with lat/lon.
+  const mapFilters = useMemo<Filters>(
+    () => (effFilters.bbox ? effFilters : { ...effFilters, bbox: "-180,-90,180,90" }),
+    [effFilters],
+  );
   const search = useQuery({
-    queryKey: ["search", effFilters, sort, offset, view === "map"],
-    queryFn: () => api.search(effFilters, sort, order, view === "map" ? 500 : PAGE, offset),
+    queryKey: ["search", view === "map" ? mapFilters : effFilters, sort, offset, view === "map"],
+    queryFn: () => api.search(view === "map" ? mapFilters : effFilters, sort, order, view === "map" ? 500 : PAGE, offset),
     placeholderData: keepPreviousData,
   });
   const facets = useQuery({ queryKey: ["facets", effFilters], queryFn: () => api.facets(effFilters) });
@@ -174,6 +188,12 @@ export function Explore() {
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
       {/* query bar */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: t.panel, borderBottom: `1px solid ${t.border}` }}>
+        <button onClick={() => setShowFacets((s) => !s)} title={tr("search.filters")} style={{
+          display: "flex", alignItems: "center", height: 26, padding: "0 7px", cursor: "pointer",
+          border: `1px solid ${t.border}`,
+          background: showFacets ? t.accentSoft : t.panel,
+          color: showFacets ? t.accent : t.fgMuted,
+        }}><Icon name="filter" size={13} /></button>
         <div style={{ position: "relative", flex: 1, maxWidth: 460 }}>
           <span style={{ position: "absolute", left: 8, top: 6, color: t.fgSubtle }}><Icon name="search" size={12} /></span>
           <input value={qInput} onChange={(e) => setQInput(e.target.value)} placeholder={tr("search.placeholder")} style={{
@@ -198,7 +218,7 @@ export function Explore() {
           border: `1px solid ${t.border}`, background: t.panel, fontSize: 11, padding: "3px 4px", fontFamily: t.sans,
         }}>
           <option value="completeness_score">↑ {tr("col.completeness")}</option>
-          <option value="std_date">{tr("col.date")}</option>
+          <option value="standard_date">{tr("col.date")}</option>
           <option value="scientific_name">{tr("col.sciname")}</option>
           <option value="catalog_number">{tr("col.catalog")}</option>
         </select>
@@ -218,20 +238,36 @@ export function Explore() {
       )}
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        <FacetPanel facets={facets.data} filters={filters} onToggle={toggle} onToggleFlag={toggleFlag} onClear={clear}
-          registry={registry.data} selectedSources={sources} onToggleSource={toggleSource}
-          selectedCollectors={collectors} onToggleCollector={toggleCollector}
-          onRecordRange={setRecordRange} />
+        {showFacets && (
+          <FacetPanel facets={facets.data} filters={filters} onToggle={toggle} onToggleFlag={toggleFlag} onClear={clear}
+            registry={registry.data} selectedSources={sources} onToggleSource={toggleSource}
+            selectedCollectors={collectors} onToggleCollector={toggleCollector}
+            onRecordRange={setRecordRange} />
+        )}
 
         {view === "split" ? (
           /* split-pane: dense list column + record detail (design variation B) */
           <>
-            <div style={{ width: 380, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.panel, display: "flex", flexDirection: "column", minHeight: 0 }}>
-              {search.isLoading && !search.data
-                ? <Spinner />
-                : <SplitList rows={rows} activeId={activeRowId} onSelect={setActiveId} />}
-              {pager}
-            </div>
+            {splitListOpen ? (
+              <div style={{ width: 380, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.panel, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", padding: "3px 6px", borderBottom: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>
+                  <div style={{ flex: 1 }} />
+                  <button onClick={() => setSplitListOpen(false)} title={tr("view.collapseList")} style={collapseBtn}>
+                    <Icon name="back" size={12} />
+                  </button>
+                </div>
+                {search.isLoading && !search.data
+                  ? <Spinner />
+                  : <SplitList rows={rows} activeId={activeRowId} onSelect={setActiveId} />}
+                {pager}
+              </div>
+            ) : (
+              <div style={{ width: 26, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.panelAlt, display: "flex", justifyContent: "center", paddingTop: 4 }}>
+                <button onClick={() => setSplitListOpen(true)} title={tr("view.expandList")} style={collapseBtn}>
+                  <Icon name="caretR" size={12} />
+                </button>
+              </div>
+            )}
             {activeRowId
               ? <RecordDetailView key={activeRowId} id={activeRowId} embedded />
               : <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: t.fgSubtle, fontSize: 12, background: t.panelAlt }}>{tr("search.results")}: 0</div>}
@@ -255,3 +291,8 @@ const pgBtn = (disabled: boolean): React.CSSProperties => ({
   border: `1px solid ${t.border}`, background: t.panel, padding: "2px 8px",
   cursor: disabled ? "not-allowed" : "pointer", color: disabled ? t.fgSubtle : t.fg, display: "flex",
 });
+
+const collapseBtn: React.CSSProperties = {
+  border: "none", background: "transparent", cursor: "pointer",
+  color: t.fgMuted, display: "flex", padding: 2,
+};

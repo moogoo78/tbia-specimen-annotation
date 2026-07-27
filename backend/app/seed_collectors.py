@@ -29,7 +29,7 @@ def _distinct_recorded_by(db_path: str) -> list[tuple[str, int]]:
     con = duckdb.connect(db_path, read_only=True)
     try:
         return con.execute(
-            "SELECT recorded_by, count(*) FROM occurrences "
+            "SELECT recorded_by, count(*) FROM occurrence "
             "WHERE recorded_by IS NOT NULL AND trim(recorded_by) <> '' "
             "GROUP BY recorded_by"
         ).fetchall()

@@ -2,8 +2,16 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
 const en = {
-  app: { title: "TBIA Specimen Annotation Platform", short: "TBIA Annotate" },
-  nav: { explore: "Explore", institutions: "Institutions", dashboard: "Dashboard", login: "Sign in", logout: "Sign out" },
+  app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
+  nav: { home: "Home", explore: "Explore", institutions: "Institutions", dashboard: "Dashboard", login: "Sign in", logout: "Sign out" },
+  home: {
+    tagline: "Closing gaps in specimen metadata",
+    blurb: "A collaborative platform for enriching TBIA natural-history specimen records. Find occurrences missing identification, coordinates, or dates — fill them by hand or with AI-assisted label transcription — and return reviewed enrichments to data providers.",
+    startExploring: "Start exploring",
+    browseByGroup: "Browse by biological group",
+    browseByOrg: "Browse by organization",
+    records: "records", datasets: "datasets",
+  },
   inst: { title: "Collection institutions", datasets: "datasets", records: "records", viewAll: "View all records" },
   search: {
     placeholder: "Search taxon, locality, collector, catalog #…",
@@ -22,7 +30,7 @@ const en = {
     search: "Search collector…", none: "No matching collectors",
     filterBy: "Show all {{n}} records by this collector",
   },
-  view: { table: "Table", grid: "Grid", split: "Split", map: "Map" },
+  view: { table: "Table", grid: "Grid", split: "Split", map: "Map", collapseList: "Hide list", expandList: "Show list" },
   col: {
     catalog: "Catalog #", record_number: "Record #", sciname: "Scientific name", common: "Common", family: "Family",
     group: "Group", county: "County", locality: "Locality", date: "Collected",
@@ -33,14 +41,58 @@ const en = {
     media: "Media", annotations: "Annotations", missing: "missing",
     collector: "Collector", coordinates: "Coordinates", elevation: "Elevation",
     backToResults: "Back to results", noMedia: "No images for this specimen",
+    resize: "Drag to resize",
   },
   annotate: {
     title: "Fill the gaps", field: "Field", proposed: "Proposed value",
     note: "Note (optional)", submit: "Submit annotation", saveDraft: "Save draft",
-    aiExtract: "AI extract from image", aiHint: "Review the AI draft, then edit and submit.",
     confidence: "confidence", accept: "Accept", reject: "Reject", merge: "Mark merged",
     loginToAnnotate: "Sign in to annotate", history: "Annotation history",
-    apply: "Use", model: "Model",
+    apply: "Use", applyAll: "Use all", model: "Model",
+    src_ai: "AI", src_mixed: "AI·edited",
+    current: "now", fieldsFilled: "fields to submit",
+    grpCollection: "Collection", grpEvent: "Collection event", grpTaxonomy: "Taxonomy",
+    grpLocality: "Locality", grpOther: "Annotation-only",
+
+    // AI assist block
+    aiTitle: "Read the label with AI",
+    aiWhat: "AI reads the text off the specimen image and proposes values for the form below. Nothing is submitted until you review it.",
+    aiPickHint: "Two ways to do it — pick either:",
+    aiNoImage: "This record has no image, so AI has no label to read. You can still fill the form by hand.",
+
+    // Option A — server-side queue
+    optQueueTitle: "Let the platform do it",
+    optQueueWhat: "Adds this record to the processing queue. You don't have to wait — when it finishes, the proposed values appear below under \"Annotation history\" as submitted annotations for you to review.",
+    optQueueGo: "Add to queue",
+    optQueueSlow: "Processing is run in batches, so this usually is not instant.",
+    engineIs: "Engine: {{name}}",
+
+    // Queue status strip
+    qPending: "Queued — waiting to be processed",
+    qPendingWhat: "Batches are run by the platform team, so there is no fixed wait. You don't have to stay here: this page updates itself while it's open, and the proposals will be waiting under \"Annotation history\" whenever you come back.",
+    qPendingAlt: "Don't want to wait? Run it yourself with option 2 below, or just fill the form in by hand — queuing doesn't block either.",
+    qDone: "Processed — see the proposed values below",
+    qDoneWhat: "The proposals are in \"Annotation history\" below, marked AI and awaiting review.",
+    qFailed: "Processing failed",
+    qFailedWhat: "Nothing was written. You can queue it again, or use option 2 below.",
+    qBy: "queued by {{who}}",
+    qAgain: "Queue again",
+
+    // Option B — bring your own AI chat
+    optPasteTitle: "Use your own AI chat",
+    optPasteWhat: "Free — you run it in ChatGPT / Claude / etc. and paste the answer back. Takes about a minute.",
+    optPasteGo: "Start",
+    step1: "Open the specimen image",
+    step1hint: "Open it, then drag or upload it into your AI chat.",
+    step1none: "No image on this record — attach your own photo of the label instead.",
+    step2: "Copy this prompt into the same chat",
+    step3: "Paste the AI's reply back here",
+    copyPrompt: "Copy prompt", copied: "Copied!",
+    pasteBack: "Paste the JSON reply here…", parse: "Read the reply",
+
+    // Draft results
+    draftsTitle: "AI proposals",
+    draftsHint: "Check each value, then \"Use\" it to load it into the form below. You still have to submit.",
   },
   status: {
     draft: "Draft", submitted: "Submitted", accepted: "Accepted",
@@ -61,17 +113,35 @@ const en = {
     orcidCompleting: "Completing sign-in…",
     orcidRetry: "Try again",
     orcidHelp: "No ORCID iD? Register free at",
+    devTitle: "Developer sign-in",
+    devHint: "ORCID can't round-trip on localhost. Pick a demo role to test (local dev only).",
   },
   fields: {
     scientificName: "Scientific name", eventDate: "Event date",
     decimalLatitude: "Latitude", decimalLongitude: "Longitude", locality: "Locality",
-    taxonRank: "Taxon rank",
+    taxonRank: "Taxon rank", full_text: "Full label text", other: "Other / notes",
+    catalogNumber: "Catalog #", typeStatus: "Type status",
+    recordedBy: "Recorded by", recordNumber: "Record number",
+    annotationScientificName: "Scientific name (verbatim)", annotationVernacularName: "Vernacular name (verbatim)",
+    verbatimCoordinateSystem: "Coordinate system",
+    verbatimLatitude: "Latitude (verbatim)", verbatimLongitude: "Longitude (verbatim)",
+    annotationLatitudeDMS: "Latitude (DMS)", annotationLongitudeDMS: "Longitude (DMS)",
+    annotationLatitudeDecimal: "Latitude (decimal)", annotationLongitudeDecimal: "Longitude (decimal)",
+    annotationCounty: "County", annotationMunicipality: "Municipality",
   },
 };
 
 const zh: typeof en = {
-  app: { title: "TBIA 標本資料補遺平台", short: "TBIA 補遺" },
-  nav: { explore: "探索", institutions: "典藏機構", dashboard: "貢獻儀表板", login: "登入", logout: "登出" },
+  app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
+  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", dashboard: "貢獻儀表板", login: "登入", logout: "登出" },
+  home: {
+    tagline: "填補標本後設資料的缺口",
+    blurb: "TBIA 自然史標本資料的協作標註平台。找出缺少鑑定、座標或日期的標本紀錄，以人工或 AI 輔助的標籤辨識補齊，並將審核後的補遺回饋給資料提供者。",
+    startExploring: "開始探索",
+    browseByGroup: "依生物類群瀏覽",
+    browseByOrg: "依組織單位瀏覽",
+    records: "筆紀錄", datasets: "個資料集",
+  },
   inst: { title: "典藏機構", datasets: "個資料集", records: "筆紀錄", viewAll: "查看全部紀錄" },
   search: {
     placeholder: "搜尋物種、地點、採集者、館號…",
@@ -90,7 +160,7 @@ const zh: typeof en = {
     search: "搜尋採集者…", none: "查無符合的採集者",
     filterBy: "顯示此採集者的全部 {{n}} 筆紀錄",
   },
-  view: { table: "表格", grid: "圖卡", split: "分割", map: "地圖" },
+  view: { table: "表格", grid: "圖卡", split: "分割", map: "地圖", collapseList: "隱藏清單", expandList: "顯示清單" },
   col: {
     catalog: "館號", record_number: "採集號", sciname: "學名", common: "俗名", family: "科",
     group: "類群", county: "縣市", locality: "地點", date: "採集日期",
@@ -101,14 +171,58 @@ const zh: typeof en = {
     media: "影像", annotations: "標註", missing: "缺漏",
     collector: "採集者", coordinates: "座標", elevation: "海拔",
     backToResults: "返回結果", noMedia: "此標本沒有影像",
+    resize: "拖曳調整寬度",
   },
   annotate: {
     title: "補齊缺漏資料", field: "欄位", proposed: "建議值",
     note: "備註（選填）", submit: "送出標註", saveDraft: "儲存草稿",
-    aiExtract: "以 AI 辨識影像", aiHint: "檢視 AI 草稿，編輯後送出。",
     confidence: "信心值", accept: "採納", reject: "退回", merge: "標記為已合併",
     loginToAnnotate: "登入後即可標註", history: "標註紀錄",
-    apply: "套用", model: "模型",
+    apply: "填入", applyAll: "全部填入", model: "模型",
+    src_ai: "AI", src_mixed: "AI·修改",
+    current: "現值", fieldsFilled: "個欄位待送出",
+    grpCollection: "典藏資訊", grpEvent: "採集事件", grpTaxonomy: "生物分類",
+    grpLocality: "地點", grpOther: "標註專用",
+
+    // AI assist block
+    aiTitle: "用 AI 辨識標籤",
+    aiWhat: "由 AI 讀取標本影像上的標籤文字，替下方表單提出建議值。建議值一定要你檢查過、按下送出才會成立。",
+    aiPickHint: "兩種做法，擇一即可：",
+    aiNoImage: "此紀錄沒有影像，AI 沒有標籤可讀。你仍然可以手動填寫下方表單。",
+
+    // Option A — server-side queue
+    optQueueTitle: "交給平台處理",
+    optQueueWhat: "把這筆紀錄排入處理佇列。你不需要等待 — 處理完成後，建議值會以「已送出」的標註出現在下方「標註紀錄」，再由你檢查。",
+    optQueueGo: "排入佇列",
+    optQueueSlow: "採批次處理，通常不會立即完成。",
+    engineIs: "引擎：{{name}}",
+
+    // Queue status strip
+    qPending: "已排入佇列 — 等待處理中",
+    qPendingWhat: "由平台人員分批執行，沒有固定的等待時間。你不需要留在這頁：本頁開著時會自動更新；離開後再回來，建議值也會留在下方「標註紀錄」等你。",
+    qPendingAlt: "不想等？可用下方第 2 種做法自己跑，或直接手動填寫表單 — 排入佇列不會擋住這兩件事。",
+    qDone: "已處理完成 — 建議值請見下方",
+    qDoneWhat: "建議值已在下方「標註紀錄」，標示為 AI，等待審核。",
+    qFailed: "處理失敗",
+    qFailedWhat: "沒有寫入任何資料。你可以重新排入佇列，或改用下方第 2 種做法。",
+    qBy: "由 {{who}} 排入",
+    qAgain: "重新排入佇列",
+
+    // Option B — bring your own AI chat
+    optPasteTitle: "用你自己的 AI 對話",
+    optPasteWhat: "免費 — 你在 ChatGPT／Claude 等自行執行，再把答案貼回來。大約需要一分鐘。",
+    optPasteGo: "開始",
+    step1: "開啟標本影像",
+    step1hint: "開啟後，把影像拖曳或上傳到你的 AI 對話中。",
+    step1none: "此紀錄沒有影像 — 請改為自行附上標籤照片。",
+    step2: "複製這段提示詞，貼到同一個對話",
+    step3: "把 AI 的回覆貼回這裡",
+    copyPrompt: "複製提示詞", copied: "已複製！",
+    pasteBack: "在此貼上 JSON 回覆…", parse: "讀取回覆",
+
+    // Draft results
+    draftsTitle: "AI 建議值",
+    draftsHint: "逐項確認後按「填入」，值會帶進下方表單；仍需按送出才算完成。",
   },
   status: {
     draft: "草稿", submitted: "已送出", accepted: "已採納",
@@ -129,11 +243,21 @@ const zh: typeof en = {
     orcidCompleting: "正在完成登入…",
     orcidRetry: "重試",
     orcidHelp: "還沒有 ORCID iD？免費註冊：",
+    devTitle: "開發者登入",
+    devHint: "ORCID 無法在 localhost 完成流程。選擇一個示範角色進行測試（僅限本機開發）。",
   },
   fields: {
     scientificName: "學名", eventDate: "採集日期",
     decimalLatitude: "緯度", decimalLongitude: "經度", locality: "地點",
-    taxonRank: "分類階層",
+    taxonRank: "分類階層", full_text: "標籤全文", other: "其他／備註",
+    catalogNumber: "館號", typeStatus: "標本類型",
+    recordedBy: "採集者", recordNumber: "採集號",
+    annotationScientificName: "學名(抄錄)", annotationVernacularName: "中文名(抄錄)",
+    verbatimCoordinateSystem: "座標系統",
+    verbatimLatitude: "緯度(抄錄)", verbatimLongitude: "經度(抄錄)",
+    annotationLatitudeDMS: "緯度(度分秒)", annotationLongitudeDMS: "經度(度分秒)",
+    annotationLatitudeDecimal: "緯度(十進位)", annotationLongitudeDecimal: "經度(十進位)",
+    annotationCounty: "縣市", annotationMunicipality: "鄉鎮市區",
   },
 };
 

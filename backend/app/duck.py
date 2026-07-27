@@ -25,7 +25,7 @@ def connect() -> None:
     global _con, _attached
     if not os.path.exists(settings.duckdb_path):
         raise RuntimeError(
-            f"DuckDB not found at {settings.duckdb_path}. Run `make ingest` first."
+            f"DuckDB not found at {settings.duckdb_path}. Run `make prepare` first."
         )
     _con = duckdb.connect(settings.duckdb_path, read_only=True)
     _con.execute(f"PRAGMA threads={settings.duck_threads}")

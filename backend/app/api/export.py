@@ -34,7 +34,7 @@ async def _rows_federated(dataset_name: str, statuses: list[str]) -> list[dict]:
                o.scientific_name, a.field, a.original_value, a.proposed_value,
                a.status, u.display_name AS contributor, a.reviewed_at
         FROM ann.annotations a
-        JOIN occurrences o ON o.id = a.occurrence_id
+        JOIN occurrence o ON o.id = a.occurrence_id
         LEFT JOIN ann.users u ON u.id = a.contributor_id
         WHERE a.dataset_name = ? AND a.status IN ({placeholders})
         ORDER BY a.reviewed_at DESC NULLS LAST, a.id DESC
@@ -53,7 +53,7 @@ def _rows_python(db: Session, dataset_name: str, statuses: list[str]) -> list[di
     for a in anns:
         occ = None
         # one-by-one detail lookups are fine here (export is low-volume)
-        rec = duck._run("SELECT catalog_number, scientific_name FROM occurrences WHERE id = ?",
+        rec = duck._run("SELECT catalog_number, scientific_name FROM occurrence WHERE id = ?",
                         [a.occurrence_id])
         occ = rec[0] if rec else {}
         u = db.get(User, a.contributor_id)

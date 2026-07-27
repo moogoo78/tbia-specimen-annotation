@@ -34,6 +34,22 @@ class OrcidCallback(BaseModel):
     code: str
 
 
+# ── Dev-only sign-in (NDB_DEV_LOGIN) ───────────────────────────────────────
+class DevUser(BaseModel):
+    email: str
+    display_name: str
+    role: str
+
+
+class DevLoginConfig(BaseModel):
+    enabled: bool
+    users: list[DevUser]
+
+
+class DevLoginRequest(BaseModel):
+    email: str
+
+
 class AnnotationCreate(BaseModel):
     field: str
     proposed_value: str | None = None
@@ -71,7 +87,7 @@ class AnnotationOut(BaseModel):
     modified: datetime
 
 
-# ── AI extraction stub ─────────────────────────────────────────────────────
+# ── AI extraction ──────────────────────────────────────────────────────────
 class ExtractedField(BaseModel):
     field: str
     value: str
@@ -82,4 +98,48 @@ class ExtractResponse(BaseModel):
     occurrence_id: str
     image_url: str | None
     model: str
+    service: str | None = None       # AI service the contributor used (e.g. ChatGPT)
+    extracted_at: str | None = None  # date of the extraction (YYYY-MM-DD)
     fields: list[ExtractedField]
+
+
+# ── AI copy-paste flow ─────────────────────────────────────────────────────
+# The platform hands the user a ready prompt (+ image URL) to paste into their
+# own AI chat, then parses the JSON they paste back into an ExtractResponse.
+class ExtractPromptResponse(BaseModel):
+    occurrence_id: str
+    image_url: str | None
+    target_fields: list[str]
+    prompt: str
+
+
+class ExtractPaste(BaseModel):
+    raw: str
+
+
+class TranscribeOptions(BaseModel):
+    """Per-request pipeline overrides (all optional -> global settings)."""
+    mode: str | None = None          # "single" | "two_stage"
+    ocr_model: str | None = None     # two_stage stage-1 vision model
+    field_model: str | None = None   # primary field model (both modes)
+
+
+class TranscribeConfig(BaseModel):
+    """What the server's "auto" preset actually resolves to, so the UI can name
+    the models instead of showing an opaque "Auto". Resolved from the settings at
+    request time — a queued request with no overrides picks up whatever these are
+    when the worker eventually runs it, not when it was queued."""
+
+    mode: str                  # "single" | "two_stage"
+    ocr_model: str | None      # stage-1 vision model (two_stage only)
+    field_model: str           # primary field model (both modes)
+
+
+class TranscribeRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    occurrence_id: str
+    contributor_id: int
+    created: datetime
+    notified: bool = False  # whether a Discord ping was actually sent

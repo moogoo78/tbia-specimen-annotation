@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -9,7 +9,89 @@ import type { ExtractedField, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
 
-const ANNOTATABLE = ["scientificName", "taxonRank", "eventDate", "decimalLatitude", "decimalLongitude", "locality"];
+// Annotatable form, mirroring docs/annotation-schema.md (parts + widgets).
+type Widget = "input" | "textarea" | "select" | "date" | "dms";
+type FieldDef = {
+  name: string;               // tbia annotation field name (submitted as-is)
+  widget: Widget;
+  options?: string[];         // select
+  hemis?: [string, string];   // dms: [positive, negative] hemisphere labels
+  degMax?: number;            // dms: max degrees (lat 90 / lon 180)
+  decimalField?: string;      // dms: sibling field auto-filled with the decimal value
+};
+
+// Controlled vocabularies (see annotation-schema.md).
+const TYPE_STATUS_OPTIONS = [
+  "HOLOTYPE", "ISOTYPE", "LECTOTYPE", "ISOLECTOTYPE", "SYNTYPE",
+  "PARATYPE", "PARALECTOTYPE", "NEOTYPE", "EPITYPE", "ALLOTYPE", "COTYPE", "TOPOTYPE",
+];
+const COORD_SYS_OPTIONS = ["TWD67", "TWD97"];
+const TAXON_RANK_OPTIONS = [
+  "kingdom", "phylum", "class", "order", "family",
+  "genus", "species", "subspecies", "variety", "form",
+];
+
+const ANNOTATABLE_GROUPS: { labelKey: string; fields: FieldDef[] }[] = [
+  { labelKey: "annotate.grpCollection", fields: [
+    { name: "catalogNumber", widget: "input" },
+    { name: "typeStatus", widget: "select", options: TYPE_STATUS_OPTIONS },
+  ] },
+  { labelKey: "annotate.grpEvent", fields: [
+    { name: "recordedBy", widget: "input" },
+    { name: "recordNumber", widget: "input" },
+    { name: "eventDate", widget: "date" },
+  ] },
+  { labelKey: "annotate.grpTaxonomy", fields: [
+    { name: "annotationScientificName", widget: "input" },
+    { name: "annotationVernacularName", widget: "input" },
+    { name: "taxonRank", widget: "select", options: TAXON_RANK_OPTIONS },
+  ] },
+  { labelKey: "annotate.grpLocality", fields: [
+    { name: "locality", widget: "input" },
+    { name: "verbatimCoordinateSystem", widget: "select", options: COORD_SYS_OPTIONS },
+    { name: "verbatimLatitude", widget: "input" },
+    { name: "verbatimLongitude", widget: "input" },
+    { name: "annotationLongitudeDMS", widget: "dms", hemis: ["東經", "西經"], degMax: 180, decimalField: "annotationLongitudeDecimal" },
+    { name: "annotationLatitudeDMS", widget: "dms", hemis: ["北緯", "南緯"], degMax: 90, decimalField: "annotationLatitudeDecimal" },
+    { name: "annotationLongitudeDecimal", widget: "input" },
+    { name: "annotationLatitudeDecimal", widget: "input" },
+    { name: "annotationCounty", widget: "input" },
+    { name: "annotationMunicipality", widget: "input" },
+  ] },
+  { labelKey: "annotate.grpOther", fields: [
+    { name: "full_text", widget: "textarea" },
+    { name: "other", widget: "textarea" },
+  ] },
+];
+const ALL_FIELDS: FieldDef[] = ANNOTATABLE_GROUPS.flatMap((g) => g.fields);
+
+
+// Composite widgets keep their parts under dotted sub-keys in the values map;
+// these turn the sub-keys into the single string that gets submitted.
+function serializeField(fd: FieldDef, values: Record<string, string>): string {
+  if (fd.widget === "date") {
+    const y = values["eventDate.y"] ?? "", mo = values["eventDate.mo"] ?? "", d = values["eventDate.d"] ?? "";
+    if (!y && !mo && !d) return "";
+    return `${y.padStart(4, "0")}-${(mo || "").padStart(2, "0")}-${(d || "").padStart(2, "0")}`;
+  }
+  if (fd.widget === "dms") {
+    const deg = values[`${fd.name}.deg`] ?? "", min = values[`${fd.name}.min`] ?? "", sec = values[`${fd.name}.sec`] ?? "";
+    if (!deg && !min && !sec) return "";
+    const hemi = values[`${fd.name}.hemi`] ?? fd.hemis![0];
+    return `${hemi} ${deg || 0}°${min || 0}'${sec || 0}"`;
+  }
+  return (values[fd.name] ?? "").trim();
+}
+
+// DMS -> signed decimal degrees (negative for the second/negative hemisphere).
+function dmsToDecimal(fd: FieldDef, values: Record<string, string>): string {
+  const deg = parseFloat(values[`${fd.name}.deg`] ?? "");
+  if (!Number.isFinite(deg)) return "";
+  const min = parseFloat(values[`${fd.name}.min`] ?? "") || 0;
+  const sec = parseFloat(values[`${fd.name}.sec`] ?? "") || 0;
+  const sign = (values[`${fd.name}.hemi`] ?? fd.hemis![0]) === fd.hemis![1] ? -1 : 1;
+  return (sign * (deg + min / 60 + sec / 3600)).toFixed(6);
+}
 
 // Route wrapper: /record/:id
 export function RecordDetail() {
@@ -20,7 +102,45 @@ export function RecordDetail() {
 // Reusable record body. `embedded` (split pane) hides the back link.
 export function RecordDetailView({ id, embedded }: { id: string; embedded?: boolean }) {
   const { t: tr } = useTranslation();
-  const q = useQuery({ queryKey: ["detail", id], queryFn: () => api.detail(id) });
+  // While an AI transcription request is queued, poll so the panel flips to
+  // "processed" (and the new AI annotations appear) without a manual reload —
+  // the batch worker runs on demand, so there's no completion event to wait on.
+  const q = useQuery({
+    queryKey: ["detail", id],
+    queryFn: () => api.detail(id),
+    refetchInterval: (query) => (query.state.data?.transcribe?.status === "pending" ? 20_000 : false),
+  });
+
+  // Draggable divider between the read-only fields (left) and the media +
+  // annotation column (right). Width persists across records/sessions.
+  const ANNOT_MIN = 320, ANNOT_MAX = 820;
+  const [annotW, setAnnotW] = useState(() => {
+    const s = Number(localStorage.getItem("tbia_annot_w"));
+    return Number.isFinite(s) && s >= ANNOT_MIN ? Math.min(s, ANNOT_MAX) : 360;
+  });
+  const drag = useRef<{ x: number; w: number } | null>(null);
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!drag.current) return;
+      const next = drag.current.w - (e.clientX - drag.current.x);  // right column grows as you drag left
+      setAnnotW(Math.max(ANNOT_MIN, Math.min(ANNOT_MAX, next)));
+    };
+    const onUp = () => {
+      if (!drag.current) return;
+      drag.current = null;
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
+  useEffect(() => { localStorage.setItem("tbia_annot_w", String(annotW)); }, [annotW]);
+  const startDrag = (e: React.MouseEvent) => {
+    drag.current = { x: e.clientX, w: annotW };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+  };
 
   if (q.isLoading || !q.data) return <Spinner />;
   const r = q.data;
@@ -29,7 +149,7 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: t.panelAlt, overflow: "auto" }}>
       {/* header strip */}
       <div style={{ padding: "10px 16px", background: t.panel, borderBottom: `1px solid ${t.border}`, display: "flex", gap: 12, alignItems: "flex-start" }}>
-        {!embedded && <Link to="/" style={{ color: t.fgMuted, display: "flex", alignItems: "center", marginTop: 4 }}><Icon name="back" size={16} /></Link>}
+        {!embedded && <Link to="/explore" style={{ color: t.fgMuted, display: "flex", alignItems: "center", marginTop: 4 }}><Icon name="back" size={16} /></Link>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <GroupTag group={r.bio_group} />
@@ -48,17 +168,17 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 12, padding: 12, flex: 1, overflow: "auto", minHeight: 0 }}>
+      <div style={{ display: "flex", padding: 12, flex: 1, overflow: "auto", minHeight: 0 }}>
         {/* left column: record fields */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10, paddingRight: 12 }}>
           <Section title={tr("detail.taxonomy")}><Taxonomy r={r} /></Section>
           <Section title={tr("detail.event")}>
             <CollectorField recordedBy={r.recorded_by as string} />
-            <Field k={tr("col.date")} v={r.std_date} missing={!r.has_date} verbatim={r.event_date as string} />
+            <Field k={tr("col.date")} v={r.standard_date} missing={!r.has_date} verbatim={r.event_date as string} />
             <Field k={tr("col.county")} v={[r.county, r.municipality].filter(Boolean).join(" ")} />
             <Field k={tr("col.locality")} v={r.locality} />
             <Field k={tr("detail.coordinates")}
-              v={r.has_coordinates ? `${r.std_lat}, ${r.std_lon}` : null} missing={!r.has_coordinates}
+              v={r.has_coordinates ? `${r.standard_latitude}, ${r.standard_longitude}` : null} missing={!r.has_coordinates}
               verbatim={[r.verbatim_latitude, r.verbatim_longitude].filter(Boolean).join(", ") || undefined} />
           </Section>
           <Section title={tr("detail.record")}>
@@ -69,10 +189,18 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
           </Section>
         </div>
 
+        {/* draggable divider — drag left to widen the annotation column */}
+        <div onMouseDown={startDrag} title={tr("detail.resize")} style={{
+          width: 8, flexShrink: 0, cursor: "col-resize", alignSelf: "stretch",
+          display: "flex", justifyContent: "center", position: "relative",
+        }}>
+          <div style={{ width: 2, background: t.border }} />
+        </div>
+
         {/* right column: media + annotation */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ width: annotW, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, paddingLeft: 12 }}>
           <Section title={`${tr("detail.media")} · ${r.media.length}`}>
-            <MediaGallery urls={r.media} references={r.references_url as string} />
+            <MediaGallery urls={r.media} references={r["references"] as string} />
           </Section>
           <AnnotationPanel record={r} />
         </div>
@@ -125,7 +253,7 @@ function CollectorField({ recordedBy }: { recordedBy?: string | null }) {
       <span style={{ flex: 1, fontSize: 12, wordBreak: "break-word" }}>
         {!has ? <span style={{ color: t.danger, fontSize: 11 }}>{tr("detail.missing")}</span>
           : c ? (
-            <Link to="/" state={{ collector: { id: c.id, label: c.label } }}
+            <Link to="/explore" state={{ collector: { id: c.id, label: c.label } }}
               title={tr("collector.filterBy", { n: c.n_records.toLocaleString() })}
               style={{ color: t.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
               <Icon name="user" size={11} />{String(recordedBy)}<Icon name="caretR" size={9} />
@@ -138,8 +266,8 @@ function CollectorField({ recordedBy }: { recordedBy?: string | null }) {
 
 function Taxonomy({ r }: { r: OccurrenceDetail }) {
   const chain = [
-    [r.kingdom_c, r.kingdom], [r.phylum_c, r.phylum], [r.class_c, r.class_name],
-    [r.order_c, r.order_name], [r.family_c, r.family], [r.genus_c, r.genus],
+    [r.kingdom_c, r.kingdom], [r.phylum_c, r.phylum], [r.class_c, r["class"]],
+    [r.order_c, r["order"]], [r.family_c, r.family], [r.genus_c, r.genus],
   ].filter(([, lat]) => lat) as [string, string][];
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center", fontSize: 11, lineHeight: 1.8 }}>
@@ -183,29 +311,81 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   const { t: tr } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [field, setField] = useState(
-    !record.has_identification ? "scientificName" :
-    !record.has_coordinates ? "decimalLatitude" :
-    !record.has_date ? "eventDate" : "scientificName"
+  // Start on the class most likely to have a gap to fill.
+  const [activeGroup, setActiveGroup] = useState(
+    !record.has_identification ? "annotate.grpTaxonomy" :
+    !record.has_coordinates ? "annotate.grpLocality" :
+    !record.has_date ? "annotate.grpEvent" : "annotate.grpTaxonomy"
   );
-  const [value, setValue] = useState("");
+  // Proposed values keyed by field — many fields can be edited at once.
+  const [values, setValues] = useState<Record<string, string>>({});
+  // AI value that was applied into a field (from a draft). Lets submit tell
+  // apart ai (kept verbatim), mixed (AI value then edited), manual (typed).
+  const [aiSeed, setAiSeed] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
-  const [drafts, setDrafts] = useState<ExtractedField[]>([]);
-  const [model, setModel] = useState<string | null>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["detail", record.id] });
 
-  const extractMut = useMutation({
-    mutationFn: () => api.extract(record.id),
-    onSuccess: (res) => { setDrafts(res.fields); setModel(res.model); },
-  });
+  // The record's holding-institution code (from registry.json, keyed by the
+  // record's tbia_dataset_id) — shown as a read-only prefix on catalogNumber.
+  const registry = useQuery({ queryKey: ["registry"], queryFn: () => api.registry(), staleTime: Infinity });
+  const institutionCode = useMemo(() => {
+    const dsid = record.tbia_dataset_id as string | undefined;
+    const insts = registry.data?.institutions;
+    if (!dsid || !insts) return null;
+    for (const [code, ent] of Object.entries(insts)) {
+      if (ent.datasets && dsid in ent.datasets) return code;
+    }
+    return null;
+  }, [registry.data, record.tbia_dataset_id]);
+
+  // Fields (across every class) that currently hold a proposed value.
+  const filled = ALL_FIELDS
+    .map((fd) => ({ fd, value: serializeField(fd, values) }))
+    .filter((x) => x.value !== "");
+  const setVal = (f: string, v: string) => setValues((s) => ({ ...s, [f]: v }));
+  const groupOf = (name: string) =>
+    ANNOTATABLE_GROUPS.find((g) => g.fields.some((f) => f.name === name))?.labelKey;
+  // A DMS sub-part changed: store it and keep the sibling decimal field in sync.
+  const setDms = (fd: FieldDef, part: "hemi" | "deg" | "min" | "sec", v: string) =>
+    setValues((s) => {
+      const next = { ...s, [`${fd.name}.${part}`]: v };
+      if (fd.decimalField) next[fd.decimalField] = dmsToDecimal(fd, next);
+      return next;
+    });
+
+  // ai = kept the AI value verbatim; mixed = AI value the human edited;
+  // manual = typed with no AI seed for this field.
+  const sourceFor = (name: string, value: string): string => {
+    const seed = aiSeed[name];
+    if (seed === undefined) return "manual";
+    return value === seed ? "ai" : "mixed";
+  };
+  // Record that a field was seeded from an AI draft (used by sourceFor).
+  const seed = (name: string, value: string) => setAiSeed((s) => ({ ...s, [name]: value }));
+
+  // Apply an AI draft into the form. Most fields are a plain string, but the
+  // eventDate composite must be split into its year/month/day sub-inputs;
+  // seed the serialized (padded) form so sourceFor still classifies it "ai".
+  const applyDraft = (name: string, value: string) => {
+    if (name !== "eventDate") { setVal(name, value); seed(name, value); return; }
+    const m = value.trim().match(/^(\d{4})(?:[-/.](\d{1,2}))?(?:[-/.](\d{1,2}))?/);
+    const y = m?.[1] ?? "";
+    const mo = m?.[2] ? String(parseInt(m[2], 10)) : "";
+    const d = m?.[3] ? String(parseInt(m[3], 10)) : "";
+    setValues((s) => ({ ...s, "eventDate.y": y, "eventDate.mo": mo, "eventDate.d": d }));
+    seed(name, y ? `${y.padStart(4, "0")}-${(mo || "").padStart(2, "0")}-${(d || "").padStart(2, "0")}` : "");
+  };
+
   const createMut = useMutation({
-    mutationFn: (status: string) => api.createAnnotation(record.id, {
-      field, proposed_value: value, original_value: originalFor(record, field),
-      note: note || null, source: drafts.some((d) => d.field === field && d.value === value) ? "ai" : "manual",
-      status,
-    }),
-    onSuccess: () => { setValue(""); setNote(""); refresh(); },
+    mutationFn: (status: string) => Promise.all(filled.map(({ fd, value }) =>
+      api.createAnnotation(record.id, {
+        field: fd.name, proposed_value: value, original_value: originalFor(record, fd.name),
+        note: note || null,
+        source: sourceFor(fd.name, value),
+        status,
+      }))),
+    onSuccess: () => { setValues({}); setAiSeed({}); setNote(""); refresh(); },
   });
   const reviewMut = useMutation({
     mutationFn: ({ annId, status }: { annId: number; status: string }) => api.updateAnnotation(annId, { status }),
@@ -231,34 +411,100 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
         <Icon name="spark" size={11} />{tr("annotate.title")}
       </div>
       <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-        {/* AI extract */}
-        <Button small onClick={() => extractMut.mutate()} disabled={extractMut.isPending}>
-          <Icon name="spark" size={11} />{extractMut.isPending ? "…" : tr("annotate.aiExtract")}
-        </Button>
-        {model && (
-          <div style={{ fontSize: 10, color: t.fgSubtle }}>
-            {tr("annotate.aiHint")} <span style={{ fontFamily: t.mono }}>({model})</span>
-          </div>
-        )}
-        {drafts.map((d, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", background: t.panelAlt, border: `1px solid ${t.borderSoft}`, fontSize: 11 }}>
-            <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted, width: 90, flexShrink: 0 }}>{d.field}</span>
-            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.value}</span>
-            <span style={{ fontSize: 9, color: t.ok, fontFamily: t.mono }}>{Math.round(d.confidence * 100)}%</span>
-            <Button small onClick={() => { setField(d.field); setValue(d.value); }}>{tr("annotate.apply")}</Button>
-          </div>
-        ))}
+        <AiAssist record={record} onUse={(field, value) => {
+          applyDraft(field, value);
+          const g = groupOf(field); if (g) setActiveGroup(g);
+        }} />
 
-        {/* manual form */}
+        {/* manual form — class tabs, each editing all its fields at once */}
         <div style={{ borderTop: `1px solid ${t.borderSoft}`, paddingTop: 8 }}>
-          <select value={field} onChange={(e) => setField(e.target.value)} style={inputStyle}>
-            {ANNOTATABLE.map((f) => <option key={f} value={f}>{tr(`fields.${f}`, f)}</option>)}
-          </select>
-          <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={tr("annotate.proposed")} style={{ ...inputStyle, marginTop: 6 }} />
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tr("annotate.note")} style={{ ...inputStyle, marginTop: 6 }} />
-          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-            <Button primary small disabled={!value || createMut.isPending} onClick={() => createMut.mutate("submitted")}>{tr("annotate.submit")}</Button>
-            <Button small disabled={!value || createMut.isPending} onClick={() => createMut.mutate("draft")}>{tr("annotate.saveDraft")}</Button>
+          {/* class tab nav */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 2, borderBottom: `1px solid ${t.borderSoft}`, marginBottom: 8 }}>
+            {ANNOTATABLE_GROUPS.map((g) => {
+              const active = activeGroup === g.labelKey;
+              const n = g.fields.filter((f) => serializeField(f, values) !== "").length;
+              return (
+                <button key={g.labelKey} onClick={() => setActiveGroup(g.labelKey)} style={{
+                  padding: "4px 9px", fontSize: 11, fontFamily: t.sans, cursor: "pointer",
+                  border: "none", background: "transparent",
+                  color: active ? t.fg : t.fgMuted, fontWeight: active ? 600 : 400,
+                  borderBottom: active ? `2px solid ${t.accent}` : "2px solid transparent", marginBottom: -1,
+                  display: "flex", alignItems: "center", gap: 4,
+                }}>
+                  {tr(g.labelKey)}
+                  {n > 0 && <span style={{ fontSize: 9, fontFamily: t.mono, color: t.accent }}>·{n}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* every field in the active class */}
+          {ANNOTATABLE_GROUPS.find((g) => g.labelKey === activeGroup)!.fields.map((fd) => {
+            const orig = originalFor(record, fd.name);
+            return (
+              <div key={fd.name} style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: t.fgMuted }}>{tr(`fields.${fd.name}`, fd.name)}</span>
+                  {serializeField(fd, values) !== "" && <SourceTag source={sourceFor(fd.name, serializeField(fd, values))} />}
+                  {orig != null && (
+                    <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      title={orig}>{tr("annotate.current")}: {orig}</span>
+                  )}
+                </div>
+                {fd.widget === "textarea" ? (
+                  <textarea value={values[fd.name] ?? ""} onChange={(e) => setVal(fd.name, e.target.value)}
+                    placeholder={tr("annotate.proposed")} style={{ ...textareaStyle, height: fd.name === "full_text" ? 110 : 70 }} />
+                ) : fd.widget === "select" ? (
+                  <select value={values[fd.name] ?? ""} onChange={(e) => setVal(fd.name, e.target.value)} style={inputStyle}>
+                    <option value="">—</option>
+                    {fd.options!.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                ) : fd.widget === "date" ? (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <input inputMode="numeric" value={values["eventDate.y"] ?? ""} onChange={(e) => setVal("eventDate.y", e.target.value)}
+                      placeholder="YYYY" style={{ ...inputStyle, width: 64 }} />
+                    <select value={values["eventDate.mo"] ?? ""} onChange={(e) => setVal("eventDate.mo", e.target.value)} style={{ ...inputStyle, width: 60 }}>
+                      <option value="">MM</option>
+                      {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <input inputMode="numeric" value={values["eventDate.d"] ?? ""} onChange={(e) => setVal("eventDate.d", e.target.value)}
+                      placeholder="DD" style={{ ...inputStyle, width: 52 }} />
+                  </div>
+                ) : fd.widget === "dms" ? (
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <select value={values[`${fd.name}.hemi`] ?? fd.hemis![0]} onChange={(e) => setDms(fd, "hemi", e.target.value)} style={{ ...inputStyle, width: 62 }}>
+                      {fd.hemis!.map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                    <input inputMode="numeric" value={values[`${fd.name}.deg`] ?? ""} onChange={(e) => setDms(fd, "deg", e.target.value)}
+                      placeholder="0" style={{ ...inputStyle, width: 52 }} /><span style={{ fontSize: 11, color: t.fgSubtle }}>°</span>
+                    <input inputMode="numeric" value={values[`${fd.name}.min`] ?? ""} onChange={(e) => setDms(fd, "min", e.target.value)}
+                      placeholder="0" style={{ ...inputStyle, width: 44 }} /><span style={{ fontSize: 11, color: t.fgSubtle }}>′</span>
+                    <input inputMode="numeric" value={values[`${fd.name}.sec`] ?? ""} onChange={(e) => setDms(fd, "sec", e.target.value)}
+                      placeholder="0" style={{ ...inputStyle, width: 44 }} /><span style={{ fontSize: 11, color: t.fgSubtle }}>″</span>
+                  </div>
+                ) : fd.name === "catalogNumber" && institutionCode ? (
+                  <div style={{ display: "flex", alignItems: "stretch" }}>
+                    <span title="institutionCode" style={{
+                      display: "flex", alignItems: "center", padding: "0 7px", fontSize: 12,
+                      fontFamily: t.mono, color: t.fgMuted, background: t.panelAlt,
+                      border: `1px solid ${t.border}`, borderRight: "none", whiteSpace: "nowrap",
+                    }}>{institutionCode}</span>
+                    <input value={values[fd.name] ?? ""} onChange={(e) => setVal(fd.name, e.target.value)}
+                      placeholder={tr("annotate.proposed")} style={{ ...inputStyle, width: "auto", flex: 1, minWidth: 0, borderLeft: "none" }} />
+                  </div>
+                ) : (
+                  <input value={values[fd.name] ?? ""} onChange={(e) => setVal(fd.name, e.target.value)}
+                    placeholder={tr("annotate.proposed")} style={inputStyle} />
+                )}
+              </div>
+            );
+          })}
+
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tr("annotate.note")} style={inputStyle} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+            <Button primary small disabled={filled.length === 0 || createMut.isPending} onClick={() => createMut.mutate("submitted")}>{tr("annotate.submit")}</Button>
+            <Button small disabled={filled.length === 0 || createMut.isPending} onClick={() => createMut.mutate("draft")}>{tr("annotate.saveDraft")}</Button>
+            {filled.length > 0 && <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>{filled.length} {tr("annotate.fieldsFilled")}</span>}
           </div>
         </div>
 
@@ -266,6 +512,282 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
           onReview={(annId, status) => reviewMut.mutate({ annId, status })} />
       </div>
     </div>
+  );
+}
+
+// ── AI assist ──────────────────────────────────────────────────────────────
+// One block for both AI routes, because they do the same job and the user only
+// needs to pick one:
+//   A. queue it — the server-side batch worker writes the proposals back as
+//      submitted annotations (arrives later, shows up in History).
+//   B. do it yourself — copy the prompt into your own AI chat, paste the JSON
+//      reply back (no platform API cost, results land in the form immediately).
+// `onUse` loads one proposed value into the manual form below.
+function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: string, value: string) => void }) {
+  const { t: tr } = useTranslation();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState<"queue" | "paste" | null>(null);
+  const [pasteRaw, setPasteRaw] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [drafts, setDrafts] = useState<ExtractedField[]>([]);
+  // Provenance of the last pasted AI draft: service · model (date).
+  const [prov, setProv] = useState<{ model: string; service?: string | null; extracted_at?: string | null } | null>(null);
+
+  const hasImage = record.media.length > 0;
+  const q = record.transcribe;   // durable queue state (survives reload)
+
+  // "Auto" sends no overrides, so what it runs is whatever the server is
+  // configured for — ask, rather than showing an opaque "Auto".
+  const engineCfg = useQuery({
+    queryKey: ["transcribe-config"],
+    queryFn: () => api.transcribeConfig(),
+    staleTime: 10 * 60_000,
+  });
+  // The server's model chain as "sonnet-5→opus-4-8" (the claude- prefix is noise
+  // at this width). Read-only: the contributor doesn't pick an engine.
+  const engineChain = (() => {
+    const c = engineCfg.data;
+    if (!c) return undefined;
+    const short = (m: string) => m.replace(/^claude-/, "");
+    return c.mode === "two_stage" && c.ocr_model
+      ? `${short(c.ocr_model)}→${short(c.field_model)}`
+      : short(c.field_model);
+  })();
+
+  // Prompt is fetched lazily — only once the user opens the copy-paste route.
+  const promptQuery = useQuery({
+    queryKey: ["extract-prompt", record.id],
+    queryFn: () => api.extractPrompt(record.id),
+    enabled: open === "paste",
+  });
+  const pasteMut = useMutation({
+    mutationFn: () => api.extractPaste(record.id, pasteRaw),
+    onSuccess: (res) => {
+      setDrafts(res.fields); setProv({ model: res.model, service: res.service, extracted_at: res.extracted_at });
+      setOpen(null); setPasteRaw("");
+    },
+  });
+  // Queue this record for transcription (persists occ id + user id, then
+  // best-effort Discord notification). Independent of submitting annotations.
+  const queueMut = useMutation({
+    mutationFn: () => api.scheduleTranscribe(record.id),
+    onSuccess: () => { setOpen(null); qc.invalidateQueries({ queryKey: ["detail", record.id] }); },
+  });
+  const copyPrompt = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  };
+
+  return (
+    <div style={{ border: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>
+      <div style={{ padding: "6px 8px", borderBottom: `1px solid ${t.borderSoft}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600 }}>
+          <Icon name="spark" size={12} />{tr("annotate.aiTitle")}
+        </div>
+        <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.6, marginTop: 3 }}>{tr("annotate.aiWhat")}</div>
+        {!hasImage && (
+          <div style={{ fontSize: 10, color: t.warn, lineHeight: 1.5, marginTop: 4, display: "flex", gap: 4 }}>
+            <Icon name="alert" size={11} /><span>{tr("annotate.aiNoImage")}</span>
+          </div>
+        )}
+      </div>
+
+      {/* durable queue state — replaces the old 5-second "已排程" flash */}
+      {q && <QueueStatus q={q} />}
+
+      <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontSize: 10, color: t.fgSubtle }}>{tr("annotate.aiPickHint")}</div>
+
+        {/* route A — hand it to the platform's batch worker */}
+        <OptionCard n={1} title={tr("annotate.optQueueTitle")} what={tr("annotate.optQueueWhat")}
+          open={open === "queue"} onToggle={() => setOpen(open === "queue" ? null : "queue")}
+          cta={q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")} disabled={!hasImage}
+          meta={engineChain ? tr("annotate.engineIs", { name: engineChain }) : undefined}>
+          <div style={{ fontSize: 10, color: t.fgSubtle }}>{tr("annotate.optQueueSlow")}</div>
+          {engineChain && (
+            <div style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>
+              {tr("annotate.engineIs", { name: engineChain })}
+            </div>
+          )}
+          {queueMut.isError && <div style={{ fontSize: 10, color: t.danger }}>{(queueMut.error as Error).message}</div>}
+          <Button primary small disabled={!hasImage || queueMut.isPending}
+            onClick={() => queueMut.mutate()}>
+            {queueMut.isPending ? "…" : <><Icon name="down" size={11} />{q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")}</>}
+          </Button>
+        </OptionCard>
+
+        {/* route B — the user's own AI chat, three explicit steps */}
+        <OptionCard n={2} title={tr("annotate.optPasteTitle")} what={tr("annotate.optPasteWhat")}
+          open={open === "paste"} onToggle={() => setOpen(open === "paste" ? null : "paste")}
+          cta={tr("annotate.optPasteGo")}>
+          {promptQuery.isLoading && <Spinner />}
+          {promptQuery.data && (
+            <>
+              <Step n={1} label={tr("annotate.step1")}>
+                {promptQuery.data.image_url ? (
+                  <>
+                    <a href={promptQuery.data.image_url} target="_blank" rel="noreferrer"
+                      style={{ color: t.accent, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <Icon name="img" size={11} />{tr("annotate.step1")} ↗
+                    </a>
+                    <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 2 }}>{tr("annotate.step1hint")}</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 10, color: t.warn }}>{tr("annotate.step1none")}</div>
+                )}
+              </Step>
+              <Step n={2} label={tr("annotate.step2")}>
+                <textarea readOnly value={promptQuery.data.prompt}
+                  onFocus={(e) => e.currentTarget.select()}
+                  style={{ ...textareaStyle, height: 110 }} />
+                <div style={{ marginTop: 4 }}>
+                  <Button small onClick={() => copyPrompt(promptQuery.data!.prompt)}>
+                    <Icon name={copied ? "check" : "down"} size={11} />
+                    {copied ? tr("annotate.copied") : tr("annotate.copyPrompt")}
+                  </Button>
+                </div>
+              </Step>
+              <Step n={3} label={tr("annotate.step3")}>
+                <textarea value={pasteRaw} onChange={(e) => setPasteRaw(e.target.value)}
+                  placeholder={tr("annotate.pasteBack")} style={{ ...textareaStyle, height: 80 }} />
+                {pasteMut.isError && (
+                  <div style={{ fontSize: 10, color: t.danger, marginTop: 2 }}>{(pasteMut.error as Error).message}</div>
+                )}
+                <div style={{ marginTop: 4 }}>
+                  <Button primary small disabled={!pasteRaw.trim() || pasteMut.isPending} onClick={() => pasteMut.mutate()}>
+                    {pasteMut.isPending ? "…" : tr("annotate.parse")}
+                  </Button>
+                </div>
+              </Step>
+            </>
+          )}
+        </OptionCard>
+      </div>
+
+      {/* proposals from route B — route A's land in History instead */}
+      {drafts.length > 0 && (
+        <div style={{ borderTop: `1px solid ${t.borderSoft}`, padding: 8, background: t.panel }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <span style={{ fontSize: 11, fontWeight: 600 }}>{tr("annotate.draftsTitle")} · {drafts.length}</span>
+            <div style={{ flex: 1 }} />
+            {drafts.length > 1 && (
+              <Button small onClick={() => drafts.forEach((d) => onUse(d.field, d.value))}>{tr("annotate.applyAll")}</Button>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.5, marginBottom: 6 }}>{tr("annotate.draftsHint")}</div>
+          {prov && (
+            <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginBottom: 4 }}>
+              {[prov.service, prov.model].filter(Boolean).join(" · ")}{prov.extracted_at ? `, ${prov.extracted_at}` : ""}
+            </div>
+          )}
+          {drafts.map((d, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", marginBottom: 3, background: t.panelAlt, border: `1px solid ${t.borderSoft}`, fontSize: 11 }}>
+              <span style={{ fontSize: 10, color: t.fgMuted, width: 78, flexShrink: 0 }} title={d.field}>{tr(`fields.${d.field}`, d.field)}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.value}>{d.value}</span>
+              <span style={{ fontSize: 9, color: t.ok, fontFamily: t.mono }} title={tr("annotate.confidence")}>{Math.round(d.confidence * 100)}%</span>
+              <Button small onClick={() => onUse(d.field, d.value)}>{tr("annotate.apply")}</Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Collapsed: a numbered row you can read in one glance, plus `meta` — the
+// current value of a setting that lives inside, so it's discoverable without
+// opening the card. Expanded: its controls (meta hides, the real control shows).
+function OptionCard({ n, title, what, cta, open, onToggle, disabled, meta, children }: {
+  n: number; title: string; what: string; cta: string; open: boolean;
+  onToggle: () => void; disabled?: boolean; meta?: string; children: React.ReactNode;
+}) {
+  return (
+    <div style={{ border: `1px solid ${open ? t.accent : t.borderSoft}`, background: t.panel, opacity: disabled && !open ? 0.55 : 1 }}>
+      <button onClick={onToggle} style={{
+        width: "100%", textAlign: "left", display: "flex", gap: 7, padding: "7px 8px",
+        border: "none", background: "transparent", cursor: "pointer", fontFamily: t.sans,
+      }}>
+        <span style={{
+          flexShrink: 0, width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 10, fontFamily: t.mono, color: open ? t.bg : t.fgMuted,
+          background: open ? t.accent : t.panelAlt, border: `1px solid ${open ? t.accent : t.border}`,
+        }}>{n}</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: t.fg }}>
+            {title}
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 10, fontWeight: 400, color: t.accent }}>{open ? "" : cta} </span>
+            <Icon name={open ? "caretD" : "caretR"} size={10} />
+          </span>
+          <span style={{ display: "block", fontSize: 10, color: t.fgMuted, lineHeight: 1.6, marginTop: 3 }}>{what}</span>
+          {meta && !open && (
+            <span style={{ display: "inline-block", fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginTop: 4, padding: "0 4px", border: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>{meta}</span>
+          )}
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 8px 8px 31px", display: "flex", flexDirection: "column", gap: 6 }}>{children}</div>
+      )}
+    </div>
+  );
+}
+
+function Step({ n, label, children }: { n: number; label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: t.fgMuted, marginBottom: 3 }}>
+        <span style={{ fontFamily: t.mono, color: t.accent }}>{n}.</span> {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// What happened to the queued request — and, since the batch worker is run
+// on demand (no ETA to promise), what the contributor can do instead of wait.
+function QueueStatus({ q }: { q: NonNullable<OccurrenceDetail["transcribe"]> }) {
+  const { t: tr } = useTranslation();
+  const tone = q.status === "failed" ? t.danger : q.status === "done" ? t.ok : t.warn;
+  const label = q.status === "failed" ? tr("annotate.qFailed")
+    : q.status === "done" ? tr("annotate.qDone") : tr("annotate.qPending");
+  const what = q.status === "failed" ? tr("annotate.qFailedWhat")
+    : q.status === "done" ? tr("annotate.qDoneWhat") : tr("annotate.qPendingWhat");
+  const when = (q.processed_at || q.created || "").slice(0, 16).replace("T", " ");
+  return (
+    <div style={{ padding: "6px 8px", borderBottom: `1px solid ${t.borderSoft}`, background: t.panel, borderLeft: `2px solid ${tone}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: tone, fontWeight: 600 }}>
+        <Icon name={q.status === "failed" ? "alert" : q.status === "done" ? "check" : "cog"} size={11} />{label}
+      </div>
+      <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.6, marginTop: 3 }}>{what}</div>
+      {q.status === "pending" && (
+        <div style={{ fontSize: 10, color: t.fgSubtle, lineHeight: 1.6, marginTop: 3 }}>{tr("annotate.qPendingAlt")}</div>
+      )}
+      {q.status === "failed" && q.error && (
+        <div style={{ fontSize: 10, color: t.danger, marginTop: 3, wordBreak: "break-word" }}>{q.error}</div>
+      )}
+      <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginTop: 3 }}>
+        {when}{q.requested_by ? ` · ${tr("annotate.qBy", { who: q.requested_by })}` : ""}
+      </div>
+    </div>
+  );
+}
+
+// Value provenance: ai (kept verbatim) · mixed (AI, then human-edited) ·
+// manual (typed). Legacy rows may be blank → treated as manual (no tag).
+function SourceTag({ source }: { source: string }) {
+  const { t: tr } = useTranslation();
+  if (source !== "ai" && source !== "mixed") return null;
+  const tone = source === "ai" ? t.accent : t.warn;
+  return (
+    <span title={tr(`annotate.src_${source}`)} style={{
+      display: "inline-flex", alignItems: "center", gap: 2, fontSize: 9,
+      fontFamily: t.mono, color: tone, border: `1px solid ${tone}`, padding: "0 3px",
+    }}>
+      <Icon name="spark" size={8} />{tr(`annotate.src_${source}`)}
+    </span>
   );
 }
 
@@ -283,7 +805,7 @@ function History({ annotations, isReviewer, onReview }: {
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted }}>{a.field}</span>
             <span style={{ flex: 1 }} />
-            {a.source === "ai" && <Icon name="spark" size={10} />}
+            <SourceTag source={a.source} />
             <StatusPill status={a.status} />
           </div>
           <div style={{ marginTop: 1 }}>
@@ -309,10 +831,13 @@ function History({ annotations, isReviewer, onReview }: {
   );
 }
 
+// Current occurrence value shown as reference. `annotation*` fields are ones
+// TBIA doesn't hold (annotation-schema.md), so they have no original value.
 function originalFor(r: OccurrenceDetail, field: string): string | null {
   const map: Record<string, unknown> = {
-    scientificName: r.scientific_name, taxonRank: r.taxon_rank, eventDate: r.std_date,
-    decimalLatitude: r.std_lat, decimalLongitude: r.std_lon, locality: r.locality,
+    catalogNumber: r.catalog_number, typeStatus: r.type_status,
+    recordedBy: r.recorded_by, recordNumber: r.record_number,
+    taxonRank: r.taxon_rank, eventDate: r.standard_date, locality: r.locality,
   };
   const v = map[field];
   return v == null ? null : String(v);
@@ -321,4 +846,8 @@ function originalFor(r: OccurrenceDetail, field: string): string | null {
 const inputStyle: React.CSSProperties = {
   width: "100%", boxSizing: "border-box", padding: "5px 7px", fontSize: 12,
   border: `1px solid ${t.border}`, background: t.panelAlt, outline: "none", fontFamily: t.sans,
+};
+
+const textareaStyle: React.CSSProperties = {
+  ...inputStyle, resize: "vertical", fontFamily: t.mono, fontSize: 11, lineHeight: 1.4,
 };

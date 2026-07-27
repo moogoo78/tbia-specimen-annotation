@@ -11,7 +11,7 @@ DATA = os.path.join(REPO, "data")
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NDB_", env_file=".env", extra="ignore")
 
-    duckdb_path: str = os.path.join(DATA, "occurrences.duckdb")
+    duckdb_path: str = os.path.join(DATA, "tbia.duckdb")
     sqlite_path: str = os.path.join(DATA, "annotations.sqlite")
 
     # DuckDB resource caps. Defaults preserve prior local behavior (4 threads,
@@ -44,8 +44,34 @@ class Settings(BaseSettings):
     # sign-in. Everyone else defaults to `contributor`.
     orcid_admin_ids: str = Field(default="", validation_alias="ORCID_ADMIN_IDS")
 
+    # DEV-ONLY password-less sign-in for the seeded demo users. ORCID OAuth
+    # cannot round-trip on localhost, so this lets local dev pick a role without
+    # ORCID. It mints tokens ONLY for existing seeded demo users (email set) and
+    # is gated everywhere by this flag. MUST stay false in any shared/deployed
+    # environment — enabling it there is a full auth bypass.
+    dev_login: bool = False
+
     # Comma-separated origins allowed by CORS (the Vite dev server).
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    # Discord webhook for "request review" pings (empty -> notifications are
+    # skipped; the request is still persisted). Create one in a Discord channel
+    # under Integrations → Webhooks and paste its URL. Plain env vars (no NDB_).
+    discord_webhook_url: str = Field(default="", validation_alias="DISCORD_WEBHOOK_URL")
+
+    # AI transcription pipeline (the batch worker that drains transcribe_requests
+    # and calls Claude vision). ANTHROPIC_API_KEY is read by the SDK directly;
+    # without it the worker skips API calls. Plain env vars (no NDB_ prefix).
+    anthropic_model: str = Field(
+        default="claude-opus-5", validation_alias="ANTHROPIC_MODEL"
+    )
+    transcribe_batch: int = Field(default=20, validation_alias="TRANSCRIBE_BATCH")
+    # "single" = one Claude vision call does OCR + fields (uses anthropic_model).
+    # "two_stage" = ocr_model reads the label to verbatim text, then field_model
+    # (text-only) structures it into annotation fields — cheaper image tokens.
+    transcribe_mode: str = Field(default="two_stage", validation_alias="TRANSCRIBE_MODE")
+    ocr_model: str = Field(default="claude-sonnet-5", validation_alias="OCR_MODEL")
+    field_model: str = Field(default="claude-opus-5", validation_alias="FIELD_MODEL")
 
     @property
     def sqlite_url(self) -> str:

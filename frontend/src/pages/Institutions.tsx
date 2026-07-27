@@ -75,7 +75,7 @@ function OrgCard({ kind, code, ent, statsById, defaultOpen }: {
   const pct = total ? Math.round((weighted / total) * 100) : 0;
 
   // Drill into Explore filtered to one or more source datasets ("kind:code/id").
-  const drill = (childKeys: string[]) => nav("/", { state: { sources: childKeys } });
+  const drill = (childKeys: string[]) => nav("/explore", { state: { sources: childKeys } });
   const allKeys = ids.map((id) => `${kind}:${code}/${id}`);
 
   return (

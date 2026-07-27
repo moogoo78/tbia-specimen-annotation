@@ -57,7 +57,7 @@ class Annotation(Base):
     original_value: Mapped[str | None] = mapped_column(Text)
     proposed_value: Mapped[str | None] = mapped_column(Text)
 
-    source: Mapped[str] = mapped_column(String(16), default="manual")  # manual | ai
+    source: Mapped[str] = mapped_column(String(16), default="manual")  # manual | ai | mixed
     ai_confidence: Mapped[float | None] = mapped_column(Float)
     ai_raw: Mapped[str | None] = mapped_column(Text)  # JSON payload from extractor
 
@@ -77,6 +77,28 @@ class Annotation(Base):
 
 
 Index("idx_ann_occ_status", Annotation.occurrence_id, Annotation.status)
+
+
+class TranscribeRequest(Base):
+    """A contributor scheduling a record for (AI) transcription. Deliberately
+    minimal — just the TBIA occurrence id and who scheduled it (+ when)."""
+
+    __tablename__ = "transcribe_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    occurrence_id: Mapped[str] = mapped_column(String(64), index=True)
+    contributor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    # Worker lifecycle: pending -> done | failed.
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    error: Mapped[str | None] = mapped_column(Text)
+    # Per-request overrides (null -> fall back to the global settings). mode is
+    # "single" | "two_stage"; field_model is the primary model in both modes,
+    # ocr_model is the stage-1 vision model (two_stage only).
+    mode: Mapped[str | None] = mapped_column(String(16))
+    ocr_model: Mapped[str | None] = mapped_column(String(64))
+    field_model: Mapped[str | None] = mapped_column(String(64))
 
 
 class Collector(Base):

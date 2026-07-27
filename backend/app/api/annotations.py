@@ -1,14 +1,24 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import auth, duck, extract, search
+from .. import auth, duck, extract, notify, search
 from ..annotations_store import _serialize
+from ..config import settings
 from ..db import get_session
-from ..models import Annotation, User
-from ..schemas import AnnotationCreate, AnnotationUpdate, ExtractResponse
+from ..models import Annotation, TranscribeRequest, User
+from ..schemas import (
+    AnnotationCreate,
+    AnnotationUpdate,
+    ExtractPaste,
+    ExtractPromptResponse,
+    ExtractResponse,
+    TranscribeConfig,
+    TranscribeOptions,
+    TranscribeRequestOut,
+)
 
 router = APIRouter(prefix="/api", tags=["annotations"])
 
@@ -29,6 +39,70 @@ async def ai_extract(occ_id: str, user: User = Depends(auth.current_user)):
     return extract.extract(record)
 
 
+@router.get("/occurrences/{occ_id}/extract-prompt", response_model=ExtractPromptResponse)
+async def ai_extract_prompt(occ_id: str, user: User = Depends(auth.current_user)):
+    """Build a ready-to-paste prompt (+ image URL) for the user's own AI chat."""
+    record = await search.get_detail(occ_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Occurrence not found")
+    return extract.build_prompt(record)
+
+
+@router.post("/occurrences/{occ_id}/extract-paste", response_model=ExtractResponse)
+async def ai_extract_paste(
+    occ_id: str, body: ExtractPaste, user: User = Depends(auth.current_user)
+):
+    """Parse the JSON the user pastes back into AI-draft fields."""
+    try:
+        return extract.parse_pasted(occ_id, body.raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/transcribe/config", response_model=TranscribeConfig)
+async def transcribe_config():
+    """The models the "auto" preset resolves to. Mirrors the fallback logic in
+    pipeline.transcribe_record: single mode uses anthropic_model and no OCR pass;
+    two_stage uses ocr_model -> field_model."""
+    if settings.transcribe_mode == "single":
+        return TranscribeConfig(mode="single", ocr_model=None, field_model=settings.anthropic_model)
+    return TranscribeConfig(
+        mode="two_stage", ocr_model=settings.ocr_model, field_model=settings.field_model,
+    )
+
+
+@router.post("/occurrences/{occ_id}/transcribe-request", response_model=TranscribeRequestOut)
+async def schedule_transcribe(
+    occ_id: str,
+    opts: TranscribeOptions | None = Body(default=None),
+    user: User = Depends(auth.current_user),
+    db: Session = Depends(get_session),
+):
+    """Schedule a record for transcription: persist the request (occurrence id +
+    who scheduled it + optional pipeline overrides) and ping Discord. The Discord
+    ping is best-effort and never blocks the request."""
+    record = await duck.query_one("SELECT id FROM occurrence WHERE id = ?", [occ_id])
+    if record is None:
+        raise HTTPException(status_code=404, detail="Occurrence not found")
+
+    opts = opts or TranscribeOptions()
+    if opts.mode is not None and opts.mode not in ("single", "two_stage"):
+        raise HTTPException(status_code=400, detail="mode must be 'single' or 'two_stage'")
+
+    req = TranscribeRequest(
+        occurrence_id=occ_id, contributor_id=user.id,
+        mode=opts.mode, ocr_model=opts.ocr_model, field_model=opts.field_model,
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+
+    notified = notify.transcribe_scheduled(occ_id, user.id)
+    out = TranscribeRequestOut.model_validate(req)
+    out.notified = notified
+    return out
+
+
 @router.post("/occurrences/{occ_id}/annotations")
 async def create_annotation(
     occ_id: str,
@@ -37,7 +111,7 @@ async def create_annotation(
     db: Session = Depends(get_session),
 ):
     record = await duck.query_one(
-        "SELECT dataset_name FROM occurrences WHERE id = ?", [occ_id]
+        "SELECT dataset_name FROM occurrence WHERE id = ?", [occ_id]
     )
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")

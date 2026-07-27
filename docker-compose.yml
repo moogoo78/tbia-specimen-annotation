@@ -4,13 +4,15 @@
 services:
   backend:
     build: ./backend
+    # Code is bind-mounted below; --reload picks up edits without a rebuild.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
       - ./data:/data
     environment:
-      NDB_DUCKDB_PATH: /data/occurrences.duckdb
+      NDB_DUCKDB_PATH: /data/tbia.duckdb
       NDB_SQLITE_PATH: /data/annotations.sqlite
       # ORCID sign-in — values interpolated from the project-root .env
       # (see .env.example). Empty client id => sign-in returns 503.
@@ -20,6 +22,18 @@ services:
       ORCID_REDIRECT_URI: ${ORCID_REDIRECT_URI:-http://localhost:5173/auth/orcid/callback}
       ORCID_ADMIN_IDS: ${ORCID_ADMIN_IDS:-}
       NDB_JWT_SECRET: ${NDB_JWT_SECRET:-dev-secret-change-me}
+      # DEV-ONLY password-less sign-in for the seeded demo users (ORCID can't
+      # round-trip on localhost). Defaults off; set NDB_DEV_LOGIN=true in .env
+      # for local testing. MUST stay false in any deployed environment.
+      NDB_DEV_LOGIN: ${NDB_DEV_LOGIN:-false}
+      # Review-request Discord ping (plain env vars, no NDB_ prefix)
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      # AI transcription pipeline (run on demand: `make transcribe`)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5}
+      TRANSCRIBE_MODE: ${TRANSCRIBE_MODE:-two_stage}
+      OCR_MODEL: ${OCR_MODEL:-claude-sonnet-5}
+      FIELD_MODEL: ${FIELD_MODEL:-claude-opus-5}
 
   frontend:
     build: ./frontend

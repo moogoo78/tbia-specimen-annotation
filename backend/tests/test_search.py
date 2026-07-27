@@ -59,3 +59,23 @@ def test_detail_and_media_parse(client):
 def test_datasets_summary(client):
     ds = {d["dataset_name"]: d for d in client.get("/api/datasets").json()}
     assert ds["DS-A"]["n_records"] == 3
+
+
+def test_standard_date_is_a_plain_date(client):
+    """standard_date is a TIMESTAMP in the store; both reads narrow it to a day."""
+    detail = client.get("/api/occurrences/r1").json()
+    assert detail["standard_date"] == "2004-09-16"
+    row = next(x for x in client.get("/api/occurrences").json()["items"] if x["id"] == "r1")
+    assert row["standard_date"] == "2004-09-16"
+
+
+def test_registry_merges_datasets_from_the_db(client):
+    """Datasets not curated in registry.json are discovered from the `dataset`
+    table and grouped under aggregators by institution_code."""
+    reg = client.get("/api/registry").json()
+    ent = reg["aggregators"]["TEST"]
+    assert set(ent["datasets"]) == {"DS-A", "DS-B"}
+    # the aggregator uuid is referenced from the DB, never pinned in the file
+    assert ent["datasets"]["DS-A"]["gbif"] == "src-DS-A"
+    # curated institutions still come from the file
+    assert reg["institutions"]

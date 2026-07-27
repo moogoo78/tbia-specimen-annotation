@@ -27,17 +27,22 @@ the read store (DuckDB) and the write store (SQLite) are separate.
 
 ## Quick start (local)
 
-Prereqs: Python 3.11+, Node 20+, and the TBIA export `tbia_*.zip` in the repo root.
+Prereqs: Python 3.11+, Node 20+, and the TBIA ETL export at `data/tbia.duckdb`
+(tables `occurrence` + `dataset`; see `task-tbia-data-etl.md`).
 
 ```bash
 make install        # python venv + npm install
-make ingest         # load all ~2M rows -> data/occurrences.duckdb (~35s)
+make prepare        # derive completeness flags + indexes on data/tbia.duckdb (~15s)
 make seed           # create SQLite schema + demo users
 make api            # terminal 1: FastAPI on :8000
 make web            # terminal 2: Vite dev server on :5173
 ```
 
-Open http://localhost:5173. Use `make ingest-sample` for a fast 50k-row slice during dev.
+Open http://localhost:5173.
+
+`make prepare` is what turns a raw export into something the API can serve — it adds the
+completeness flags, `completeness_score`, `year` and the indexes, and rolls the same counts
+up per dataset. It is idempotent, so **re-run it after every ETL refresh**.
 
 **Sign-in is ORCID-only.** Copy `.env.example` to `.env` and fill in
 `ORCID_CLIENT_ID` / `ORCID_CLIENT_SECRET` (register a client at
@@ -47,7 +52,7 @@ redirect URI `http://localhost:5173/auth/orcid/callback`). List your own ORCID i
 `contributor`. Until a client id is set, `/api/auth/orcid/*` returns 503.
 
 ### Docker (alternative)
-`make ingest && make seed` on the host, then `docker compose up` (serves API on :8000 and
+`make prepare && make seed` on the host, then `docker compose up` (serves API on :8000 and
 the frontend on :5173). The embedded DuckDB/SQLite files in `./data` are mounted in.
 
 ## Using it
