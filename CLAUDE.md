@@ -13,9 +13,11 @@ transcription, and reviewed enrichments are exported back to data providers.
 
 Occurrence data is **read-only**; enrichment lives only as annotations. Hence two stores:
 
-- **DuckDB** (`data/occurrences.duckdb`) — ~2M occurrence rows, read-only at serve time.
-  Columnar → fast facets/completeness aggregation. Opened read-only; queries run in a
-  threadpool (`app/duck.py`).
+- **DuckDB** (`data/tbia.duckdb`) — the TBIA ETL's export (`task-tbia-data-etl.md`):
+  table `occurrence` (~1.79M rows, 927 datasets) + table `dataset` (one row per
+  `tbia_dataset_id`). Read-only at serve time; columnar → fast facets/completeness
+  aggregation; queries run in a threadpool (`app/duck.py`). The ETL owns the raw
+  columns; `make prepare` adds the derived ones the app needs.
 - **SQLite** (`data/annotations.sqlite`) — annotations + users (writes) via SQLAlchemy.
 - **Federated joins**: DuckDB `ATTACH`es the SQLite file (`sqlite_scanner`, read-only) so
   dashboard/export queries join occurrences ↔ annotations in one SQL pass.
@@ -27,8 +29,9 @@ Occurrence data is **read-only**; enrichment lives only as annotations. Hence tw
 
 ```bash
 make install        # backend venv (backend/.venv) + npm install
-make ingest         # load all ~2M rows -> data/occurrences.duckdb  (~35s)
-make ingest-sample  # 50k-row dev slice
+make prepare        # derive flags/indexes on the ETL's data/tbia.duckdb (~15s)
+make ingest         # LEGACY CSV loader -> data/occurrences.duckdb
+make ingest-sample  # LEGACY 50k-row dev slice
 make seed           # SQLite schema + demo users
 make api            # FastAPI on :8000   (frontend proxies /api here)
 make web            # Vite dev server on :5173
@@ -56,10 +59,11 @@ local dev + tests have deterministic users; tests mint JWTs directly via `auth.c
 ```
 backend/app/        main.py, duck.py, db.py, models.py, search.py, extract.py, auth.py, config.py
 backend/app/api/    occurrences.py, annotations.py, auth.py, export.py
-backend/ingest/     ingest_tbia.py     (DuckDB read_csv loader)
+backend/ingest/     prepare.py (derives flags on the ETL export — the live path);
+                    ingest_tbia.py / ingest_filtered.py (legacy read_csv loaders)
 backend/tests/      conftest.py builds a tiny DuckDB+SQLite; test_search, test_annotations
 frontend/src/       pages/ (Explore, RecordDetail, Dashboard, Login), components/, api/, i18n/, design/
-data/               generated DBs + registry.json + datasets.csv (gitignored)
+data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.json (gitignored)
 ```
 
 ## Conventions
@@ -67,11 +71,19 @@ data/               generated DBs + registry.json + datasets.csv (gitignored)
 - **Data values stay Chinese** (taxonomy `bio_group`/`kingdom_c`/…, county names). Only UI
   chrome is bilingual — add label keys to `frontend/src/i18n/index.ts` (both `en` and `zh`).
 - **Completeness flags** are the product's core: `has_identification / has_coordinates /
-  has_date / has_media` + `completeness_score` (0–4), computed at ingest in
-  `ingest_tbia.py`. Default search sort = `completeness_score asc` (gaps first).
-- Occurrence columns are snake_case (DuckDB); the CSV→column mapping lives in `COLUMNS` in
-  `ingest_tbia.py`. **Changing which columns are ingested requires re-running `make ingest`**
-  (DuckDB is rebuilt from scratch each run).
+  has_date / has_media` + `completeness_score` (0–4) + `year`. The ETL does **not** produce
+  them — `ingest/prepare.py` (`make prepare`) derives them in place on `occurrence`, and
+  rolls the same counts up onto `dataset`. It is idempotent, so **re-run it after every ETL
+  refresh** or the flags/indexes go missing. Default search sort = `completeness_score asc`
+  (gaps first).
+- Occurrence columns are the ETL's snake_case names, used verbatim from SQL through the API
+  to the frontend: `standard_latitude / standard_longitude / standard_date` (a TIMESTAMP,
+  narrowed to DATE on every read — see `DATE_EXPR` in `search.py`), and `class` / `order` /
+  `references`, which need quoting in SQL and bracket access in TS.
+- `bio_group` has ~21 fine-grained values in this export (`被子植物`, `蛾類`, … — the older
+  coarse `維管束植物` / `昆蟲` are gone). `BIO_GROUP_TONE` in `design/tokens.ts` maps the
+  splits onto the parent group's tone; unlisted groups take the neutral fallback rather
+  than a new hue.
 - Search/facet SQL is built once in `app/search.py` (`build_where`) and reused by list,
   count, and facet endpoints. Free-text is substring/`ILIKE` (no CJK tokenizer).
 - AI extraction (`app/extract.py`) is a **stub** shaped like a real vision response
@@ -84,8 +96,17 @@ data/               generated DBs + registry.json + datasets.csv (gitignored)
 `{ institutions: {...}, aggregators: {...} }`, each `CODE: { name, datasets: { <tbia_dataset_id>: { name, groups[] } } }`.
 `groups` vocabulary: `Aves, Amphibia, Reptilia, Mammalia, Actinopterygii, Mollusca,
 Arachnida, Insecta, Plantae, Fungi, Protozoa` (plus `Zoology`/`Other` used as broad tags).
-The Explore **Source** facet is driven by this file (served via `GET /api/registry`);
-selecting a source expands to the union of its `tbia_dataset_id`s.
+
+It is **hand-curated and holds only the 13 stable institution datasets.** The GBIF
+aggregator's datasets (914 of them) turn over with every TBIA export, so their ids are
+*not* pinned here — `GET /api/registry` reads them from the `dataset` table at request
+time and merges them under `aggregators`, keyed by `institution_code`. The GBIF uuid
+comes from `source_dataset_id` (the export's own `gbif_dataset_id` is empty). Curated
+entries always win: anything registry.json lists is left untouched, so promoting a
+dataset to "stable" is just adding it to the file.
+
+The Explore **Source** facet is driven by that merged response; selecting a source
+expands to the union of its `tbia_dataset_id`s.
 
 ## Gotchas
 
@@ -96,7 +117,9 @@ selecting a source expands to the union of its `tbia_dataset_id`s.
 - `init_db()` must run before `duck.connect()` (lifespan order in `main.py`) so the ATTACH
   finds the SQLite file; otherwise `annotations_attached` is false and export falls back to
   a Python-side join.
-- Settings via env with `NDB_` prefix (`app/config.py`): `NDB_DUCKDB_PATH`,
-  `NDB_SQLITE_PATH`, `NDB_JWT_SECRET`, `NDB_CORS_ORIGINS`.
+- Settings via env with `NDB_` prefix (`app/config.py`): `NDB_DUCKDB_PATH` (defaults to
+  `data/tbia.duckdb`), `NDB_SQLITE_PATH`, `NDB_JWT_SECRET`, `NDB_CORS_ORIGINS`.
+- A fresh ETL export has no completeness flags, so the API errors on every query until
+  `make prepare` has run over it.
 - The Chrome browser-automation tools aren't connected in this environment — verify UI
   changes via `tsc`/`vite build` + API checks, and ask the user for visual confirmation.

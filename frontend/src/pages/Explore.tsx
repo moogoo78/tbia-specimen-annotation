@@ -218,7 +218,7 @@ export function Explore() {
           border: `1px solid ${t.border}`, background: t.panel, fontSize: 11, padding: "3px 4px", fontFamily: t.sans,
         }}>
           <option value="completeness_score">↑ {tr("col.completeness")}</option>
-          <option value="std_date">{tr("col.date")}</option>
+          <option value="standard_date">{tr("col.date")}</option>
           <option value="scientific_name">{tr("col.sciname")}</option>
           <option value="catalog_number">{tr("col.catalog")}</option>
         </select>

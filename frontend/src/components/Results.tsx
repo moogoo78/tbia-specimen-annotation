@@ -68,7 +68,7 @@ export function TableView({ rows, activeId, onSelect }: {
               <Cell muted>{r.common_name_c || "—"}</Cell>
               <Cell>{r.county || "—"}</Cell>
               <Cell muted>{r.locality || "—"}</Cell>
-              <Cell mono>{r.std_date || "—"}</Cell>
+              <Cell mono>{r.standard_date || "—"}</Cell>
               <Cell><CollectorLink value={r.recorded_by} /></Cell>
               <Cell muted>{r.dataset_name || "—"}</Cell>
             </tr>
@@ -117,7 +117,7 @@ export function SplitList({ rows, activeId, onSelect }: {
                 <span style={{ color: t.fgSubtle, fontSize: 10 }}> {r.name_author}</span>
               </div>
               <div style={{ display: "flex", gap: 6, fontSize: 10, color: t.fgMuted, alignItems: "center", overflow: "hidden" }}>
-                <span style={{ fontFamily: t.mono }}>{r.std_date || "—"}</span>
+                <span style={{ fontFamily: t.mono }}>{r.standard_date || "—"}</span>
                 <span>·</span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{r.locality || r.county || "—"}</span>
                 <CompletenessDots row={r} size={6} />
@@ -185,7 +185,7 @@ export function GridView({ rows, activeId, onSelect }: {
               <div style={{ fontFamily: t.mono, fontSize: 9, color: t.fgMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.catalog_number || "—"}</div>
               <div style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><i>{r.scientific_name || "—"}</i></div>
               <div style={{ fontSize: 10, color: t.fgMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.common_name_c || r.family || "—"}</div>
-              <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.std_date || "—"} · {r.county || "—"}</div>
+              <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.standard_date || "—"} · {r.county || "—"}</div>
               {r.recorded_by && (
                 <div style={{ fontSize: 10, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   <CollectorLink value={r.recorded_by} />

@@ -12,7 +12,7 @@ services:
       - ./backend:/app
       - ./data:/data
     environment:
-      NDB_DUCKDB_PATH: /data/occurrences.duckdb
+      NDB_DUCKDB_PATH: /data/tbia.duckdb
       NDB_SQLITE_PATH: /data/annotations.sqlite
       # ORCID sign-in — values interpolated from the project-root .env
       # (see .env.example). Empty client id => sign-in returns 503.

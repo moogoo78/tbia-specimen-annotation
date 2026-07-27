@@ -39,7 +39,7 @@ _OCR_PROMPT = (
 _ORIGINAL_COLUMN = {
     "catalogNumber": "catalog_number", "typeStatus": "type_status",
     "recordedBy": "recorded_by", "recordNumber": "record_number",
-    "taxonRank": "taxon_rank", "eventDate": "std_date", "locality": "locality",
+    "taxonRank": "taxon_rank", "eventDate": "standard_date", "locality": "locality",
 }
 
 

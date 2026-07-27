@@ -14,7 +14,7 @@ migrate the SQLite annotation store to a managed database.
 ```
 :80/:443 ─> web (Caddy)  ── serves built SPA (frontend/dist), auto-TLS
                          └─ /api/* ─> backend (uvicorn, 1 worker) ── mounts ./data
-                                                                     occurrences.duckdb (ro)
+                                                                     tbia.duckdb (ro)
                                                                      annotations.sqlite (rw)
 ```
 
@@ -74,14 +74,14 @@ Build the DBs **on your laptop** (don't run the ~2 M-row ingest on the small
 box) and copy them up:
 
 ```bash
-# on your laptop, after `make ingest && make seed`
-scp data/occurrences.duckdb data/annotations.sqlite ubuntu@<elastic-ip>:$APP/data/
+# on your laptop, after `make prepare && make seed`
+scp data/tbia.duckdb data/annotations.sqlite ubuntu@<elastic-ip>:$APP/data/
 ```
 
 Verify on the box:
 
 ```bash
-ls -lh data/occurrences.duckdb data/annotations.sqlite
+ls -lh data/tbia.duckdb data/annotations.sqlite
 ```
 
 ## 4. Create the secrets file (`backend/.env`)
@@ -193,14 +193,14 @@ enough; everything else (DuckDB) is regenerable from the source export.
 
 ## Updating the occurrence data
 
-DuckDB is rebuilt from scratch by ingest. Re-run `make ingest` on your laptop,
-`scp` the new `occurrences.duckdb` up, then
+DuckDB is rebuilt from scratch by the TBIA ETL. Take the fresh export, run
+`make prepare` over it on your laptop, `scp` the new `tbia.duckdb` up, then
 `docker compose -f docker-compose.prod.yml restart backend`.
 
 ## Troubleshooting
 
 - **502 from Caddy** — backend not healthy; check `logs backend`. Common cause:
-  missing `data/occurrences.duckdb` (the backend raises on startup).
+  missing `data/tbia.duckdb` (the backend raises on startup).
 - **TLS not issued** — `SITE_ADDRESS` must be a real domain resolving to this
   box; Let's Encrypt rejects IPs and `*.compute.amazonaws.com`.
 - **Cloudflare 525 "SSL handshake failed"** — the domain is proxied (orange

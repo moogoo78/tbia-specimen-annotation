@@ -3,7 +3,7 @@
 # resource caps for a small instance (e.g. t4g.small, 2 GB).
 #
 # Prereqs on the host:
-#   - data/occurrences.duckdb + data/annotations.sqlite scp'd into ./data
+#   - data/tbia.duckdb + data/annotations.sqlite scp'd into ./data
 #   - mkdir -p data/duck-tmp            (DuckDB spill dir)
 #   - backend/.env with NDB_JWT_SECRET  (generate: openssl rand -hex 32; chmod 600)
 #   - export SITE_ADDRESS=https://your-domain   (or leave unset -> :80 plain HTTP)
@@ -18,7 +18,7 @@ services:
     restart: always
     env_file: ./backend/.env
     environment:
-      NDB_DUCKDB_PATH: /data/occurrences.duckdb
+      NDB_DUCKDB_PATH: /data/tbia.duckdb
       NDB_SQLITE_PATH: /data/annotations.sqlite
       NDB_DUCK_TEMP_DIR: /data/duck-tmp
       NDB_DUCK_THREADS: "2"

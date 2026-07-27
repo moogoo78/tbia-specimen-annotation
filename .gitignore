@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 *.env
+dotenvbak
 *.pem
 *.key
 secrets*
@@ -18,6 +19,9 @@ secrets*
 /response_*.csv
 /response_*.json
 *.zip
+# The downloaded TBIA export + its field docs (~2 GB), and TBIA API scratch dumps.
+/source/
+/results/
 
 # --- Intermediate dataset-selection working files (not needed to run/serve) ---
 /dataset-selected13.json

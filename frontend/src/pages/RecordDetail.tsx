@@ -174,11 +174,11 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
           <Section title={tr("detail.taxonomy")}><Taxonomy r={r} /></Section>
           <Section title={tr("detail.event")}>
             <CollectorField recordedBy={r.recorded_by as string} />
-            <Field k={tr("col.date")} v={r.std_date} missing={!r.has_date} verbatim={r.event_date as string} />
+            <Field k={tr("col.date")} v={r.standard_date} missing={!r.has_date} verbatim={r.event_date as string} />
             <Field k={tr("col.county")} v={[r.county, r.municipality].filter(Boolean).join(" ")} />
             <Field k={tr("col.locality")} v={r.locality} />
             <Field k={tr("detail.coordinates")}
-              v={r.has_coordinates ? `${r.std_lat}, ${r.std_lon}` : null} missing={!r.has_coordinates}
+              v={r.has_coordinates ? `${r.standard_latitude}, ${r.standard_longitude}` : null} missing={!r.has_coordinates}
               verbatim={[r.verbatim_latitude, r.verbatim_longitude].filter(Boolean).join(", ") || undefined} />
           </Section>
           <Section title={tr("detail.record")}>
@@ -200,7 +200,7 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
         {/* right column: media + annotation */}
         <div style={{ width: annotW, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, paddingLeft: 12 }}>
           <Section title={`${tr("detail.media")} · ${r.media.length}`}>
-            <MediaGallery urls={r.media} references={r.references_url as string} />
+            <MediaGallery urls={r.media} references={r["references"] as string} />
           </Section>
           <AnnotationPanel record={r} />
         </div>
@@ -266,8 +266,8 @@ function CollectorField({ recordedBy }: { recordedBy?: string | null }) {
 
 function Taxonomy({ r }: { r: OccurrenceDetail }) {
   const chain = [
-    [r.kingdom_c, r.kingdom], [r.phylum_c, r.phylum], [r.class_c, r.class_name],
-    [r.order_c, r.order_name], [r.family_c, r.family], [r.genus_c, r.genus],
+    [r.kingdom_c, r.kingdom], [r.phylum_c, r.phylum], [r.class_c, r["class"]],
+    [r.order_c, r["order"]], [r.family_c, r.family], [r.genus_c, r.genus],
   ].filter(([, lat]) => lat) as [string, string][];
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center", fontSize: 11, lineHeight: 1.8 }}>
@@ -837,7 +837,7 @@ function originalFor(r: OccurrenceDetail, field: string): string | null {
   const map: Record<string, unknown> = {
     catalogNumber: r.catalog_number, typeStatus: r.type_status,
     recordedBy: r.recorded_by, recordNumber: r.record_number,
-    taxonRank: r.taxon_rank, eventDate: r.std_date, locality: r.locality,
+    taxonRank: r.taxon_rank, eventDate: r.standard_date, locality: r.locality,
   };
   const v = map[field];
   return v == null ? null : String(v);

@@ -5,7 +5,7 @@ import type { OccurrenceRow } from "../api/types";
 
 export function MapView({ rows }: { rows: OccurrenceRow[] }) {
   const nav = useNavigate();
-  const pts = rows.filter((r) => r.std_lat != null && r.std_lon != null);
+  const pts = rows.filter((r) => r.standard_latitude != null && r.standard_longitude != null);
   // Default view over Taiwan.
   return (
     <div style={{ flex: 1, position: "relative" }}>
@@ -15,7 +15,7 @@ export function MapView({ rows }: { rows: OccurrenceRow[] }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {pts.map((r) => (
-          <CircleMarker key={r.id} center={[r.std_lat!, r.std_lon!]} radius={5}
+          <CircleMarker key={r.id} center={[r.standard_latitude!, r.standard_longitude!]} radius={5}
             pathOptions={{ color: toneFor(r.bio_group), fillColor: toneFor(r.bio_group), fillOpacity: 0.7, weight: 1 }}>
             <Popup>
               <div style={{ fontFamily: t.sans, fontSize: 12, minWidth: 160 }}>

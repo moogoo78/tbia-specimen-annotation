@@ -11,7 +11,7 @@ DATA = os.path.join(REPO, "data")
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NDB_", env_file=".env", extra="ignore")
 
-    duckdb_path: str = os.path.join(DATA, "occurrences.duckdb")
+    duckdb_path: str = os.path.join(DATA, "tbia.duckdb")
     sqlite_path: str = os.path.join(DATA, "annotations.sqlite")
 
     # DuckDB resource caps. Defaults preserve prior local behavior (4 threads,

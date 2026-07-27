@@ -81,7 +81,7 @@ async def schedule_transcribe(
     """Schedule a record for transcription: persist the request (occurrence id +
     who scheduled it + optional pipeline overrides) and ping Discord. The Discord
     ping is best-effort and never blocks the request."""
-    record = await duck.query_one("SELECT id FROM occurrences WHERE id = ?", [occ_id])
+    record = await duck.query_one("SELECT id FROM occurrence WHERE id = ?", [occ_id])
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")
 
@@ -111,7 +111,7 @@ async def create_annotation(
     db: Session = Depends(get_session),
 ):
     record = await duck.query_one(
-        "SELECT dataset_name FROM occurrences WHERE id = ?", [occ_id]
+        "SELECT dataset_name FROM occurrence WHERE id = ?", [occ_id]
     )
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")

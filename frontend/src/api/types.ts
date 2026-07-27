@@ -11,9 +11,9 @@ export interface OccurrenceRow {
   kingdom_c: string | null;
   county: string | null;
   locality: string | null;
-  std_lat: number | null;
-  std_lon: number | null;
-  std_date: string | null;
+  standard_latitude: number | null;
+  standard_longitude: number | null;
+  standard_date: string | null;
   year: number | null;
   type_status: string | null;
   dataset_name: string | null;
@@ -73,6 +73,7 @@ export interface Dataset {
   dataset_name: string;
   tbia_dataset_id: string | null;
   rights_holder: string | null;
+  institution_code: string | null;
   n_records: number;
   n_identified: number;
   n_georeferenced: number;

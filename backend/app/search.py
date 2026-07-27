@@ -12,12 +12,22 @@ from typing import Any
 
 from . import duck
 
-# Columns returned in list/grid/table rows (kept lean for 2M-row scans).
+# The ETL's occurrence table. Read-only here; `ingest/prepare.py` adds the
+# completeness flags this module filters and sorts on.
+TABLE = "occurrence"
+
+# standard_date arrives as a TIMESTAMP; the platform only ever deals in whole
+# days, so every read narrows it to a DATE.
+DATE_EXPR = "CAST(standard_date AS DATE)"
+DATE_COL = f"{DATE_EXPR} AS standard_date"
+
+# Columns returned in list/grid/table rows (kept lean for ~1.8M-row scans).
 LIST_COLUMNS = [
     "id", "catalog_number", "scientific_name", "name_author", "common_name_c",
     "family", "genus", "taxon_rank", "bio_group", "kingdom_c", "county", "locality",
-    "std_lat", "std_lon", "std_date", "year", "type_status", "dataset_name",
-    "recorded_by", "record_number", "has_coordinates", "has_date", "has_identification", "has_media",
+    "standard_latitude", "standard_longitude", DATE_COL, "year", "type_status",
+    "dataset_name", "recorded_by", "record_number",
+    "has_coordinates", "has_date", "has_identification", "has_media",
     "completeness_score", "associated_media",
 ]
 
@@ -41,7 +51,7 @@ FACET_COLUMNS = {
 
 SORTABLE = {
     "completeness_score": "completeness_score",
-    "std_date": "std_date",
+    "standard_date": "standard_date",
     "scientific_name": "scientific_name",
     "catalog_number": "catalog_number",
     "county": "county",
@@ -164,7 +174,9 @@ def build_where(f: Filters) -> tuple[str, list[Any]]:
     if f.bbox:
         try:
             min_lon, min_lat, max_lon, max_lat = (float(x) for x in f.bbox.split(","))
-            where.append("std_lon BETWEEN ? AND ? AND std_lat BETWEEN ? AND ?")
+            where.append(
+                "standard_longitude BETWEEN ? AND ? AND standard_latitude BETWEEN ? AND ?"
+            )
             params.extend([min_lon, max_lon, min_lat, max_lat])
         except (ValueError, TypeError):
             pass
@@ -188,9 +200,9 @@ async def search(f: Filters, *, sort: str, order: str, limit: int, offset: int) 
     order_by = f"{sort_col} {order_sql} NULLS LAST, id ASC"
 
     cols = ", ".join(LIST_COLUMNS)
-    total = (await duck.query_one(f"SELECT count(*) AS n FROM occurrences{where}", params))["n"]
+    total = (await duck.query_one(f"SELECT count(*) AS n FROM {TABLE}{where}", params))["n"]
     items = await duck.query(
-        f"SELECT {cols} FROM occurrences{where} ORDER BY {order_by} LIMIT ? OFFSET ?",
+        f"SELECT {cols} FROM {TABLE}{where} ORDER BY {order_by} LIMIT ? OFFSET ?",
         params + [limit, offset],
     )
     # Surface the first media URL as a lightweight thumbnail for the grid view;
@@ -210,7 +222,7 @@ async def facets(f: Filters, *, top: int = 20) -> dict:
         limit = 50 if name in ("dataset_name", "county") else top
         joiner = " AND " if where else " WHERE "
         rows = await duck.query(
-            f"SELECT {col} AS value, count(*) AS count FROM occurrences{where}"
+            f"SELECT {col} AS value, count(*) AS count FROM {TABLE}{where}"
             f"{joiner}{col} IS NOT NULL AND {col} <> '' "
             f"GROUP BY {col} ORDER BY count DESC LIMIT {limit}",
             params,
@@ -224,7 +236,7 @@ async def facets(f: Filters, *, top: int = 20) -> dict:
               sum(CASE WHEN NOT has_identification THEN 1 ELSE 0 END) AS missing_identification,
               sum(CASE WHEN has_media THEN 1 ELSE 0 END)              AS has_media,
               count(*)                                                AS total
-            FROM occurrences{where}""",
+            FROM {TABLE}{where}""",
         params,
     )
     out["completeness"] = gaps
@@ -232,7 +244,10 @@ async def facets(f: Filters, *, top: int = 20) -> dict:
 
 
 async def get_detail(occ_id: str) -> dict | None:
-    row = await duck.query_one("SELECT * FROM occurrences WHERE id = ?", [occ_id])
+    row = await duck.query_one(
+        f"SELECT * REPLACE ({DATE_EXPR} AS standard_date) FROM {TABLE} WHERE id = ?",
+        [occ_id],
+    )
     if row is None:
         return None
     row["media"] = parse_media(row.get("associated_media"))

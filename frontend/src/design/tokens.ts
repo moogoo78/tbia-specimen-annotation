@@ -18,18 +18,32 @@ export const t = {
   row: 28,
 };
 
-// Bilingual tone per biological group (data values stay Chinese).
+// Tone per biological group (data values stay Chinese). The TBIA export carries
+// ~21 bio_group values — far more than a categorical palette can keep tellable
+// apart — so several fine-grained groups share the tone of the coarse group they
+// were split out of (被子/裸子植物 were 維管束植物; the five insect groups were
+// 昆蟲). Anything not listed stays the neutral "other" tone rather than earning a
+// generated hue; the row and the map popup always name the group in text, so
+// identity never rests on colour alone.
+const PLANT = "oklch(0.60 0.09 140)";
+const INSECT = "oklch(0.56 0.10 60)";
+
 export const BIO_GROUP_TONE: Record<string, string> = {
   魚類: "oklch(0.58 0.10 230)",
-  昆蟲: "oklch(0.56 0.10 60)",
-  維管束植物: "oklch(0.60 0.09 140)",
-  蕨類植物: "oklch(0.58 0.09 160)",
-  苔蘚植物: "oklch(0.56 0.08 175)",
   鳥類: "oklch(0.58 0.10 30)",
   哺乳類: "oklch(0.54 0.07 40)",
   爬蟲類: "oklch(0.56 0.09 130)",
   兩棲類: "oklch(0.58 0.10 150)",
+  被子植物: PLANT,
+  裸子植物: PLANT,
+  蕨類植物: "oklch(0.58 0.09 160)",
+  苔蘚植物: "oklch(0.56 0.08 175)",
   藻類: "oklch(0.58 0.09 195)",
+  蛾類: INSECT,
+  蝶類: INSECT,
+  甲蟲類: INSECT,
+  蜻蛉類: INSECT,
+  其他昆蟲: INSECT,
 };
 
 export function toneFor(group?: string | null): string {

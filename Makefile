@@ -1,4 +1,4 @@
-.PHONY: install backend-install frontend-install ingest ingest-sample seed seed-collectors sync-collectors api web test build clean
+.PHONY: install backend-install frontend-install prepare ingest ingest-sample seed seed-collectors sync-collectors api web test build clean
 
 PY := backend/.venv/bin/python
 PIP := backend/.venv/bin/pip
@@ -13,8 +13,17 @@ backend-install:
 frontend-install:
 	cd frontend && npm install
 
-# Load into data/occurrences.duckdb, scoped to exactly the datasets in
-# registry.json (auto-detects tbia_*.zip).
+# Derive the app-facing columns on the ETL's data/tbia.duckdb: completeness
+# flags + score + year on `occurrence`, roll-ups on `dataset`, plus indexes.
+# Idempotent — run it after every ETL refresh. This is what the API reads.
+prepare:
+	cd backend && .venv/bin/python -m ingest.prepare
+
+# LEGACY CSV loaders, superseded by the TBIA ETL (task-tbia-data-etl.md) which
+# now produces data/tbia.duckdb directly. These still build the old
+# data/occurrences.duckdb from a tbia_*.zip, scoped to registry.json — which
+# since the GBIF ids moved out of that file means the 13 institution datasets
+# only. Point NDB_DUCKDB_PATH at the result if you need the old store.
 ingest:
 	cd backend && .venv/bin/python -m ingest.ingest_filtered --registry
 
