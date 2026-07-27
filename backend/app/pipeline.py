@@ -171,6 +171,37 @@ def _image_url(record: dict) -> str:
     return media[0]
 
 
+def build_annotations(
+    result: ExtractResponse, record: dict, contributor_id: int,
+    *, default_service: str = "anthropic",
+) -> list[Annotation]:
+    """Turn a transcription result into `ai` annotation drafts (status `submitted`).
+
+    Shared by the worker and by `app.import_results`, so a draft written from an
+    imported JSON file is indistinguishable in shape from one the worker wrote —
+    and the note format only has to be maintained in one place. `default_service`
+    is what the note credits when the result carries no `meta.service`; importers
+    should pass something that is not "anthropic", since an imported file did not
+    necessarily come from this pipeline.
+    """
+    note = f"AI transcription ({result.service or default_service} · {result.model})"
+    return [
+        Annotation(
+            occurrence_id=result.occurrence_id,
+            dataset_name=record.get("dataset_name"),
+            field=field.field,
+            original_value=_original(record, field.field),
+            proposed_value=field.value,
+            source="ai",
+            ai_confidence=field.confidence,
+            note=note,
+            status="submitted",
+            contributor_id=contributor_id,
+        )
+        for field in result.fields
+    ]
+
+
 async def process_one(db: Session, req: TranscribeRequest) -> int:
     """Transcribe one pending request into annotation rows; returns the count.
 
@@ -185,19 +216,8 @@ async def process_one(db: Session, req: TranscribeRequest) -> int:
         )
 
         n = 0
-        for field in result.fields:
-            db.add(Annotation(
-                occurrence_id=req.occurrence_id,
-                dataset_name=record.get("dataset_name"),
-                field=field.field,
-                original_value=_original(record, field.field),
-                proposed_value=field.value,
-                source="ai",
-                ai_confidence=field.confidence,
-                note=f"AI transcription ({result.service or 'anthropic'} · {result.model})",
-                status="submitted",
-                contributor_id=req.contributor_id,
-            ))
+        for ann in build_annotations(result, record, req.contributor_id):
+            db.add(ann)
             n += 1
 
         req.status = "done"

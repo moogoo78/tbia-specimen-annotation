@@ -31,6 +31,13 @@ seed:
 transcribe:
 	cd backend && .venv/bin/python -m app.worker
 
+# Import transcription result JSON produced elsewhere (agent session, a
+# contributor's own AI chat) into the annotation store. Dry run by default:
+#   make import-results DIR=../results          # preview
+#   make import-results DIR=../results COMMIT=1 # write
+import-results:
+	cd backend && .venv/bin/python -m app.import_results $(DIR) $(if $(COMMIT),--commit,)
+
 # Build the collector table + alias map from recorded_by (run after `make ingest`).
 seed-collectors:
 	cd backend && .venv/bin/python -m app.seed_collectors
