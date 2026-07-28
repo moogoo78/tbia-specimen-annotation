@@ -79,7 +79,19 @@ You can browse **without** signing in — but you must sign in to **annotate**.
 
 ---
 
-## 2 · The Explore page
+## 2 · Starting from the home page
+
+The landing page gives you three ways in:
+
+- **Start exploring** — straight to the full Explore page
+- **Browse by biological group** — birds, plants, insects…
+- **Browse by organization** — holding institutions and aggregators, with record counts
+
+If you don't know where to start, pick a group or an institution, then narrow with filters.
+
+----
+
+### The Explore page
 
 This is where you find records. Four zones:
 
@@ -175,11 +187,13 @@ Missing fields are clearly marked **missing** — those are your targets. 🎯
 
 In the record's **"Fill the gaps"** panel:
 
-1. Choose the **Field** you want to complete (e.g. Coordinates)
-2. Enter a **Proposed value**
+1. Pick the tab for the kind of field you're filling — **Collection**, **Collection
+   event**, **Taxonomy**, **Locality**, or **Annotation-only**
+2. Enter a **Proposed value** (the current value is shown alongside as *now*)
 3. Add an optional **Note** (your reasoning / source)
 4. Click **Submit annotation** — or **Save draft** to finish later
 
+You can fill several fields at once; the button counts **fields to submit**.
 You must be **signed in** to do this.
 
 Note:
@@ -198,19 +212,59 @@ This keeps the source data safe while letting the community improve it.
 
 ---
 
-## 8 · AI-assisted transcription
+## 8 · Reading the label with AI
 
-For records **with a label image**, you can get a head start:
+The **Read the label with AI** block in the annotation panel has AI read the text
+off the specimen image and propose values for the form below.
 
-1. Click **AI extract from image**
-2. The system reads the label and proposes values, each with a **confidence** score
-3. **Review carefully**, click **Use** to apply a suggestion into a field
-4. Edit if needed, then **Submit**
+**Two ways to do it — pick either.** Same result; the difference is who runs it:
+
+1. **Let the platform do it** — add to a queue, processed in batches
+2. **Use your own AI chat** — copy the prompt, run it yourself, paste the reply back
+
+<small>No image on the record means AI has no label to read — you can still fill the form by hand.</small>
+
+Note:
+Both routes produce *proposals*. Nothing is submitted until you review it and press submit.
+
+----
+
+### Option 1 · Let the platform do it
+
+Click **Add to queue**. You **don't have to wait on this page**.
+
+- Runs in **batches** by the platform team, so there is no fixed wait
+- While the page is open it updates itself (Queued → Processed)
+- Leave and come back: the values will be waiting under **Annotation history** as submitted annotations, marked **AI**
+
+<small>Don't want to wait? Use option 2, or just fill the form in by hand — queuing blocks neither.</small>
+
+----
+
+### Option 2 · Use your own AI chat
+
+Free — run it in ChatGPT / Claude / etc., about a minute. Click **Start**, then three steps:
+
+1. **Open the specimen image** — drag or upload it into your AI chat
+2. **Copy this prompt** into the same chat and send it
+3. **Paste the AI's reply back here** — paste the JSON, then click **Read the reply**
+
+<small>If the record has no image, attach your own photo of the label instead.</small>
+
+----
+
+### Once the proposals appear
+
+They are listed under **AI proposals**:
+
+- Check each value, then click **Use** (or **Use all**) to load it into the form below
+- Edit anything that needs it
+- You still have to click **Submit annotation** to finish
 
 > ⚠️ The AI is an assistant, not the author. **You** are responsible for what you submit.
 
 Note:
-AI output is a starting draft. Low-confidence fields especially need human checking before submitting.
+On submit, each field records where its value came from: AI (kept verbatim), AI·edited (AI value you changed), or manual.
 
 ---
 
@@ -227,6 +281,9 @@ Every annotation moves through statuses:
 | **Merged** | Packaged to return to the provider |
 
 <small>Contributors create Drafts/Submitted. Reviewers Accept / Reject / Mark merged.</small>
+
+Each value also carries a source badge — **AI**, **AI·edited**, or nothing for a
+value you typed yourself — so reviewers can see how it was produced.
 
 ---
 
