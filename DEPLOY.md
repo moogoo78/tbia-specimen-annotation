@@ -86,18 +86,39 @@ ls -lh data/tbia.duckdb data/annotations.sqlite
 
 ## 4. Create the secrets file (`backend/.env`)
 
-Gitignored — **never committed**. Generate a real JWT secret:
+Gitignored — **never committed**. Unlike the dev compose file, which interpolates
+values from the project-root `.env`, the prod backend reads **only** this file
+(`env_file: ./backend/.env`) — so ORCID's credentials must live here, not in the
+root `.env`.
 
 ```bash
 cat > backend/.env <<EOF
 NDB_JWT_SECRET=$(openssl rand -hex 32)
+
+# Sign-in is ORCID-only. Register a client at https://orcid.org/developer-tools,
+# scope /authenticate, and set its Redirect URI to EXACTLY the value below
+# (your production domain — not localhost).
+ORCID_BASE=https://orcid.org
+ORCID_CLIENT_ID=
+ORCID_CLIENT_SECRET=
+ORCID_REDIRECT_URI=https://your-domain.org/auth/orcid/callback
+# Comma-separated ORCID iDs granted \`admin\` on first sign-in (see step 6).
+ORCID_ADMIN_IDS=
+
+# MUST stay false here — it is a full auth bypass outside local dev.
+NDB_DEV_LOGIN=false
 EOF
 chmod 600 backend/.env
 ```
 
+With an empty `ORCID_CLIENT_ID` the API returns **503** on `/api/auth/orcid/*`
+and nobody can sign in. Optional extras (`ANTHROPIC_API_KEY` for AI
+transcription, `DISCORD_WEBHOOK_URL` for review pings) go in the same file; see
+`.env.example` for the full list.
+
 > The DuckDB caps (`NDB_DUCK_THREADS`, `NDB_DUCK_MEMORY_LIMIT`,
 > `NDB_DUCK_TEMP_DIR`) and the DB paths are already set in
-> `docker-compose.prod.yml`; only the secret needs to live here.
+> `docker-compose.prod.yml` and don't belong here.
 
 ## 5. Bring it up
 
@@ -155,27 +176,45 @@ Keep your security group allowing 443 (from `0.0.0.0/0`, or restrict to
 [Cloudflare's IP ranges](https://www.cloudflare.com/ips/) to force traffic
 through the proxy).
 
-## 6. Lock down the public demo accounts (required)
+## 6. Sign-in and admin roles
 
-The seeded `demo1234` users (`admin@tbia.test`, etc.) are public in this repo.
-Reset their passwords in the running stack:
+There are **no passwords to lock down** — auth is ORCID-only and the backend
+never handles a password. Two things to check instead:
+
+**a. `NDB_DEV_LOGIN` must be false.** The `annotations.sqlite` you copied up
+carries the three seeded demo rows (`curator/reviewer/admin@tbia.test`). They
+have no password and no ORCID iD, so they are unreachable — *unless*
+`NDB_DEV_LOGIN=true`, which exposes a password-less "sign in as <demo user>"
+flow. Verify:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend \
+  python -c "from app.config import settings; print('dev_login =', settings.dev_login)"
+```
+
+**b. Grant yourself `admin`.** `ORCID_ADMIN_IDS` is applied **only when the user
+row is first created**, so put your iD there *before* your first sign-in;
+everyone else lands on `contributor`. For an iD that has already signed in, or
+to promote someone later, update the row directly:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec backend python - <<'PY'
-from app.db import SessionLocal, init_db
-from app.auth import hash_password
-from app.models import User
 from sqlalchemy import select
+from app.db import SessionLocal, init_db
+from app.models import User
 init_db()
 with SessionLocal() as db:
-    for email in ("admin@tbia.test", "reviewer@tbia.test", "curator@tbia.test"):
-        u = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
-        if u:
-            u.pw_hash = hash_password("CHANGE-ME-strong-unique-per-user")
-    db.commit()
-print("passwords reset")
+    for u in db.execute(select(User)).scalars():
+        print(u.id, u.orcid, u.email, u.display_name, u.role)
+    # Promote (uncomment and set the iD):
+    # u = db.execute(select(User).where(User.orcid == "0000-0002-1825-0097")).scalar_one()
+    # u.role = "admin"; db.commit()
 PY
 ```
+
+Roles are `contributor | reviewer | admin`. A role change takes effect without
+re-issuing tokens: every request resolves the user from SQLite (the `role` claim
+in the JWT is not what's enforced), so the user only needs to reload the page.
 
 ## Operations
 
@@ -207,6 +246,12 @@ DuckDB is rebuilt from scratch by the TBIA ETL. Take the fresh export, run
   cloud), so ACME can't reach Caddy. Use a Cloudflare Origin Certificate +
   `CADDY_TLS` + "Full (strict)" mode (see *TLS modes* above), or grey-cloud the
   record to go direct.
+- **Sign-in button dead / 503 from `/api/auth/orcid/config`** — `ORCID_CLIENT_ID`
+  is empty in `backend/.env`. Note the prod compose does **not** read the
+  project-root `.env` for these (step 4).
+- **ORCID returns `redirect_uri mismatch`** — `ORCID_REDIRECT_URI` must match the
+  Redirect URI registered on the ORCID client *byte for byte*, and point at the
+  production domain (`https://your-domain.org/auth/orcid/callback`).
 - **OOM / container killed** — confirm swap is on (`free -h`) and that only the
   Docker path is running (not also a systemd uvicorn).
 - **`database is locked`** — keep the backend at `--workers 1` (already set);
