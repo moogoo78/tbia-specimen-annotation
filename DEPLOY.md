@@ -124,6 +124,7 @@ transcription, `DISCORD_WEBHOOK_URL` for review pings) go in the same file; see
 
 ```bash
 export SITE_ADDRESS=https://your-domain.org    # or leave unset -> :80 plain HTTP
+export VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX     # optional; omit -> no analytics
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f
@@ -134,6 +135,16 @@ Health check (from the box):
 ```bash
 curl -s http://127.0.0.1/api/health
 ```
+
+> **Google Analytics** is off unless `VITE_GA_MEASUREMENT_ID` is set. Vite
+> inlines it into the JS bundle at build time, so it is passed as a *build arg*
+> — changing the ID requires `up -d --build web`, not just a restart. Tracking
+> is opt-in: a consent banner appears on first visit and `gtag.js` is not
+> fetched (no cookie is set) unless the visitor accepts. The choice — accept or
+> decline — is stored in `localStorage` under `tbia_analytics_consent`, so
+> clearing site data re-prompts. Once a choice is made, a **Cookies** link
+> appears in the header: it withdraws consent, deletes the `_ga*` cookies, and
+> brings the banner back so the visitor can choose again.
 
 > Tight on RAM during `--build`? Build the images on your laptop and transfer
 > them: `docker save <img> | ssh ubuntu@<ip> docker load`, then `up -d` without

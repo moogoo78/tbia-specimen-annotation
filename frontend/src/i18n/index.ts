@@ -129,6 +129,14 @@ const en = {
     annotationLatitudeDecimal: "Latitude (decimal)", annotationLongitudeDecimal: "Longitude (decimal)",
     annotationCounty: "County", annotationMunicipality: "Municipality",
   },
+  consent: {
+    text: "We'd like to use Google Analytics cookies to see which parts of the platform get used. Nothing is collected unless you accept, and this has no effect on your annotations.",
+    accept: "Accept",
+    decline: "Decline",
+    title: "Cookies",
+    manage: "Cookies",
+    manageTitle: "Change your analytics cookie choice",
+  },
 };
 
 const zh: typeof en = {
@@ -258,6 +266,14 @@ const zh: typeof en = {
     annotationLatitudeDMS: "緯度(度分秒)", annotationLongitudeDMS: "經度(度分秒)",
     annotationLatitudeDecimal: "緯度(十進位)", annotationLongitudeDecimal: "經度(十進位)",
     annotationCounty: "縣市", annotationMunicipality: "鄉鎮市區",
+  },
+  consent: {
+    text: "本站希望使用 Google Analytics cookie，以了解平台各功能的使用情形。未經您同意不會蒐集任何資料，也不影響您的標註內容。",
+    accept: "同意",
+    decline: "不同意",
+    title: "Cookie 使用",
+    manage: "Cookie 設定",
+    manageTitle: "變更分析 cookie 的同意設定",
   },
 };
 

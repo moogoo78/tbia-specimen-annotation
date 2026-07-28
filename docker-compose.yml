@@ -47,6 +47,11 @@ services:
       - frontend_node_modules:/app/node_modules
     environment:
       VITE_API_PROXY: http://backend:8000
+      # GA4 measurement ID, interpolated from the project-root .env. That file
+      # is NOT mounted into this container, so vite.config's envDir can't reach
+      # it — the value has to come in as an env var. Empty => no analytics and
+      # no consent banner.
+      VITE_GA_MEASUREMENT_ID: ${VITE_GA_MEASUREMENT_ID:-}
     depends_on:
       - backend
 

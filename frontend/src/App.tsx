@@ -1,6 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 import { t } from "./design/tokens";
+import { usePageviews } from "./analytics";
 import { AppHeader } from "./components/AppHeader";
+import { CookieConsent } from "./components/CookieConsent";
 import { Home } from "./pages/Home";
 import { Explore } from "./pages/Explore";
 import { Institutions } from "./pages/Institutions";
@@ -10,6 +12,8 @@ import { Login } from "./pages/Login";
 import { OrcidCallback } from "./pages/OrcidCallback";
 
 export default function App() {
+  usePageviews();
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: t.bg, color: t.fg, fontFamily: t.sans }}>
       <AppHeader />
@@ -22,6 +26,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/auth/orcid/callback" element={<OrcidCallback />} />
       </Routes>
+      <CookieConsent />
     </div>
   );
 }

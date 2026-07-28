@@ -3,11 +3,16 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { useAuth } from "../auth";
+import { ANALYTICS_ENABLED, revokeConsent, useConsent } from "../analytics";
 
 export function AppHeader() {
   const { t: tr, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const loc = useLocation();
+  const consent = useConsent();
+  // Only worth showing once there's a choice to change — while the banner is up
+  // it would just duplicate it.
+  const showCookieLink = ANALYTICS_ENABLED && consent !== "unset";
 
   const toggleLang = () => {
     const next = i18n.language === "zh" ? "en" : "zh";
@@ -51,6 +56,16 @@ export function AppHeader() {
       </div>
 
       <div style={{ flex: 1 }} />
+
+      {showCookieLink && (
+        <button onClick={revokeConsent} title={tr("consent.manageTitle")} style={{
+          display: "flex", alignItems: "center", padding: "0 10px", background: "transparent",
+          border: "none", borderLeft: `1px solid ${t.borderSoft}`, color: t.fgSubtle, cursor: "pointer",
+          fontSize: 11, fontFamily: t.sans,
+        }}>
+          {tr("consent.manage")}
+        </button>
+      )}
 
       <button onClick={toggleLang} title="language" style={{
         display: "flex", alignItems: "center", gap: 5, padding: "0 10px", background: "transparent",
