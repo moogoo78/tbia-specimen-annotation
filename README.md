@@ -2,7 +2,7 @@
 
 A collaborative annotation platform for natural-history collection data from the
 **Taiwan Biodiversity Information Alliance (TBIA)**. It serves ~1.79 million occurrence
-records across 927 datasets, lets contributors **find specimens with metadata gaps**
+records across 930 datasets, lets contributors **find specimens with metadata gaps**
 (missing taxonomic identification, coordinates, or collection date) by completeness and
 holding institution, **fill those gaps** manually or with AI-assisted label transcription,
 and exports the **aggregated, reviewed annotations back to the original data providers** —
@@ -18,7 +18,7 @@ walkthrough there is a slide deck in both languages:
 
 | Concern | Choice |
 |---|---|
-| Occurrence store (read-only, ~1.79M rows) | **DuckDB** — the TBIA ETL's export; columnar, so faceting / completeness aggregation stays fast |
+| Occurrence store (read-only, ~1.92M rows) | **DuckDB** — the TBIA ETL's export; columnar, so faceting / completeness aggregation stays fast |
 | Annotations + users (shared writes) | **SQLite** via SQLAlchemy |
 | Federated joins (dashboard / provider export) | DuckDB `ATTACH`es the SQLite file (`sqlite_scanner`, read-only) → one SQL query |
 | API | **FastAPI** (DuckDB queries run in a threadpool; JWT auth with contributor/reviewer/admin roles) |

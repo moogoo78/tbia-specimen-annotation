@@ -1,0 +1,160 @@
+{
+  "institutions": {
+    "NMNS": {
+      "name": "國立自然科學博物館",
+      "datasets": {
+        "d674d7dc7c3bd2c006cefad1d": {
+          "code": "維管束",
+          "name": "TNM-維管束學門",
+          "groups": [
+            "Plantae"
+          ]
+        },
+        "d674d7dc7c3bd2c006cefad1c": {
+          "code": "真菌",
+          "name": "科博典藏 (NMNS Collection)-真菌學門",
+          "groups": [
+            "Fungi"
+          ]
+        },
+        "d674d7dc8c3bd2c006cefad3d": {
+          "code": "無脊椎",
+          "name": "科博典藏 (NMNS Collection)-無脊椎動物學門",
+          "groups": [
+            "Zoology",
+            "Other"
+          ]
+        },
+        "d674d7dfbc3bd2c006cefb289": {
+          "code": "非維管束",
+          "name": "科博典藏 (NMNS Collection)-非維管束學門",
+          "groups": [
+            "Plantae"
+          ]
+        },
+        "d674d7df6c3bd2c006cefb217": {
+          "code": "昆蟲",
+          "name": "科博典藏 (NMNS Collection)-昆蟲學門",
+          "groups": [
+            "Zoology",
+            "Insecta"
+          ]
+        },
+        "d674d7dc6c3bd2c006cefad0d": {
+          "code": "兩棲爬蟲",
+          "name": "科博典藏 (NMNS Collection)-兩棲爬蟲學門",
+          "groups": [
+            "Zoology",
+            "Amphibia",
+            "Reptilia"
+          ]
+        }
+      }
+    },
+    "BRMAS": {
+      "name": "中央研究院生物多樣性研究博物館",
+      "datasets": {
+        "d674d7dc7c3bd2c006cefad1f": {
+          "code": "ASIZ",
+          "name": "中央研究院生物多樣性研究博物館動物標本館 (ASIZ)",
+          "groups": [
+            "Zoology",
+            "Other"
+          ]
+        },
+        "d691141ff8980195c477f429c": {
+          "code": "HAST",
+          "name": "中央研究院生物多樣性中心植物標本館 (HAST)",
+          "groups": [
+            "Plantae"
+          ]
+        }
+      }
+    },
+    "TFRI": {
+      "name": "農業部林業試驗所",
+      "datasets": {
+        "d674d7dcbc3bd2c006cefad8c": {
+          "code": "TAIF",
+          "name": "Herbarium database of Taiwan Forestry Research Institute (林業試驗所植物標本館標本資料)",
+          "groups": [
+            "Plantae"
+          ]
+        },
+        "d674d7dcec3bd2c006cefadd1": {
+          "code": "FACT",
+          "name": "林業試驗所 昆蟲標本館",
+          "groups": [
+            "Zoology",
+            "Insecta"
+          ]
+        }
+      }
+    },
+    "TARI": {
+      "name": "農業部農業試驗所",
+      "datasets": {
+        "d6965e5fc036d4e77571980d6": {
+          "name": "作物種原資訊系統",
+          "groups": [
+            "Plantae"
+          ]
+        }
+      }
+    },
+    "TAIM": {
+      "name": "國立臺灣博物館",
+      "datasets": {
+        "d674d7ddac3bd2c006cefaf3a": {
+          "name": "Biological Collection of the National Taiwan Museum, Taipei, Taiwan",
+          "groups": [
+            "Other"
+          ]
+        }
+      }
+    },
+    "NMMBA": {
+      "name": "國立海洋生物博物館",
+      "datasets": {
+        "d69b777c9358e780108f29db4": {
+          "name": "國立海洋生物博物館生物典藏管理系統",
+          "groups": [
+            "Zoology"
+          ]
+        }
+      }
+    },
+    "TBRI": {
+      "name": "農業部生物多樣性研究所",
+      "datasets": {
+        "d674d7decc3bd2c006cefb0cc": {
+          "code": "TAIE",
+          "name": "農業部生物多樣性研究所植物標本館資料集 (TAIE)",
+          "groups": [
+            "Plantae"
+          ]
+        },
+        "d674d7de5c3bd2c006cefb028": {
+          "code": "TAIE",
+          "name": "生物多樣性研究所植物標本館(TAIE)苔蘚資料",
+          "groups": [
+            "Plantae"
+          ]
+        },
+        "d674d7deac3bd2c006cefb081": {
+          "name": "Data-set of Moth Specimen from TESRI",
+          "groups": [
+            "Zoology",
+            "Insecta"
+          ]
+        }
+      }
+    }
+  },
+  "aggregators": {
+    "GBIF": {
+      "name": "GBIF (Global Biodiversity Information Facility)",
+      "datasets": {}
+    }
+  }
+}

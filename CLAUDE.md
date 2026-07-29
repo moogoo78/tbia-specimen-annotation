@@ -14,7 +14,7 @@ transcription, and reviewed enrichments are exported back to data providers.
 Occurrence data is **read-only**; enrichment lives only as annotations. Hence two stores:
 
 - **DuckDB** (`data/tbia.duckdb`) — the TBIA ETL's export (`task-tbia-data-etl.md`):
-  table `occurrence` (~1.79M rows, 927 datasets) + table `dataset` (one row per
+  table `occurrence` (~1.92M rows, 930 datasets) + table `dataset` (one row per
   `tbia_dataset_id`). Read-only at serve time; columnar → fast facets/completeness
   aggregation; queries run in a threadpool (`app/duck.py`). The ETL owns the raw
   columns; `make prepare` adds the derived ones the app needs.
@@ -97,13 +97,23 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.jso
 `groups` vocabulary: `Aves, Amphibia, Reptilia, Mammalia, Actinopterygii, Mollusca,
 Arachnida, Insecta, Plantae, Fungi, Protozoa` (plus `Zoology`/`Other` used as broad tags).
 
-It is **hand-curated and holds only the 13 stable institution datasets.** The GBIF
+It is **hand-curated (tracked in git) and holds only the 16 stable institution datasets**
+across 7 institutions. The GBIF
 aggregator's datasets (914 of them) turn over with every TBIA export, so their ids are
 *not* pinned here — `GET /api/registry` reads them from the `dataset` table at request
 time and merges them under `aggregators`, keyed by `institution_code`. The GBIF uuid
 comes from `source_dataset_id` (the export's own `gbif_dataset_id` is empty). Curated
 entries always win: anything registry.json lists is left untouched, so promoting a
 dataset to "stable" is just adding it to the file.
+
+**Anything uncurated falls into `aggregators`, not just GBIF** (`occurrences.py`, the
+`reg["aggregators"].setdefault(...)` merge). So an institution missing from registry.json
+shows up in the UI under 整合平台 instead of 典藏機構 — and because entries are matched on
+`tbia_dataset_id`, a stale *code* keeps working silently while the sidebar shows the old
+name. After every ETL refresh, reconcile registry.json's institution codes/names against
+`data/registry-institutions.json` (the ETL's own list), not just its dataset ids. The
+2026-07-29 export renamed `TAIF`→`TFRI`, `NMMBP`→`NMMBA`, folded `TAIE` into
+`TBRI` (農業部生物多樣性研究所), and prefixed 農業部 onto several names.
 
 The Explore **Source** facet is driven by that merged response; selecting a source
 expands to the union of its `tbia_dataset_id`s.

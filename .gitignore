@@ -4,14 +4,17 @@
 !.env.example
 *.env
 dotenvbak
+envbak
 *.pem
 *.key
 secrets*
 
-# --- Generated data dir (DBs, registry, CSVs, spill tmp; all large/derived) ---
-# Everything under data/ is generated or scp'd in at deploy time. Keep the dir.
+# --- Generated data dir (DBs, CSVs, spill tmp; all large/derived) ---
+# Everything under data/ is generated or scp'd in at deploy time, except
+# registry.json: that one is hand-curated source and lives in git.
 /data/*
 !/data/.gitkeep
+!/data/registry.json
 
 # --- Raw data exports & API scratch dumps at repo root (large / not source) ---
 /tbia_*.csv
