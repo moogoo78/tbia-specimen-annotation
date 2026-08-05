@@ -73,6 +73,7 @@ class Filters:
     collector_id: list[int] = field(default_factory=list)
     record_number_from: int | None = None
     record_number_to: int | None = None
+    record_number: str | None = None  # substring match, for non-numeric numbers
     missing_coordinates: bool = False
     missing_date: bool = False
     missing_identification: bool = False
@@ -154,6 +155,13 @@ def build_where(f: Filters) -> tuple[str, list[Any]]:
         else:
             where.append(f"{expr} <= ?")
             params.append(f.record_number_to)
+
+    # Text record number, for the many that aren't numbers at all ("TAI-9",
+    # "陳-123") and so can never match the range above. Substring/ILIKE, like
+    # the rest of the free-text search.
+    if f.record_number and f.record_number.strip():
+        where.append("record_number ILIKE ?")
+        params.append(f"%{f.record_number.strip()}%")
 
     if f.missing_coordinates:
         where.append("has_coordinates = FALSE")

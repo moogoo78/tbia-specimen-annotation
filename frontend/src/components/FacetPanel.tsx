@@ -16,7 +16,7 @@ const FLAGS: FlagKey[] = ["missing_identification", "missing_coordinates", "miss
 
 export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   registry, selectedSources, onToggleSource,
-  selectedCollectors, onToggleCollector, onRecordRange, width = 232 }: {
+  selectedCollectors, onToggleCollector, onRecordRange, onRecordText, width = 232 }: {
   facets?: FacetResult;
   filters: Filters;
   onToggle: (key: ArrayKey, value: string) => void;
@@ -28,6 +28,7 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   selectedCollectors: CollectorRef[];
   onToggleCollector: (c: CollectorRef) => void;
   onRecordRange: (from?: number, to?: number) => void;
+  onRecordText: (value?: string) => void;
   width?: number;
 }) {
   const { t: tr } = useTranslation();
@@ -37,7 +38,8 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   });
   const [srcOpen, setSrcOpen] = useState<Record<string, boolean>>({});
 
-  const recordActive = filters.record_number_from != null || filters.record_number_to != null;
+  const recordActive = filters.record_number_from != null || filters.record_number_to != null
+    || !!filters.record_number;
   const activeCount =
     selectedSources.length +
     selectedCollectors.length +
@@ -183,7 +185,8 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
       <div style={{ borderBottom: `1px solid ${t.borderSoft}` }}>
         {sectionHead("record_number", tr("facet.record_number"), recordActive ? 1 : 0)}
         {open.record_number && (
-          <RecordRange from={filters.record_number_from} to={filters.record_number_to} onChange={onRecordRange} />
+          <RecordRange from={filters.record_number_from} to={filters.record_number_to}
+            text={filters.record_number} onChange={onRecordRange} onText={onRecordText} />
         )}
       </div>
 
@@ -244,16 +247,23 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   );
 }
 
-// Two numeric inputs (from – to) for the record_number range; debounced so typing
-// doesn't fire a request per keystroke. Empty/invalid -> undefined (open-ended).
-function RecordRange({ from, to, onChange }: {
-  from?: number; to?: number; onChange: (from?: number, to?: number) => void;
+// Record number: a numeric range (from – to) plus a free-text box, because many
+// record numbers aren't numbers ("TAI-9", "陳-123") and can never match a range.
+// Both are debounced so typing doesn't fire a request per keystroke.
+// Empty/invalid -> undefined (open-ended / unset).
+function RecordRange({ from, to, text, onChange, onText }: {
+  from?: number; to?: number; text?: string;
+  onChange: (from?: number, to?: number) => void;
+  onText: (value?: string) => void;
 }) {
+  const { t: tr } = useTranslation();
   const [lo, setLo] = useState(from?.toString() ?? "");
   const [hi, setHi] = useState(to?.toString() ?? "");
+  const [txt, setTxt] = useState(text ?? "");
   // reflect external changes (e.g. Clear) into the inputs
   useEffect(() => { setLo(from?.toString() ?? ""); }, [from]);
   useEffect(() => { setHi(to?.toString() ?? ""); }, [to]);
+  useEffect(() => { setTxt(text ?? ""); }, [text]);
   useEffect(() => {
     const h = setTimeout(() => {
       const num = (s: string) => {
@@ -264,18 +274,28 @@ function RecordRange({ from, to, onChange }: {
     }, 400);
     return () => clearTimeout(h);
   }, [lo, hi]);
+  useEffect(() => {
+    const h = setTimeout(() => onText(txt.trim() || undefined), 400);
+    return () => clearTimeout(h);
+  }, [txt]);
 
   const inp: React.CSSProperties = {
     width: 64, boxSizing: "border-box", padding: "3px 5px", fontFamily: t.mono, fontSize: 11,
     border: `1px solid ${t.border}`, background: t.panelAlt, outline: "none",
   };
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 10px 8px" }}>
-      <input type="number" inputMode="numeric" value={lo} placeholder="100"
-        onChange={(e) => setLo(e.target.value)} style={inp} />
-      <span style={{ color: t.fgSubtle }}>–</span>
-      <input type="number" inputMode="numeric" value={hi} placeholder="200"
-        onChange={(e) => setHi(e.target.value)} style={inp} />
+    <div style={{ padding: "2px 10px 8px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input type="number" inputMode="numeric" value={lo} placeholder="100"
+          onChange={(e) => setLo(e.target.value)} style={inp} />
+        <span style={{ color: t.fgSubtle }}>–</span>
+        <input type="number" inputMode="numeric" value={hi} placeholder="200"
+          onChange={(e) => setHi(e.target.value)} style={inp} />
+      </div>
+      <input type="text" value={txt} placeholder={tr("facet.record_number_text")}
+        title={tr("facet.record_number_textHint")}
+        onChange={(e) => setTxt(e.target.value)}
+        style={{ ...inp, width: "100%", marginTop: 6, fontFamily: t.sans }} />
     </div>
   );
 }

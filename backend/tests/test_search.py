@@ -32,6 +32,35 @@ def test_record_number_range(client):
     assert {r["id"] for r in hi["items"]} == {"r3", "r5"}
 
 
+def test_record_number_text(client):
+    """r4 is 'TAI-9' — non-numeric, so no range can ever reach it."""
+    res = client.get("/api/occurrences", params={"record_number": "TAI-9"}).json()
+    assert {r["id"] for r in res["items"]} == {"r4"}
+
+    # substring, case-insensitive
+    for term in ("tai", "AI-", "9"):
+        hit = client.get("/api/occurrences", params={"record_number": term}).json()
+        assert "r4" in {r["id"] for r in hit["items"]}, term
+
+    # a numeric record number is still reachable as text
+    num = client.get("/api/occurrences", params={"record_number": "150"}).json()
+    assert {r["id"] for r in num["items"]} == {"r2"}
+
+    # blank/whitespace is not a filter
+    blank = client.get("/api/occurrences", params={"record_number": "   "}).json()
+    assert blank["total"] == client.get("/api/occurrences").json()["total"]
+
+    # combines with the range as AND — TAI-9 is not in 100–200, so nothing matches
+    both = client.get("/api/occurrences", params={
+        "record_number": "TAI-9", "record_number_from": 100, "record_number_to": 200}).json()
+    assert both["total"] == 0
+
+    # and with other facets
+    with_group = client.get("/api/occurrences", params={
+        "record_number": "tai", "bio_group": "維管束植物"}).json()
+    assert {r["id"] for r in with_group["items"]} == {"r4"}
+
+
 def test_free_text_search(client):
     res = client.get("/api/occurrences?q=Helianthus").json()
     assert res["total"] == 1 and res["items"][0]["id"] == "r3"

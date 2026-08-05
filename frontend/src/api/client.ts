@@ -51,6 +51,7 @@ export function filtersToParams(f: Filters): URLSearchParams {
   if (f.year_to != null) p.set("year_to", String(f.year_to));
   if (f.record_number_from != null) p.set("record_number_from", String(f.record_number_from));
   if (f.record_number_to != null) p.set("record_number_to", String(f.record_number_to));
+  if (f.record_number) p.set("record_number", f.record_number);
   if (f.bbox) p.set("bbox", f.bbox);
   return p;
 }

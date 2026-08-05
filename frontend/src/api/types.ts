@@ -172,6 +172,7 @@ export interface Filters {
   collector_id: number[];
   record_number_from?: number;
   record_number_to?: number;
+  record_number?: string;
   missing_coordinates: boolean;
   missing_date: boolean;
   missing_identification: boolean;
