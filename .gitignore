@@ -27,6 +27,7 @@ secrets*
 # directories need their own entries.
 /source/
 /tmp-source/
+/tmp/
 /results/
 
 # --- Intermediate dataset-selection working files (not needed to run/serve) ---
