@@ -159,6 +159,32 @@
           ]
         }
       }
+    },
+    "TBRI": {
+      "name": "生物多樣性研究所",
+      "datasets": {
+        "d674d7deac3bd2c006cefb081": {
+          "name": "Data-set of Moth Specimen from TESRI",
+          "groups": [
+            "Zoology",
+            "Insecta"
+          ]
+        },
+        "d674d7decc3bd2c006cefb0cc": {
+          "code": "TAIE",
+          "name": "農業部生物多樣性研究所植物標本館資料集 (TAIE)",
+          "groups": [
+            "Plantae"
+          ]
+        },
+        "d674d7de5c3bd2c006cefb028": {
+          "code": "TAIE",
+          "name": "生物多樣性研究所植物標本館(TAIE)苔蘚資料",
+          "groups": [
+            "Plantae"
+          ]
+        }
+      }
     }
   },
   "aggregators": {
