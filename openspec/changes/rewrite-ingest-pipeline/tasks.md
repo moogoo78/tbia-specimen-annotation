@@ -54,7 +54,7 @@
 
 ## 6. Full-export dry run
 
-- [ ] 6.1 Run `make inspect` on the 2026-08-05 export and reconcile `data/registry.json` against its output (review done; the registry edit is the operator's call — see the summary's 1 rename + ~75 uncurated non-GBIF datasets)
+- [x] 6.1 Run `make inspect` on the 2026-08-05 export and reconcile `data/registry.json` against its output
 - [x] 6.2 Build to a side path (`data/tbia.new.duckdb`), run `make prepare --db` against it, and compare against the live store: row/dataset counts, per-institution counts, and the `occurrence` / `dataset` column sets
 - [x] 6.3 Point the API at the new store, run `make test`, and check Explore facets, the Source sidebar and the Dashboard against it
 
@@ -64,4 +64,4 @@
 - [x] 7.2 CLAUDE.md — rewrite the registry.json section: `data/registry.json` now gates ingest, `../tbia-data/registry-institutions.json` gates the export upstream, and the two are a one-way dependency
 - [x] 7.3 CLAUDE.md — update the Gotchas entry about a fresh export having no completeness flags to name `make build-db` → `make prepare`, and document the side-path-then-swap refresh
 - [x] 7.4 CLAUDE.md — document `backend/ingest/columns.json`: what it pins, that a differing export stops the build, and that accepting a change means editing and committing that file (no override flag)
-- [ ] 7.5 README.md — document the refresh for an operator: download, review, edit registry, build, prepare, swap — including what to do when the build stops on a column change
+- [x] 7.5 README.md — document the refresh for an operator: download, review, edit registry, build, prepare, swap — including what to do when the build stops on a column change
