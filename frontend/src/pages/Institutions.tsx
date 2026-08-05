@@ -8,6 +8,10 @@ import { api } from "../api/client";
 import type { Dataset, RegistryEntry, SourceKind } from "../api/types";
 import { Spinner } from "../components/ui";
 
+// Every dataset here is a TBIA dataset, so its id addresses the provider-facing
+// page on the TBIA portal.
+const TBIA_DATASET_URL = "https://tbiadata.tw/dataset/";
+
 // Collection institutions / aggregators from registry.json, each with its
 // datasets and completeness stats (from /api/datasets). Clicking drills into
 // Explore filtered to that source.
@@ -123,6 +127,13 @@ function OrgCard({ kind, code, ent, statsById, defaultOpen }: {
                 <span style={{ fontSize: 10, fontFamily: t.mono, color: t.fgMuted, width: 110, textAlign: "right", flexShrink: 0 }}>
                   {s ? `${dpct}% · ${s.n_records.toLocaleString()}` : "—"}
                 </span>
+                {/* Out to the TBIA portal. stopPropagation so it doesn't also drill into Explore. */}
+                <a href={`${TBIA_DATASET_URL}${id}`} target="_blank" rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()} title={tr("inst.viewOnTbia")}
+                  aria-label={tr("inst.viewOnTbia")}
+                  style={{ display: "flex", alignItems: "center", color: t.fgSubtle, flexShrink: 0 }}>
+                  <Icon name="globe" size={11} />
+                </a>
               </div>
             );
           })}

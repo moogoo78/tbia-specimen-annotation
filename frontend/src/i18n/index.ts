@@ -12,7 +12,7 @@ const en = {
     browseByOrg: "Browse by organization",
     records: "records", datasets: "datasets",
   },
-  inst: { title: "Collection institutions", datasets: "datasets", records: "records", viewAll: "View all records" },
+  inst: { title: "Collection institutions", datasets: "datasets", records: "records", viewAll: "View all records", viewOnTbia: "View this dataset on the TBIA portal" },
   search: {
     placeholder: "Search taxon, locality, collector, catalog #…",
     results: "results", of: "of", clear: "clear", filters: "FILTERS",
@@ -150,7 +150,7 @@ const zh: typeof en = {
     browseByOrg: "依組織單位瀏覽",
     records: "筆紀錄", datasets: "個資料集",
   },
-  inst: { title: "典藏機構", datasets: "個資料集", records: "筆紀錄", viewAll: "查看全部紀錄" },
+  inst: { title: "典藏機構", datasets: "個資料集", records: "筆紀錄", viewAll: "查看全部紀錄", viewOnTbia: "在 TBIA 資料入口查看此資料集" },
   search: {
     placeholder: "搜尋物種、地點、採集者、館號…",
     results: "筆結果", of: "／", clear: "清除", filters: "篩選條件",
