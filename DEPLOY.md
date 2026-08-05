@@ -105,11 +105,19 @@ ORCID_REDIRECT_URI=https://your-domain.org/auth/orcid/callback
 # Comma-separated ORCID iDs granted \`admin\` on first sign-in (see step 6).
 ORCID_ADMIN_IDS=
 
-# MUST stay false here — it is a full auth bypass outside local dev.
+# Both MUST stay false/unset here — together they are a full auth bypass.
+# NDB_DEV_MODE also permits the placeholder JWT secret, so leaving it out is
+# what makes the NDB_JWT_SECRET line above non-optional.
 NDB_DEV_LOGIN=false
 EOF
 chmod 600 backend/.env
 ```
+
+The `NDB_JWT_SECRET` line is not boilerplate: the placeholder value is published
+in this repo, and a token signed with it grants whatever role the user row it
+names has — including the seeded `admin`. The backend **refuses to start** if it
+finds the placeholder without `NDB_DEV_MODE=true`, so a missing or typo'd line
+here fails loudly at deploy time instead of silently shipping forgeable sessions.
 
 With an empty `ORCID_CLIENT_ID` the API returns **503** on `/api/auth/orcid/*`
 and nobody can sign in. Optional extras (`ANTHROPIC_API_KEY` for AI
@@ -192,15 +200,17 @@ through the proxy).
 There are **no passwords to lock down** — auth is ORCID-only and the backend
 never handles a password. Two things to check instead:
 
-**a. `NDB_DEV_LOGIN` must be false.** The `annotations.sqlite` you copied up
-carries the three seeded demo rows (`curator/reviewer/admin@tbia.test`). They
-have no password and no ORCID iD, so they are unreachable — *unless*
-`NDB_DEV_LOGIN=true`, which exposes a password-less "sign in as <demo user>"
-flow. Verify:
+**a. Dev sign-in must be off.** The `annotations.sqlite` you copied up carries
+the three seeded demo rows (`curator/reviewer/admin@tbia.test`). They have no
+password and no ORCID iD, so they are unreachable — *unless* the password-less
+"sign in as <demo user>" flow is live, which would hand anyone that `admin` row.
+It takes **both** `NDB_DEV_LOGIN=true` and `NDB_DEV_MODE=true`, so one stray
+flag can't open it; `dev_login_enabled` is the value that actually gates the
+endpoints. Verify:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec backend \
-  python -c "from app.config import settings; print('dev_login =', settings.dev_login)"
+  python -c "from app.config import settings; print('dev_login_enabled =', settings.dev_login_enabled)"
 ```
 
 **b. Grant yourself `admin`.** `ORCID_ADMIN_IDS` is applied **only when the user

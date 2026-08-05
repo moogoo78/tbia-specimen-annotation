@@ -23,7 +23,10 @@ secrets*
 /response_*.json
 *.zip
 # The downloaded TBIA export + its field docs (~2 GB), and TBIA API scratch dumps.
+# The /tbia_*.csv|zip rules above only match at the repo root, so the unpack
+# directories need their own entries.
 /source/
+/tmp-source/
 /results/
 
 # --- Intermediate dataset-selection working files (not needed to run/serve) ---

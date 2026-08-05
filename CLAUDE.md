@@ -129,6 +129,12 @@ expands to the union of its `tbia_dataset_id`s.
   a Python-side join.
 - Settings via env with `NDB_` prefix (`app/config.py`): `NDB_DUCKDB_PATH` (defaults to
   `data/tbia.duckdb`), `NDB_SQLITE_PATH`, `NDB_JWT_SECRET`, `NDB_CORS_ORIGINS`.
+- **`NDB_DEV_MODE` is the "throwaway local environment" switch, default off.** It
+  permits the placeholder `NDB_JWT_SECRET` (the repo is public, so a deploy that
+  keeps it is trivially forgeable — `Settings` raises at import otherwise) and is
+  required alongside `NDB_DEV_LOGIN` for the password-less demo sign-in. Check
+  `settings.dev_login_enabled`, never `settings.dev_login`. `docker-compose.yml`
+  (dev) sets `NDB_DEV_MODE=true`; `docker-compose.prod.yml` must never set it.
 - A fresh ETL export has no completeness flags, so the API errors on every query until
   `make prepare` has run over it.
 - The Chrome browser-automation tools aren't connected in this environment — verify UI

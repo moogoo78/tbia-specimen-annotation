@@ -22,9 +22,14 @@ services:
       ORCID_REDIRECT_URI: ${ORCID_REDIRECT_URI:-http://localhost:5173/auth/orcid/callback}
       ORCID_ADMIN_IDS: ${ORCID_ADMIN_IDS:-}
       NDB_JWT_SECRET: ${NDB_JWT_SECRET:-dev-secret-change-me}
+      # This is the *dev* compose file, so it opts in to the placeholder secret
+      # above. Without this the backend refuses to boot on it (by design — the
+      # placeholder is public). docker-compose.prod.yml never sets this.
+      NDB_DEV_MODE: ${NDB_DEV_MODE:-true}
       # DEV-ONLY password-less sign-in for the seeded demo users (ORCID can't
       # round-trip on localhost). Defaults off; set NDB_DEV_LOGIN=true in .env
-      # for local testing. MUST stay false in any deployed environment.
+      # for local testing. Needs NDB_DEV_MODE too, and both MUST stay off in any
+      # deployed environment — together they are a full auth bypass.
       NDB_DEV_LOGIN: ${NDB_DEV_LOGIN:-false}
       # Review-request Discord ping (plain env vars, no NDB_ prefix)
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}

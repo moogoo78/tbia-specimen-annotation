@@ -102,13 +102,14 @@ def me(user: User = Depends(auth.current_user)):
 
 
 # ── Dev-only sign-in ────────────────────────────────────────────────────────
-# Gated by settings.dev_login (NDB_DEV_LOGIN). Lets local dev sign in as a
-# seeded demo user without ORCID, which cannot round-trip on localhost. Never
-# enable in a deployed environment — it is an authentication bypass.
+# Lets local dev sign in as a seeded demo user without ORCID, which cannot
+# round-trip on localhost. This is an authentication bypass — one of the demo
+# users is an `admin` — so it takes BOTH NDB_DEV_LOGIN and NDB_DEV_MODE to
+# enable (settings.dev_login_enabled); neither flag alone opens it.
 @router.get("/dev-login/config", response_model=DevLoginConfig)
 def dev_login_config(db: Session = Depends(get_session)):
     """Tell the frontend whether dev sign-in is available and list demo users."""
-    if not settings.dev_login:
+    if not settings.dev_login_enabled:
         return DevLoginConfig(enabled=False, users=[])
     # Only seeded demo users have an email (ORCID users are keyed on iD).
     rows = db.execute(select(User).where(User.email.isnot(None))).scalars().all()
@@ -120,7 +121,7 @@ def dev_login_config(db: Session = Depends(get_session)):
 
 @router.post("/dev-login", response_model=TokenResponse)
 def dev_login(body: DevLoginRequest, db: Session = Depends(get_session)):
-    if not settings.dev_login:
+    if not settings.dev_login_enabled:
         raise HTTPException(status_code=404, detail="Not found")
     user = db.execute(
         select(User).where(User.email == body.email, User.email.isnot(None))

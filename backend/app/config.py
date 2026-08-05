@@ -1,11 +1,17 @@
 import os
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 DATA = os.path.join(REPO, "data")
+
+# The placeholder JWT secret. This repo is public, so a deploy that keeps it is
+# trivially forgeable: anyone can sign a token for user id 1..3 (seed.py's demo
+# rows, one of them `admin`) and get that role, because current_user reads the
+# role from the DB row the token names. Boot refuses it unless dev_mode is on.
+DEV_JWT_SECRET = "dev-secret-change-me"
 
 
 class Settings(BaseSettings):
@@ -22,7 +28,13 @@ class Settings(BaseSettings):
     duck_memory_limit: str = ""  # e.g. "1GB"; empty -> leave DuckDB default
     duck_temp_dir: str = ""  # spill dir when memory_limit is hit; empty -> default
 
-    jwt_secret: str = "dev-secret-change-me"
+    # Master "this is a throwaway local environment" switch. Off by default, so
+    # anything unsafe stays off unless a developer opts in explicitly. Gates the
+    # placeholder jwt_secret and (together with dev_login) the password-less
+    # sign-in. NEVER set this in a shared or deployed environment.
+    dev_mode: bool = False
+
+    jwt_secret: str = DEV_JWT_SECRET
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7
 
@@ -46,9 +58,11 @@ class Settings(BaseSettings):
 
     # DEV-ONLY password-less sign-in for the seeded demo users. ORCID OAuth
     # cannot round-trip on localhost, so this lets local dev pick a role without
-    # ORCID. It mints tokens ONLY for existing seeded demo users (email set) and
-    # is gated everywhere by this flag. MUST stay false in any shared/deployed
-    # environment — enabling it there is a full auth bypass.
+    # ORCID. It mints tokens ONLY for existing seeded demo users (email set) —
+    # one of which is an `admin`, so on a deployed box this is a full auth
+    # bypass. Never read this field directly: the endpoints check
+    # `dev_login_enabled`, which also requires dev_mode, so flipping one flag by
+    # itself can't open the bypass.
     dev_login: bool = False
 
     # Comma-separated origins allowed by CORS (the Vite dev server).
@@ -72,6 +86,23 @@ class Settings(BaseSettings):
     transcribe_mode: str = Field(default="two_stage", validation_alias="TRANSCRIBE_MODE")
     ocr_model: str = Field(default="claude-sonnet-5", validation_alias="OCR_MODEL")
     field_model: str = Field(default="claude-opus-5", validation_alias="FIELD_MODEL")
+
+    @model_validator(mode="after")
+    def _refuse_insecure_defaults(self) -> "Settings":
+        if self.jwt_secret == DEV_JWT_SECRET and not self.dev_mode:
+            raise RuntimeError(
+                "NDB_JWT_SECRET is still the placeholder from this (public) repo, "
+                "so anyone could forge an admin session. Set a real one:\n"
+                "    NDB_JWT_SECRET=$(openssl rand -hex 32)\n"
+                "Local throwaway environment? Set NDB_DEV_MODE=true instead."
+            )
+        return self
+
+    @property
+    def dev_login_enabled(self) -> bool:
+        """Whether the password-less demo sign-in is available. Deliberately
+        needs *both* flags — see `dev_login`."""
+        return self.dev_login and self.dev_mode
 
     @property
     def sqlite_url(self) -> str:
