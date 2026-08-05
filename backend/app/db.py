@@ -56,11 +56,32 @@ def _migrate_users() -> None:
         conn.exec_driver_sql("CREATE UNIQUE INDEX ix_users_email ON users (email)")
 
 
+def _add_user_columns() -> None:
+    """Add columns appended to ``users`` since a DB was first created.
+
+    ``create_all`` only creates *missing tables*, so a column added to the model
+    never reaches an existing ``annotations.sqlite``. Unlike ``_migrate_users()``
+    — which had to rebuild the table because SQLite cannot ALTER a NOT NULL
+    constraint away — appending a nullable column with a default is a plain
+    ``ADD COLUMN``. Idempotent: each column is added only if absent.
+    """
+    added = [("show_in_ranking", "BOOLEAN DEFAULT 0")]
+    with engine.begin() as conn:
+        info = conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()
+        if not info:
+            return  # fresh install — create_all builds the current schema
+        have = {row[1] for row in info}
+        for name, ddl in added:
+            if name not in have:
+                conn.exec_driver_sql(f"ALTER TABLE users ADD COLUMN {name} {ddl}")
+
+
 def init_db() -> None:
     """Create tables if they do not exist (MVP migration strategy)."""
     from . import models  # noqa: F401  (register mappers)
 
     _migrate_users()
+    _add_user_columns()
     Base.metadata.create_all(engine)
 
 

@@ -67,6 +67,13 @@ export const api = {
       method: "POST", body: JSON.stringify({ code }),
     }),
   me: () => request<import("./types").User>("/auth/me"),
+  updateMe: (patch: { show_in_ranking: boolean }) =>
+    request<import("./types").User>("/auth/me", { method: "PATCH", body: JSON.stringify(patch) }),
+
+  // Public — no token needed.
+  volunteers: (range: import("./types").VolunteerRange = "all", limit = 20) =>
+    request<{ range: string; items: import("./types").Volunteer[] }>(
+      `/volunteers?range=${range}&limit=${limit}`),
 
   // Dev-only sign-in (backend NDB_DEV_LOGIN). config.enabled is false in prod.
   devLoginConfig: () =>

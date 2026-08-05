@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -98,6 +99,26 @@ def _upsert_orcid_user(db: Session, orcid_id: str, name: str) -> User:
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(auth.current_user)):
+    return UserOut.model_validate(user)
+
+
+class MePatch(BaseModel):
+    """Self-service settings. Only fields a user may change about themselves —
+    role is deliberately not here."""
+    show_in_ranking: bool
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    body: MePatch,
+    user: User = Depends(auth.current_user),
+    db: Session = Depends(get_session),
+):
+    """Opt in/out of being named on the public volunteer ranking."""
+    user.show_in_ranking = body.show_in_ranking
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return UserOut.model_validate(user)
 
 

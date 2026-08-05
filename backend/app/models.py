@@ -37,6 +37,9 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="contributor")
     pw_hash: Mapped[str | None] = mapped_column(String(255))
+    # Opt-in to being named on the public volunteer ranking. Off by default —
+    # the board shows "Contributor #<id>" until a user turns this on.
+    show_in_ranking: Mapped[bool] = mapped_column(Boolean, default=False)
     created: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     annotations: Mapped[list["Annotation"]] = relationship(

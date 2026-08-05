@@ -12,6 +12,7 @@ class UserOut(BaseModel):
     email: str | None = None
     display_name: str
     role: str
+    show_in_ranking: bool = False
 
 
 class TokenResponse(BaseModel):

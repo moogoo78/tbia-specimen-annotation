@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
@@ -37,6 +37,8 @@ export function Dashboard() {
   return (
     <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
       <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>{tr("dash.title")}</h2>
+
+      <RankingOptIn />
 
       {/* status summary */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
@@ -98,6 +100,40 @@ export function Dashboard() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Opt in to being named on the public /volunteers board. Off by default, so
+// this lives at the top of the Dashboard rather than buried in a settings page —
+// otherwise nobody would ever find it and the board stays all-pseudonyms.
+function RankingOptIn() {
+  const { t: tr } = useTranslation();
+  const qc = useQueryClient();
+  const me = useQuery({ queryKey: ["me"], queryFn: () => api.me(), retry: false });
+  const toggle = useMutation({
+    mutationFn: (v: boolean) => api.updateMe({ show_in_ranking: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["me"] });
+      qc.invalidateQueries({ queryKey: ["volunteers"] });
+    },
+  });
+  const on = !!me.data?.show_in_ranking;
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", marginBottom: 14,
+      background: t.panel, border: `1px solid ${t.border}`, maxWidth: 620,
+    }}>
+      <input type="checkbox" id="show-in-ranking" checked={on} disabled={me.isLoading || toggle.isPending}
+        onChange={(e) => toggle.mutate(e.target.checked)} style={{ marginTop: 2, cursor: "pointer" }} />
+      <label htmlFor="show-in-ranking" style={{ cursor: "pointer", flex: 1 }}>
+        <div style={{ fontSize: 12, fontWeight: 600 }}>{tr("vol.optInLabel")}</div>
+        <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 2, lineHeight: 1.5 }}>{tr("vol.optInHint")}</div>
+      </label>
+      <Link to="/volunteers" style={{ fontSize: 11, color: t.accent, textDecoration: "none", flexShrink: 0 }}>
+        {tr("vol.viewAll")}
+      </Link>
     </div>
   );
 }

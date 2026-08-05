@@ -141,7 +141,20 @@ export interface TranscribeConfig {
 export interface DevUser { email: string; display_name: string; role: string; }
 export interface DevLoginConfig { enabled: boolean; users: DevUser[]; }
 
-export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; }
+export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; show_in_ranking?: boolean; }
+
+// A row of the public volunteer ranking. `name` is null unless the volunteer
+// opted in — render `Contributor #<user_id>` in that case.
+export interface Volunteer {
+  rank: number;
+  user_id: number;
+  name: string | null;
+  anonymous: boolean;
+  n_submitted: number;
+  n_accepted: number;
+  n_records: number;
+}
+export type VolunteerRange = "all" | "month";
 
 export interface Collector {
   id: number;

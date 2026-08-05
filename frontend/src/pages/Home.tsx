@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t, toneFor } from "../design/tokens";
@@ -86,6 +86,9 @@ export function Home() {
         <Section title={tr("home.browseByOrg")} icon="rows" />
         <OrgGrid orgs={orgs.filter((o) => o.kind === "institutions")} onOrg={byOrg} loading={registry.isLoading} tr={tr} />
 
+        {/* 志工排行 — top 5, linking to the full board */}
+        <TopVolunteers />
+
         {/* 整合平台 (aggregators, e.g. GBIF) */}
         {orgs.some((o) => o.kind === "aggregators") && (
           <div style={{ marginTop: 30 }}>
@@ -115,6 +118,42 @@ function OrgGrid({ orgs, onOrg, loading, tr }: {
         </button>
       ))}
       {orgs.length === 0 && <Placeholder loading={loading} />}
+    </div>
+  );
+}
+
+// Compact top-5 from the public ranking. Same endpoint as /volunteers, limit 5.
+function TopVolunteers() {
+  const { t: tr } = useTranslation();
+  const board = useQuery({ queryKey: ["volunteers", "all", 5], queryFn: () => api.volunteers("all", 5) });
+  const items = board.data?.items ?? [];
+  if (!board.isLoading && items.length === 0) return null;
+  return (
+    <div style={{ marginTop: 30 }}>
+      <Section title={tr("vol.homeTitle")} icon="rows" />
+      <div style={{ background: t.panel, border: `1px solid ${t.border}`, maxWidth: 520 }}>
+        {items.map((v) => (
+          <div key={v.user_id} style={{
+            display: "flex", alignItems: "center", gap: 10, padding: "6px 10px",
+            borderBottom: `1px solid ${t.borderSoft}`, fontSize: 12,
+          }}>
+            <span style={{ width: 20, textAlign: "right", fontFamily: t.mono, fontSize: 11, color: t.fgSubtle }}>{v.rank}</span>
+            <span style={{
+              flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              color: v.anonymous ? t.fgSubtle : t.fg, fontStyle: v.anonymous ? "italic" : "normal",
+            }}>
+              {v.anonymous ? `${tr("vol.anonymous")} #${v.user_id}` : v.name}
+            </span>
+            <span style={{ fontFamily: t.mono, fontSize: 11, fontWeight: 600, color: t.ok }}>{v.n_accepted.toLocaleString()}</span>
+            <span style={{ fontSize: 10, color: t.fgSubtle }}>{tr("vol.accepted")}</span>
+          </div>
+        ))}
+        <Link to="/volunteers" style={{
+          display: "block", padding: "6px 10px", fontSize: 11, color: t.accent, textDecoration: "none",
+        }}>
+          {tr("vol.viewAll")} →
+        </Link>
+      </div>
     </div>
   );
 }
