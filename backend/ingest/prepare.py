@@ -32,9 +32,7 @@ import time
 
 import duckdb
 
-from ingest.ingest_tbia import REPO, SPECIES_RANKS
-
-DEFAULT_DB = os.path.join(REPO, "data", "tbia.duckdb")
+from ingest.common import DEFAULT_DB, SPECIES_RANKS
 
 # Derived occurrence columns: (name, type, SQL expression over the raw columns).
 # Order matters — completeness_score reads the four flags written before it.

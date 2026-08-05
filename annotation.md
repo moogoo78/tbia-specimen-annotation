@@ -1,6 +1,7 @@
 # Annotation Schema
 
-欄位對應以「app 欄位名」(snake_case，見 `backend/ingest/ingest_tbia.py` 的 `COLUMNS`)
+欄位對應以「app 欄位名」(snake_case，即 TBIA 匯出欄位的 snake_case 形式，
+見 `backend/ingest/columns.json`)
 
 採集事件 (Sampling Event)
 - 採集者: recorded_by            # TBIA recordedBy

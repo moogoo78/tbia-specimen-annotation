@@ -1,4 +1,4 @@
-.PHONY: install backend-install frontend-install prepare ingest ingest-sample seed seed-collectors sync-collectors api web test build clean
+.PHONY: install backend-install frontend-install prepare inspect build-db seed seed-collectors sync-collectors api web test build clean
 
 PY := backend/.venv/bin/python
 PIP := backend/.venv/bin/pip
@@ -17,19 +17,24 @@ frontend-install:
 # flags + score + year on `occurrence`, roll-ups on `dataset`, plus indexes.
 # Idempotent — run it after every ETL refresh. This is what the API reads.
 prepare:
-	cd backend && .venv/bin/python -m ingest.prepare
+	cd backend && .venv/bin/python -m ingest.prepare $(if $(DB),--db ../$(DB),)
 
-# LEGACY CSV loaders, superseded by the TBIA ETL (task-tbia-data-etl.md) which
-# now produces data/tbia.duckdb directly. These still build the old
-# data/occurrences.duckdb from a tbia_*.zip, scoped to registry.json — which
-# since the GBIF ids moved out of that file means the 13 institution datasets
-# only. Point NDB_DUCKDB_PATH at the result if you need the old store.
-ingest:
-	cd backend && .venv/bin/python -m ingest.ingest_filtered --registry
+# Step 1 of a data refresh: summarise a downloaded export and diff it against
+# data/registry.json. Read-only — writes <name>-summary.md + <name>-datasets.csv
+# next to the export. Read the summary, then edit registry.json by hand.
+#   make inspect ZIP=tmp/tbia_xxx.zip
+inspect:
+	cd backend && .venv/bin/python -m ingest.inspect ../$(ZIP)
 
-# Quick dev slice (same registry scope).
-ingest-sample:
-	cd backend && .venv/bin/python -m ingest.ingest_filtered --registry --limit 50000
+# Step 3: load the export into a NEW store, keeping only the datasets
+# registry.json lists plus everything rightsHolder=GBIF. Aborts if the export's
+# columns moved (see backend/ingest/columns.json). Build to a side path, run
+# `make prepare DB=...` on it, then swap it in — a store without completeness
+# flags cannot be served.
+#   make build-db ZIP=tmp/tbia_xxx.zip DB=data/tbia.new.duckdb
+build-db:
+	cd backend && .venv/bin/python -m ingest.build --zip ../$(ZIP) \
+		$(if $(DB),--db ../$(DB),)
 
 # Create the SQLite schema + demo users (curator/reviewer/admin, pw: demo1234).
 seed:
