@@ -3,7 +3,7 @@ import { initReactI18next } from "react-i18next";
 
 const en = {
   app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
-  nav: { home: "Home", explore: "Explore", institutions: "Institutions", volunteers: "Volunteers", dashboard: "Dashboard", login: "Sign in", logout: "Sign out" },
+  nav: { home: "Home", explore: "Explore", institutions: "Institutions", collectors: "Collectors", volunteers: "Volunteers", dashboard: "Dashboard", login: "Sign in", logout: "Sign out" },
   home: {
     tagline: "Closing gaps in specimen metadata",
     blurb: "A collaborative platform for enriching TBIA natural-history specimen records. Find occurrences missing identification, coordinates, or dates — fill them by hand or with AI-assisted label transcription — and return reviewed enrichments to data providers.",
@@ -25,6 +25,18 @@ const en = {
     optInHint: "Off by default. When off you appear as \"Contributor #<id>\"; your contribution counts are shown either way.",
     empty: "No contributions yet.",
     homeTitle: "Top volunteers", viewAll: "View the full ranking",
+  },
+  coll: {
+    title: "Collectors",
+    blurb: "{{records}} records attributed to {{collectors}} collectors — {{mapped}}% of them carry coordinates.",
+    searchPlaceholder: "Search a name, either script…",
+    discover: "A few collectors to look at", shuffle: "Shuffle",
+    sort_records: "Most records", sort_gap: "Most to georeference", sort_recent: "Collected most recently",
+    showTail: "Include under 10 records",
+    collector: "Collector", records: "Records", mapped: "Mapped", years: "Years",
+    mappedHint: "{{n}} records with coordinates",
+    prev: "Previous", next: "Next",
+    empty: "No collectors match.",
   },
   career: {
     timeline: "Collecting activity by year",
@@ -170,7 +182,7 @@ const en = {
 
 const zh: typeof en = {
   app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
-  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", volunteers: "志工排行", dashboard: "貢獻儀表板", login: "登入", logout: "登出" },
+  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", collectors: "採集者", volunteers: "志工排行", dashboard: "貢獻儀表板", login: "登入", logout: "登出" },
   home: {
     tagline: "填補標本後設資料的缺口",
     blurb: "TBIA 自然史標本資料的協作標註平台。找出缺少鑑定、座標或日期的標本紀錄，以人工或 AI 輔助的標籤辨識補齊，並將審核後的補遺回饋給資料提供者。",
@@ -192,6 +204,18 @@ const zh: typeof en = {
     optInHint: "預設為關閉。關閉時顯示為「貢獻者 #<id>」；無論是否開啟，貢獻數字都會列出。",
     empty: "尚無貢獻紀錄。",
     homeTitle: "志工排行", viewAll: "查看完整排行",
+  },
+  coll: {
+    title: "採集者",
+    blurb: "{{collectors}} 位採集者共 {{records}} 筆紀錄，其中 {{mapped}}% 有座標。",
+    searchPlaceholder: "搜尋姓名（中文或羅馬拼音）…",
+    discover: "隨機推薦", shuffle: "換一批",
+    sort_records: "紀錄最多", sort_gap: "最需定位", sort_recent: "最近採集",
+    showTail: "含 10 筆以下",
+    collector: "採集者", records: "紀錄數", mapped: "已定位", years: "年代",
+    mappedHint: "{{n}} 筆有座標",
+    prev: "上一頁", next: "下一頁",
+    empty: "沒有符合的採集者。",
   },
   career: {
     timeline: "歷年採集活動",

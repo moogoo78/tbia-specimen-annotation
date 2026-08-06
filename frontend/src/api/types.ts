@@ -180,6 +180,25 @@ export interface Collector {
   n_records: number;
 }
 
+// A row of the browsable collector index, counts rolled up from the occurrence
+// store rather than the seeded total.
+export interface CollectorBoardRow extends Collector {
+  n_geo: number;
+  n_unmapped: number;
+  mapped_pct: number;
+  year_min: number | null;
+  year_max: number | null;
+  n_aliases: number;
+}
+export type CollectorSort = "records" | "gap" | "recent" | "random";
+export interface CollectorBoard {
+  total: number;      // collectors matching the current filters
+  items: CollectorBoardRow[];
+  limit: number;
+  offset: number;
+  totals: { collectors: number; records: number; mapped: number };  // unfiltered
+}
+
 export interface RegistryDataset { code?: string; name: string; groups: string[]; gbif?: string; }
 export interface RegistryEntry { name: string; datasets: Record<string, RegistryDataset>; }
 export interface Registry {

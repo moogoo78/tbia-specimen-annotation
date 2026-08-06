@@ -52,6 +52,7 @@ export function AppHeader() {
         {tab("/", tr("nav.home"))}
         {tab("/explore", tr("nav.explore"))}
         {tab("/institutions", tr("nav.institutions"))}
+        {tab("/collectors", tr("nav.collectors"))}
         {tab("/volunteers", tr("nav.volunteers"))}
         {tab("/dashboard", tr("nav.dashboard"))}
       </div>

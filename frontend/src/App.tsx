@@ -8,6 +8,7 @@ import { Explore } from "./pages/Explore";
 import { Institutions } from "./pages/Institutions";
 import { Volunteers } from "./pages/Volunteers";
 import { Collector } from "./pages/Collector";
+import { Collectors } from "./pages/Collectors";
 import { RecordDetail } from "./pages/RecordDetail";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/explore" element={<Explore />} />
         <Route path="/institutions" element={<Institutions />} />
         <Route path="/volunteers" element={<Volunteers />} />
+        <Route path="/collectors" element={<Collectors />} />
         <Route path="/collectors/:id" element={<Collector />} />
         <Route path="/record/:id" element={<RecordDetail />} />
         <Route path="/dashboard" element={<Dashboard />} />

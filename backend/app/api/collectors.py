@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import random
+import time
+
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from .. import duck
 from ..db import SessionLocal
@@ -63,6 +67,152 @@ def resolve_collector(recorded_by: str):
             "label": _label(c),
             "n_records": c.n_records,
         }
+
+
+# ── the board ───────────────────────────────────────────────────────────────
+#
+# Coordinate coverage and year span live in DuckDB, names and aliases in SQLite.
+# Rolling up all ~17k collectors at once is a single 0.2s scan, so the board
+# sorts on any column with no per-page query and no precomputed table. Cached
+# with a TTL so a `make sync-collectors` lands without a restart.
+
+_BOARD: list[dict] | None = None
+_BOARD_AT = 0.0
+_BOARD_TTL = 600.0
+_board_lock = asyncio.Lock()
+
+BOARD_SORTS = ("records", "gap", "recent", "random")
+
+
+async def _occurrence_rollup() -> dict[int, dict]:
+    """Per-collector record / georeferenced / year-span counts, keyed by id."""
+    if duck.annotations_attached():
+        rows = await duck.query(
+            """SELECT a.collector_id AS id, count(*) AS n_records,
+                      count(*) FILTER (WHERE o.has_coordinates) AS n_geo,
+                      min(o.year) AS year_min, max(o.year) AS year_max
+               FROM occurrence o JOIN ann.collector_alias a ON a.recorded_by = o.recorded_by
+               GROUP BY a.collector_id"""
+        )
+        return {r["id"]: r for r in rows}
+
+    # No ATTACH: roll up by the raw string instead, then fold in the alias map.
+    raw = await duck.query(
+        """SELECT recorded_by, count(*) AS n_records,
+                  count(*) FILTER (WHERE has_coordinates) AS n_geo,
+                  min(year) AS year_min, max(year) AS year_max
+           FROM occurrence WHERE recorded_by IS NOT NULL GROUP BY recorded_by"""
+    )
+    by_raw = {r["recorded_by"]: r for r in raw}
+    out: dict[int, dict] = {}
+    with SessionLocal() as db:
+        aliases = db.execute(
+            select(CollectorAlias.collector_id, CollectorAlias.recorded_by)
+        ).all()
+    for cid, recorded_by in aliases:
+        r = by_raw.get(recorded_by)
+        if r is None:
+            continue
+        acc = out.setdefault(
+            cid, {"id": cid, "n_records": 0, "n_geo": 0, "year_min": None, "year_max": None}
+        )
+        acc["n_records"] += r["n_records"]
+        acc["n_geo"] += r["n_geo"]
+        for key, pick in (("year_min", min), ("year_max", max)):
+            if r[key] is not None:
+                acc[key] = r[key] if acc[key] is None else pick(acc[key], r[key])
+    return out
+
+
+async def _board_rows() -> list[dict]:
+    """Every collector with its counts, names and alias count. Cached."""
+    global _BOARD, _BOARD_AT
+    async with _board_lock:
+        if _BOARD is not None and time.monotonic() - _BOARD_AT < _BOARD_TTL:
+            return _BOARD
+
+        stats = await _occurrence_rollup()
+        with SessionLocal() as db:
+            collectors = db.execute(
+                select(Collector.id, Collector.name, Collector.name_en, Collector.n_records)
+            ).all()
+            n_aliases = dict(
+                db.execute(
+                    select(CollectorAlias.collector_id, func.count())
+                    .group_by(CollectorAlias.collector_id)
+                ).all()
+            )
+
+        rows = []
+        for cid, name, name_en, seeded in collectors:
+            s = stats.get(cid) or {}
+            # The rollup is authoritative — the seeded count can predate a
+            # refresh — but keep it as the floor when a collector is missing
+            # from the store entirely.
+            n_records = s.get("n_records") or seeded or 0
+            n_geo = s.get("n_geo") or 0
+            rows.append({
+                "id": cid,
+                "name": name or "",
+                "name_en": name_en or "",
+                "label": " ".join(p for p in (name, name_en) if p),
+                "n_records": n_records,
+                "n_geo": n_geo,
+                "n_unmapped": n_records - n_geo,
+                "mapped_pct": round(100.0 * n_geo / n_records, 1) if n_records else 0.0,
+                "year_min": s.get("year_min"),
+                "year_max": s.get("year_max"),
+                "n_aliases": n_aliases.get(cid, 0),
+            })
+        _BOARD, _BOARD_AT = rows, time.monotonic()
+        return rows
+
+
+@router.get("/collectors/board")
+async def collector_board(
+    q: str | None = Query(default=None, description="substring match on name / name_en"),
+    sort: str = Query(default="records", description=" | ".join(BOARD_SORTS)),
+    min_records: int = Query(default=10, ge=1, description="hide the one-record tail"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    """Browsable index of every collector, with their coordinate gap.
+
+    ``sort=gap`` puts whoever has the most records *without* coordinates first,
+    which is the georeferencing queue by person. ``sort=random`` samples the
+    same filtered pool instead, so the page can show someone other than the
+    same 50 names every visit (``offset`` is ignored — a random page has no
+    stable order to page through).
+    """
+    if sort not in BOARD_SORTS:
+        raise HTTPException(status_code=422, detail=f"sort must be one of {BOARD_SORTS}")
+
+    rows = await _board_rows()
+    totals = {
+        "collectors": len(rows),
+        "records": sum(r["n_records"] for r in rows),
+        "mapped": sum(r["n_geo"] for r in rows),
+    }
+
+    pool = [r for r in rows if r["n_records"] >= min_records]
+    if q and q.strip():
+        needle = q.strip().lower()
+        pool = [r for r in pool if needle in r["name"].lower() or needle in r["name_en"].lower()]
+
+    if sort == "random":
+        items = random.sample(pool, min(limit, len(pool)))
+        offset = 0
+    else:
+        if sort == "gap":
+            pool.sort(key=lambda r: (-r["n_unmapped"], -r["n_records"]))
+        elif sort == "recent":
+            pool.sort(key=lambda r: (-(r["year_max"] or -9999), -r["n_records"]))
+        else:
+            pool.sort(key=lambda r: (-r["n_records"], r["label"]))
+        items = pool[offset:offset + limit]
+
+    return {"total": len(pool), "items": items, "limit": limit, "offset": offset,
+            "totals": totals}
 
 
 @router.get("/collectors/{collector_id}")

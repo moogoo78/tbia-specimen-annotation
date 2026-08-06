@@ -105,6 +105,21 @@ export const api = {
     if (q) p.set("q", q);
     return request<import("./types").Collector[]>(`/collectors?${p}`);
   },
+  // The browsable index. `nonce` only exists to give a reshuffle a fresh URL.
+  collectorBoard: (opts: {
+    q?: string; sort?: import("./types").CollectorSort;
+    minRecords?: number; limit?: number; offset?: number; nonce?: number;
+  } = {}) => {
+    const p = new URLSearchParams({
+      sort: opts.sort ?? "records",
+      min_records: String(opts.minRecords ?? 10),
+      limit: String(opts.limit ?? 50),
+      offset: String(opts.offset ?? 0),
+    });
+    if (opts.q) p.set("q", opts.q);
+    if (opts.nonce) p.set("nonce", String(opts.nonce));
+    return request<import("./types").CollectorBoard>(`/collectors/board?${p}`);
+  },
   resolveCollector: (recordedBy: string) =>
     request<import("./types").Collector | null>(
       `/collectors/resolve?recorded_by=${encodeURIComponent(recordedBy)}`),
