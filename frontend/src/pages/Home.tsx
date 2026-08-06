@@ -3,8 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t, toneFor } from "../design/tokens";
-import { Icon } from "../design/Icon";
+import { Icon, type IconName } from "../design/Icon";
 import { api } from "../api/client";
+import { useAuth } from "../auth";
 import { emptyFilters, type Dataset, type SourceKind } from "../api/types";
 
 // Landing page: introduces the platform, then offers two card grids that drill
@@ -69,6 +70,9 @@ export function Home() {
       </div>
 
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 24px 40px" }}>
+        {/* 開始使用 — the contribution loop, before the browse grids */}
+        <GetStarted />
+
         {/* 生物類群 */}
         <Section title={tr("home.browseByGroup")} icon="grid" />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, marginBottom: 30 }}>
@@ -96,6 +100,62 @@ export function Home() {
             <OrgGrid orgs={orgs.filter((o) => o.kind === "aggregators")} onOrg={byOrg} loading={registry.isLoading} tr={tr} />
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// The four steps of the contribution loop, each one a real link into the app
+// rather than a description of one. Step 1 flips to "done" once you're signed
+// in, so a returning contributor sees where they already are. The long-form
+// version of all four lives on /guide.
+function GetStarted() {
+  const { t: tr } = useTranslation();
+  const { user } = useAuth();
+  const nav = useNavigate();
+
+  const steps: { n: number; icon: IconName; key: string; go: () => void }[] = [
+    { n: 1, icon: "user", key: "step1", go: () => nav(user ? "/guide#step-1" : "/login") },
+    // The manual's own highest-value combination: identifiable from the photo.
+    { n: 2, icon: "search", key: "step2", go: () => nav("/explore", { state: { flags: { missing_identification: true, has_media: true } } }) },
+    { n: 3, icon: "spark", key: "step3", go: () => nav("/guide#step-3") },
+    { n: 4, icon: "check", key: "step4", go: () => nav("/dashboard") },
+  ];
+
+  return (
+    <div style={{ marginBottom: 30 }}>
+      <Section title={tr("home.getStarted")} icon="check" />
+      <p style={{ fontSize: 12, color: t.fgMuted, lineHeight: 1.7, margin: "-6px 0 12px", maxWidth: 680 }}>
+        {tr("home.getStartedBlurb")}
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+        {steps.map((s) => {
+          const done = s.n === 1 && !!user;
+          return (
+            <button key={s.n} onClick={s.go} style={{
+              ...cardStyle, flexDirection: "column", alignItems: "stretch", gap: 6, padding: 12,
+            }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <span style={{
+                  flexShrink: 0, width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 10, fontFamily: t.mono, color: done ? "#fff" : t.fgMuted,
+                  background: done ? t.ok : t.panelAlt, border: `1px solid ${done ? t.ok : t.border}`,
+                }}>{done ? <Icon name="check" size={10} stroke={2} /> : s.n}</span>
+                <Icon name={s.icon} size={13} />
+                <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600 }}>{tr(`guide.${s.key}Title`)}</span>
+                <Icon name="caretR" size={11} />
+              </span>
+              <span style={{ textAlign: "left", fontSize: 11, color: t.fgMuted, lineHeight: 1.6 }}>
+                {done ? tr("guide.step1Done") : tr(`guide.${s.key}What`)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 8, textAlign: "right" }}>
+        <Link to="/guide" style={{ fontSize: 11, color: t.accent, textDecoration: "none" }}>
+          {tr("home.viewGuide")} →
+        </Link>
       </div>
     </div>
   );
@@ -158,7 +218,7 @@ function TopVolunteers() {
   );
 }
 
-function Section({ title, icon }: { title: string; icon: "grid" | "rows" }) {
+function Section({ title, icon }: { title: string; icon: IconName }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "0 0 12px" }}>
       <Icon name={icon} size={14} />

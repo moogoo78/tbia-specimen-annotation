@@ -24,7 +24,7 @@ export const Icons = {
   refresh: "M13.5 8a5.5 5.5 0 1 1-1.7-4M13.5 1.5V5h-3.5",
 };
 
-type IconName = keyof typeof Icons;
+export type IconName = keyof typeof Icons;
 
 export function Icon({ name, size = 14, stroke = 1.4 }: { name: IconName; size?: number; stroke?: number }) {
   return (

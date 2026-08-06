@@ -11,6 +11,7 @@ import { Collector } from "./pages/Collector";
 import { Collectors } from "./pages/Collectors";
 import { RecordDetail } from "./pages/RecordDetail";
 import { Dashboard } from "./pages/Dashboard";
+import { Guide } from "./pages/Guide";
 import { Login } from "./pages/Login";
 import { OrcidCallback } from "./pages/OrcidCallback";
 
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/collectors/:id" element={<Collector />} />
         <Route path="/record/:id" element={<RecordDetail />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/guide" element={<Guide />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/orcid/callback" element={<OrcidCallback />} />
       </Routes>

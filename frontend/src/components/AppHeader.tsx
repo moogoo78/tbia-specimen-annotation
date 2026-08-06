@@ -55,6 +55,7 @@ export function AppHeader() {
         {tab("/collectors", tr("nav.collectors"))}
         {tab("/volunteers", tr("nav.volunteers"))}
         {tab("/dashboard", tr("nav.dashboard"))}
+        {tab("/guide", tr("nav.guide"))}
       </div>
 
       <div style={{ flex: 1 }} />
