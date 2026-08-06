@@ -54,18 +54,25 @@ ORG_KW = (
     "School", "Network", "Program", "Office", "Inc.", "Ltd", "Dept", "Univ.", " Co.",
     "Division", "Station", "Council", "Agency", "Commission",
 )
-# Phrases that mean "no recorded collector". Compared case-insensitively, which
-# is what catches the shouted "COMMERCIAL FISHERMEN".
-UNKNOWN_KW = ("unknown", "採集者不明", "不明", "anonymous", "s.n.", "no collector", "佚名",
-              "fisherman", "fishermen", "illegible", "捐贈", "代購", "贈",
+# Collectives that stand in for a name — "Owston Jap. Collectors", "Native
+# collector", "commercial fishermen". Matched case-insensitively against the
+# segment (the export shouts as often as not), so a real collector listed
+# *before* one of these survives: "F.B. Steiner, Commercial fisherman".
+CREW_KW = ("collector", "fisherman", "fishermen")
+
+# Phrases that mean "no recorded collector". Compared case-insensitively.
+UNKNOWN_KW = ("unknown", "採集者不明", "不明", "anonymous", "anon.", "s.n.", "no collector",
+              "佚名", "illegible", "捐贈", "代購", "贈", "not stated",
               "ukn", "ign.", "unspecified")
 
 # A field label that leaked into the value: "Collector(s): Alex H. T. Yu". The
 # long forms may drop the colon ("Collector Unknown"); the abbreviations must
 # keep their punctuation, or "Legrand" would lose its first three letters.
 LABEL = re.compile(
-    # latin: the colon is optional, a following space is not
-    r"^\s*(?:collector\(s\)|collectors?|collected\s+by|recorded\s+by)\s*[:：]?\s+"
+    # latin: the colon is required. Without it, "COLLECTORS FOR N. KURODA" would
+    # be stripped down to a person named "FOR N. KURODA"; the label-less forms
+    # ("Collector Unknown") are unusable anyway and get caught downstream.
+    r"^\s*(?:collector\(s\)|collectors?|collected\s+by|recorded\s+by)\s*[:：]\s*"
     # chinese: no space to rely on, so the colon carries it
     r"|^\s*(?:採集者|採集人|記錄者)\s*[:：]\s*"
     # abbreviations: punctuation required, or Legrand loses its first letters
@@ -214,6 +221,23 @@ def strip_org_tag(seg: str) -> str:
     return re.sub(r"\s+", " ", f"{m.group('name')} {' '.join(kept)}").strip(" -_·")
 
 
+# Square brackets only. Parentheses carry the romanization and the radical
+# decompositions, and are parsed structurally further down.
+BRACKETED = re.compile(r"^[\[［]\s*(?P<inner>.+?)\s*[\]］]$")
+HAS_LETTER = re.compile(r"[A-Za-z㐀-鿿豈-﫿]")
+
+
+def unwrap_brackets(seg: str) -> str:
+    """``[Swinhoe]`` -> ``Swinhoe``.
+
+    A whole value in brackets is an editorial note, and the ones that wrap a
+    name would otherwise become a separate collector from the same person
+    recorded without them.
+    """
+    m = BRACKETED.match(seg.strip())
+    return m.group("inner") if m else seg
+
+
 def is_person(raw: str, seg: str, zh: str, en: str) -> bool:
     """Whether the parsed name is a person.
 
@@ -225,6 +249,10 @@ def is_person(raw: str, seg: str, zh: str, en: str) -> bool:
     collector named "Lu".
     """
     if not zh and not en:
+        return False
+    if not HAS_LETTER.search(f"{zh}{en}"):
+        return False                      # punctuation left over from "[...]"
+    if any(k in seg.lower() for k in CREW_KW):
         return False
     if f"{zh}{en}".strip().lower() in PLACE_ONLY:
         return False
@@ -247,7 +275,7 @@ def parse_collector(raw: str) -> tuple[str, str] | None:
     if not raw or not raw.strip():
         return None
     raw = LABEL.sub("", raw)
-    seg = strip_org_tag(first_segment(raw))
+    seg = unwrap_brackets(strip_org_tag(first_segment(raw)))
     zh, en = parse_person(seg)
     if not is_person(raw, seg, zh, en):
         return None

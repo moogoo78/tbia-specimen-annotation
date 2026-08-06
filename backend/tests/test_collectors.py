@@ -51,6 +51,37 @@ def test_field_label_prefix_is_stripped():
     assert parse_collector("leg. ign.") is None
 
 
+def test_collecting_crews_are_not_people():
+    """A named crew is not a collector: the four Owston spellings were four
+    'people' in the table, and none of them is one."""
+    for crew in ("Owston Jap. Collectors", "Owston's Jap. Collectors",
+                 "Owston Jap. Collector", "Alan Owston's Japanese collectors",
+                 "Japanese Collectors", "McLaren's Collectors,", "Native collector",
+                 "local collector", "COLLECTORS FOR N. KURODA",
+                 "COLLECTORS FOR VISCOUNT MATSUDAIRA"):
+        assert parse_collector(crew) is None, crew
+    # ...but a person listed before the crew still counts
+    assert parse_collector("F.B. Steiner, Commercial fisherman") == ("", "F.B. Steiner")
+    assert parse_collector("J. Saxby, native fishermen") == ("", "J. Saxby")
+    assert parse_collector("Judson Linsley Gressitt, Native collector") == (
+        "", "Judson Linsley Gressitt")
+
+
+def test_bracketed_notes_and_placeholders():
+    # an editorial note, not an attribution
+    assert parse_collector("[Collector has not been verified and entered]") is None
+    assert parse_collector("[Not Stated]") is None
+    assert parse_collector("Anon. [CCIS]") is None
+    # a name in brackets is the same person as one without them
+    assert parse_collector("[Swinhoe]") == ("", "Swinhoe")
+    assert parse_collector("[R. Kanehira]") == ("", "R. Kanehira")
+    # placeholders with no letters at all
+    for junk in ("[...]", "?", "???", "546", "03576203)"):
+        assert parse_collector(junk) is None, junk
+    # parentheses are structural and must survive the bracket handling
+    assert parse_collector("(?)-Hua Cai (蔡(?)華)") == ("蔡華", "Hua Cai")
+
+
 def test_label_strip_does_not_bite_into_names():
     """`leg`/`coll`/`det` need their punctuation — otherwise Legrand loses it."""
     assert parse_collector("Legrand, R.") == ("", "R. Legrand")
