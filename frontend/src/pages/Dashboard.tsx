@@ -104,7 +104,7 @@ export function Dashboard() {
   );
 }
 
-// Opt in to being named on the public /volunteers board. Off by default, so
+// Opt in to being named on the public /contributors board. Off by default, so
 // this lives at the top of the Dashboard rather than buried in a settings page —
 // otherwise nobody would ever find it and the board stays all-pseudonyms.
 function RankingOptIn() {
@@ -131,7 +131,7 @@ function RankingOptIn() {
         <div style={{ fontSize: 12, fontWeight: 600 }}>{tr("vol.optInLabel")}</div>
         <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 2, lineHeight: 1.5 }}>{tr("vol.optInHint")}</div>
       </label>
-      <Link to="/volunteers" style={{ fontSize: 11, color: t.accent, textDecoration: "none", flexShrink: 0 }}>
+      <Link to="/contributors" style={{ fontSize: 11, color: t.accent, textDecoration: "none", flexShrink: 0 }}>
         {tr("vol.viewAll")}
       </Link>
     </div>

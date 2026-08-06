@@ -90,7 +90,7 @@ export function Home() {
         <Section title={tr("home.browseByOrg")} icon="rows" />
         <OrgGrid orgs={orgs.filter((o) => o.kind === "institutions")} onOrg={byOrg} loading={registry.isLoading} tr={tr} />
 
-        {/* 志工排行 — top 5, linking to the full board */}
+        {/* 貢獻者排行 — top 5, linking to the full board */}
         <TopVolunteers />
 
         {/* 整合平台 (aggregators, e.g. GBIF) */}
@@ -182,7 +182,7 @@ function OrgGrid({ orgs, onOrg, loading, tr }: {
   );
 }
 
-// Compact top-5 from the public ranking. Same endpoint as /volunteers, limit 5.
+// Compact top-5 from the public ranking. Same endpoint as /contributors, limit 5.
 function TopVolunteers() {
   const { t: tr } = useTranslation();
   const board = useQuery({ queryKey: ["volunteers", "all", 5], queryFn: () => api.volunteers("all", 5) });
@@ -208,7 +208,7 @@ function TopVolunteers() {
             <span style={{ fontSize: 10, color: t.fgSubtle }}>{tr("vol.accepted")}</span>
           </div>
         ))}
-        <Link to="/volunteers" style={{
+        <Link to="/contributors" style={{
           display: "block", padding: "6px 10px", fontSize: 11, color: t.accent, textDecoration: "none",
         }}>
           {tr("vol.viewAll")} →

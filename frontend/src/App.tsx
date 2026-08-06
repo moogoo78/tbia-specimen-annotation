@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { t } from "./design/tokens";
 import { usePageviews } from "./analytics";
 import { AppHeader } from "./components/AppHeader";
@@ -25,7 +25,9 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/explore" element={<Explore />} />
         <Route path="/institutions" element={<Institutions />} />
-        <Route path="/volunteers" element={<Volunteers />} />
+        <Route path="/contributors" element={<Volunteers />} />
+        {/* The board was /volunteers (志工) until the rename; keep old links working. */}
+        <Route path="/volunteers" element={<Navigate to="/contributors" replace />} />
         <Route path="/collectors" element={<Collectors />} />
         <Route path="/collectors/:id" element={<Collector />} />
         <Route path="/record/:id" element={<RecordDetail />} />

@@ -3,7 +3,7 @@ import { initReactI18next } from "react-i18next";
 
 const en = {
   app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
-  nav: { home: "Home", explore: "Explore", institutions: "Institutions", collectors: "Collectors", volunteers: "Volunteers", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  nav: { home: "Home", explore: "Explore", institutions: "Institutions", collectors: "Collectors", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
   home: {
     tagline: "Closing gaps in specimen metadata",
     blurb: "A collaborative platform for enriching TBIA natural-history specimen records. Find occurrences missing identification, coordinates, or dates — fill them by hand or with AI-assisted label transcription — and return reviewed enrichments to data providers.",
@@ -17,17 +17,17 @@ const en = {
   },
   inst: { title: "Collection institutions", datasets: "datasets", records: "records", viewAll: "View all records", viewOnTbia: "View this dataset on the TBIA portal" },
   vol: {
-    title: "Top volunteers",
+    title: "Top contributors",
     blurb: "Ranked by annotations a reviewer accepted — the work that actually reached a data provider. Submitted counts everything proposed; records counts distinct specimens improved.",
     rangeAll: "All time", rangeMonth: "This month",
-    rank: "#", volunteer: "Volunteer", submitted: "Submitted", accepted: "Accepted", records: "Records",
-    anonymous: "Contributor",
-    anonymousHint: "This volunteer has not opted in to being named.",
+    rank: "#", volunteer: "Contributor", submitted: "Submitted", accepted: "Accepted", records: "Records",
+    anonymous: "Unnamed contributor",
+    anonymousHint: "This contributor has not opted in to being named.",
     youAreAnonymous: "You are listed anonymously. Turn on \"Show my name\" in the Dashboard to be named here.",
-    optInLabel: "Show my name on the volunteer ranking",
-    optInHint: "Off by default. When off you appear as \"Contributor #<id>\"; your contribution counts are shown either way.",
+    optInLabel: "Show my name on the contributor ranking",
+    optInHint: "Off by default. When off you appear as \"Unnamed contributor #<id>\"; your contribution counts are shown either way.",
     empty: "No contributions yet.",
-    homeTitle: "Top volunteers", viewAll: "View the full ranking",
+    homeTitle: "Top contributors", viewAll: "View the full ranking",
   },
   coll: {
     title: "Collectors",
@@ -274,7 +274,7 @@ const en = {
 
 const zh: typeof en = {
   app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
-  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", collectors: "採集者", volunteers: "志工排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
+  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", collectors: "採集者", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
   home: {
     tagline: "填補標本後設資料的缺口",
     blurb: "TBIA 自然史標本資料的協作標註平台。找出缺少鑑定、座標或日期的標本紀錄，以人工或 AI 輔助的標籤辨識補齊，並將審核後的補遺回饋給資料提供者。",
@@ -288,17 +288,17 @@ const zh: typeof en = {
   },
   inst: { title: "典藏機構", datasets: "個資料集", records: "筆紀錄", viewAll: "查看全部紀錄", viewOnTbia: "在 TBIA 資料入口查看此資料集" },
   vol: {
-    title: "志工排行",
+    title: "貢獻者排行",
     blurb: "依審核通過的註記數排名——也就是真正回饋給資料提供者的成果。「提交」計入所有提出的註記，「標本數」計入改善過的不重複標本。",
     rangeAll: "全部時間", rangeMonth: "本月",
-    rank: "#", volunteer: "志工", submitted: "提交", accepted: "通過", records: "標本數",
-    anonymous: "貢獻者",
-    anonymousHint: "這位志工尚未選擇公開姓名。",
+    rank: "#", volunteer: "貢獻者", submitted: "提交", accepted: "通過", records: "標本數",
+    anonymous: "未具名貢獻者",
+    anonymousHint: "這位貢獻者尚未選擇公開姓名。",
     youAreAnonymous: "您目前以匿名方式顯示。可在貢獻儀表板開啟「顯示我的姓名」。",
-    optInLabel: "在志工排行顯示我的姓名",
-    optInHint: "預設為關閉。關閉時顯示為「貢獻者 #<id>」；無論是否開啟，貢獻數字都會列出。",
+    optInLabel: "在貢獻者排行顯示我的姓名",
+    optInHint: "預設為關閉。關閉時顯示為「未具名貢獻者 #<id>」；無論是否開啟，貢獻數字都會列出。",
     empty: "尚無貢獻紀錄。",
-    homeTitle: "志工排行", viewAll: "查看完整排行",
+    homeTitle: "貢獻者排行", viewAll: "查看完整排行",
   },
   coll: {
     title: "採集者",
