@@ -96,6 +96,8 @@ def filters_dep(
     has_media: bool = False,
     year_from: int | None = None,
     year_to: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     bbox: str | None = None,
 ) -> Filters:
     return Filters(
@@ -106,7 +108,8 @@ def filters_dep(
         record_number=record_number,
         missing_coordinates=missing_coordinates, missing_date=missing_date,
         missing_identification=missing_identification, has_media=has_media,
-        year_from=year_from, year_to=year_to, bbox=bbox,
+        year_from=year_from, year_to=year_to,
+        date_from=date_from, date_to=date_to, bbox=bbox,
     )
 
 

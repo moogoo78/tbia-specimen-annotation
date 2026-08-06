@@ -80,6 +80,9 @@ class Filters:
     has_media: bool = False
     year_from: int | None = None
     year_to: int | None = None
+    # Finer than year — a collecting trip is a date range. ISO "YYYY-MM-DD".
+    date_from: str | None = None
+    date_to: str | None = None
     bbox: str | None = None  # "minLon,minLat,maxLon,maxLat"
 
 
@@ -178,6 +181,15 @@ def build_where(f: Filters) -> tuple[str, list[Any]]:
     if f.year_to is not None:
         where.append("year <= ?")
         params.append(f.year_to)
+
+    # Inclusive on both ends, compared as DATE so a TIMESTAMP time-of-day can't
+    # push a record out of its own trip.
+    if f.date_from:
+        where.append(f"{DATE_EXPR} >= CAST(? AS DATE)")
+        params.append(f.date_from)
+    if f.date_to:
+        where.append(f"{DATE_EXPR} <= CAST(? AS DATE)")
+        params.append(f.date_to)
 
     if f.bbox:
         try:

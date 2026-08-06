@@ -49,6 +49,8 @@ export function filtersToParams(f: Filters): URLSearchParams {
   }
   if (f.year_from != null) p.set("year_from", String(f.year_from));
   if (f.year_to != null) p.set("year_to", String(f.year_to));
+  if (f.date_from) p.set("date_from", f.date_from);
+  if (f.date_to) p.set("date_to", f.date_to);
   if (f.record_number_from != null) p.set("record_number_from", String(f.record_number_from));
   if (f.record_number_to != null) p.set("record_number_to", String(f.record_number_to));
   if (f.record_number) p.set("record_number", f.record_number);
@@ -71,6 +73,9 @@ export const api = {
     request<import("./types").User>("/auth/me", { method: "PATCH", body: JSON.stringify(patch) }),
 
   // Public — no token needed.
+  collectorCareer: (id: number) =>
+    request<import("./types").Career>(`/collectors/${id}/career`),
+
   volunteers: (range: import("./types").VolunteerRange = "all", limit = 20) =>
     request<{ range: string; items: import("./types").Volunteer[] }>(
       `/volunteers?range=${range}&limit=${limit}`),

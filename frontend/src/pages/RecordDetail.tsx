@@ -253,7 +253,7 @@ function CollectorField({ recordedBy }: { recordedBy?: string | null }) {
       <span style={{ flex: 1, fontSize: 12, wordBreak: "break-word" }}>
         {!has ? <span style={{ color: t.danger, fontSize: 11 }}>{tr("detail.missing")}</span>
           : c ? (
-            <Link to="/explore" state={{ collector: { id: c.id, label: c.label } }}
+            <Link to={`/collectors/${c.id}`}
               title={tr("collector.filterBy", { n: c.n_records.toLocaleString() })}
               style={{ color: t.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
               <Icon name="user" size={11} />{String(recordedBy)}<Icon name="caretR" size={9} />

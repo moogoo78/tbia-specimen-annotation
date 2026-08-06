@@ -156,6 +156,22 @@ export interface Volunteer {
 }
 export type VolunteerRange = "all" | "month";
 
+// A collecting trip: a run of days separated by more than the gap.
+export interface Trip {
+  start: string; end: string;
+  n_days: number; n_records: number; n_mapped: number;
+  place: string | null;
+}
+export interface Career {
+  collector: { id: number; name: string; name_en: string; label: string };
+  summary: {
+    n_records: number; n_dated: number; n_undated: number; n_geo: number;
+    n_days: number; n_trips: number; year_min: number | null; year_max: number | null;
+  };
+  years: { year: number; count: number; mapped: number }[];
+  trips: Trip[];
+}
+
 export interface Collector {
   id: number;
   name: string;       // 中文 (may be "")
@@ -192,6 +208,8 @@ export interface Filters {
   has_media: boolean;
   year_from?: number;
   year_to?: number;
+  date_from?: string;
+  date_to?: string;
   bbox?: string;
 }
 
