@@ -164,6 +164,8 @@ export interface Trip {
 }
 export interface Career {
   collector: { id: number; name: string; name_en: string; label: string };
+  gap: number;   // idle days that end a trip — the threshold actually used
+
   summary: {
     n_records: number; n_dated: number; n_undated: number; n_geo: number;
     n_days: number; n_trips: number; year_min: number | null; year_max: number | null;

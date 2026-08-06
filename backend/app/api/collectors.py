@@ -340,4 +340,7 @@ async def collector_career(collector_id: int, gap: int = Query(default=7, ge=1, 
     trips = await duck.query(trips_sql(src), [*params, gap])
 
     summary["n_trips"] = len(trips)
-    return {"collector": collector, "summary": summary, "years": years, "trips": trips}
+    # Echo the threshold: the page states the rule, and it must state the one
+    # actually used rather than assume the default.
+    return {"collector": collector, "gap": gap, "summary": summary,
+            "years": years, "trips": trips}

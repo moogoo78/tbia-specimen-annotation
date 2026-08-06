@@ -119,10 +119,31 @@ export function Collector() {
               }}>{tr("career.clearSel")}</button>
             )}
           </div>
+          {/* How a trip is defined — otherwise the grouping is unexplained. */}
+          <div style={{
+            padding: "6px 10px", fontSize: 10, lineHeight: 1.5, color: t.fgSubtle,
+            borderBottom: `1px solid ${t.borderSoft}`, background: t.bg,
+          }}>
+            {tr("career.tripRule", { gap: career.data.gap })}
+          </div>
           {trips.length === 0 ? (
             <div style={{ padding: 14, fontSize: 12, color: t.fgSubtle }}>{tr("career.noTrips")}</div>
           ) : (
             <div style={{ maxHeight: 520, overflow: "auto" }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "3px 10px",
+                fontSize: 9, textTransform: "uppercase", letterSpacing: 0.3,
+                color: t.fgSubtle, borderBottom: `1px solid ${t.borderSoft}`,
+                position: "sticky", top: 0, background: t.panel,
+              }}>
+                <span>{tr("career.tripDates")}</span>
+                <div style={{ flex: 1 }} />
+                <span>{tr("career.days")}</span>
+                <span>{tr("career.records")}</span>
+                <span style={{ width: 34, textAlign: "right", color: t.ok }}>
+                  {tr("career.mapped")}
+                </span>
+              </div>
               {trips.map((trip) => (
                 <TripRow key={trip.start} trip={trip}
                   active={sel?.from === trip.start && sel?.to === trip.end}

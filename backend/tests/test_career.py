@@ -131,6 +131,13 @@ def test_career_is_public_and_404s_on_unknown(client):
     # no auth header anywhere in this module — the board is public like /collectors
 
 
+def test_career_echoes_the_gap_it_used(client, lu_id):
+    """The page states the rule, so it needs the threshold, not the default."""
+    assert client.get(f"/api/collectors/{lu_id}/career").json()["gap"] == 7
+    assert client.get(f"/api/collectors/{lu_id}/career",
+                      params={"gap": 30}).json()["gap"] == 30
+
+
 def test_career_gap_param_is_bounded(client, lu_id):
     assert client.get(f"/api/collectors/{lu_id}/career", params={"gap": 0}).status_code == 422
     assert client.get(f"/api/collectors/{lu_id}/career", params={"gap": 400}).status_code == 422
