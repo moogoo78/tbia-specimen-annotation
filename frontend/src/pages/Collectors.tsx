@@ -17,6 +17,10 @@ import { Spinner } from "../components/ui";
 // the page into the georeferencing queue, by person.
 const PAGE = 50;
 const SORTS: CollectorSort[] = ["records", "gap", "recent"];
+// The random strip draws from a deliberately higher floor than the list: 50+
+// records (1,833 collectors) is enough of a career to be worth opening, so a
+// shuffle never lands on a thin or half-parsed entry.
+const DISCOVER_MIN = 50;
 
 export function Collectors() {
   const { t: tr } = useTranslation();
@@ -63,7 +67,7 @@ export function Collectors() {
         </p>
       )}
 
-      <Discover minRecords={minRecords} />
+      <Discover />
 
       {/* sort + tail toggle */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: "14px 0 8px" }}>
@@ -104,14 +108,15 @@ export function Collectors() {
 }
 
 // A handful of collectors picked at random, so the page isn't the same 50 names
-// on every visit. Same pool as the list below it, so nothing unreachable-thin
-// shows up here.
-function Discover({ minRecords }: { minRecords: number }) {
+// on every visit. Independent of the list's own threshold — see DISCOVER_MIN.
+function Discover() {
   const { t: tr } = useTranslation();
   const [nonce, setNonce] = useState(1);
   const picks = useQuery({
-    queryKey: ["collector-random", minRecords, nonce],
-    queryFn: () => api.collectorBoard({ sort: "random", minRecords, limit: 6, nonce }),
+    queryKey: ["collector-random", nonce],
+    queryFn: () => api.collectorBoard({
+      sort: "random", minRecords: DISCOVER_MIN, limit: 6, nonce,
+    }),
     placeholderData: keepPreviousData,
   });
 
