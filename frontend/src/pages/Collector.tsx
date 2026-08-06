@@ -178,8 +178,13 @@ function Timeline({ years, sel, onSelect }: {
   const width = years.length * (W + GAP);
   return (
     <div style={{ background: t.panel, border: `1px solid ${t.border}`, padding: "8px 10px" }}>
-      <div style={{ fontSize: 10, color: t.fgMuted, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>
-        {tr("career.timeline")}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+        <span style={{ fontSize: 10, color: t.fgMuted, textTransform: "uppercase", letterSpacing: 0.3 }}>
+          {tr("career.timeline")}
+        </span>
+        <Swatch color={t.border} label={tr("career.legendAll")} />
+        <Swatch color={t.ok} label={tr("career.legendMapped")} />
+        <span style={{ fontSize: 10, color: t.fgSubtle }}>{tr("career.legendHint")}</span>
       </div>
       <div style={{ overflowX: "auto" }}>
         <svg width={Math.max(width, 200)} height={H + 16} style={{ display: "block" }}>
@@ -206,6 +211,15 @@ function Timeline({ years, sel, onSelect }: {
         </svg>
       </div>
     </div>
+  );
+}
+
+function Swatch({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: t.fgMuted }}>
+      <span style={{ width: 8, height: 8, background: color, display: "inline-block" }} />
+      {label}
+    </span>
   );
 }
 

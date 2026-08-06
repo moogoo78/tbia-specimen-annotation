@@ -28,6 +28,8 @@ const en = {
   },
   career: {
     timeline: "Collecting activity by year",
+    legendAll: "all records", legendMapped: "with coordinates",
+    legendHint: "bar height = records that year; click a year to filter",
     trips: "Trips", records: "records", days: "collecting days", mapped: "mapped",
     undated: "undated", wholeCareer: "Whole career", clearSel: "clear selection",
     gap: "{{mapped}} of {{total}} records are on the map — {{unmapped}} have a date and a locality but no coordinates.",
@@ -193,6 +195,8 @@ const zh: typeof en = {
   },
   career: {
     timeline: "歷年採集活動",
+    legendAll: "全部紀錄", legendMapped: "有座標",
+    legendHint: "長條高度為該年紀錄數；點選年份可篩選",
     trips: "採集行程", records: "筆紀錄", days: "採集日", mapped: "已定位",
     undated: "無日期", wholeCareer: "全部紀錄", clearSel: "清除選取",
     gap: "{{total}} 筆紀錄中有 {{mapped}} 筆已標於地圖——其餘 {{unmapped}} 筆有日期與地點描述，但沒有座標。",
