@@ -57,7 +57,21 @@ ORG_KW = (
 # Phrases that mean "no recorded collector". Compared case-insensitively, which
 # is what catches the shouted "COMMERCIAL FISHERMEN".
 UNKNOWN_KW = ("unknown", "採集者不明", "不明", "anonymous", "s.n.", "no collector", "佚名",
-              "fisherman", "fishermen", "illegible", "捐贈", "代購", "贈")
+              "fisherman", "fishermen", "illegible", "捐贈", "代購", "贈",
+              "ukn", "ign.", "unspecified")
+
+# A field label that leaked into the value: "Collector(s): Alex H. T. Yu". The
+# long forms may drop the colon ("Collector Unknown"); the abbreviations must
+# keep their punctuation, or "Legrand" would lose its first three letters.
+LABEL = re.compile(
+    # latin: the colon is optional, a following space is not
+    r"^\s*(?:collector\(s\)|collectors?|collected\s+by|recorded\s+by)\s*[:：]?\s+"
+    # chinese: no space to rely on, so the colon carries it
+    r"|^\s*(?:採集者|採集人|記錄者)\s*[:：]\s*"
+    # abbreviations: punctuation required, or Legrand loses its first letters
+    r"|^\s*(?:leg|coll|det)\s*[.:：]\s*",
+    re.I,
+)
 
 # split helpers
 PERSON_SEP = re.compile(r"\s*(?:&|、|和(?![一-龥])|與|及| and )\s*")
@@ -232,6 +246,7 @@ def parse_collector(raw: str) -> tuple[str, str] | None:
     """
     if not raw or not raw.strip():
         return None
+    raw = LABEL.sub("", raw)
     seg = strip_org_tag(first_segment(raw))
     zh, en = parse_person(seg)
     if not is_person(raw, seg, zh, en):

@@ -36,6 +36,28 @@ def test_organizations_are_skipped():
     assert parse_collector("China And Taiwan Union Investigation Team") is None
 
 
+def test_field_label_prefix_is_stripped():
+    """The export's biggest single label leak: `Collector(s): NAME`. The `(s)`
+    used to be read as the romanization bracket, leaving "Collector : X"."""
+    assert parse_collector("Collector(s): Alex H. T. Yu") == ("", "Alex H. T. Yu")
+    assert parse_collector("Collector(s): Pi-fong Lu") == ("", "Pi-fong Lu")
+    assert parse_collector("Collector(s): Jonathan J. Fong, Yen-Po Lin") == (
+        "", "Jonathan J. Fong")
+    assert parse_collector("採集者：許天銓") == ("許天銓", "")
+    assert parse_collector("Leg. R. Knapp") == ("", "R. Knapp")
+    # the label around an unknown marker still resolves to unknown
+    assert parse_collector("Collector(s): unknown") is None
+    assert parse_collector("Coll. Ukn.") is None
+    assert parse_collector("leg. ign.") is None
+
+
+def test_label_strip_does_not_bite_into_names():
+    """`leg`/`coll`/`det` need their punctuation — otherwise Legrand loses it."""
+    assert parse_collector("Legrand, R.") == ("", "R. Legrand")
+    assert parse_collector("Collins, M.") == ("", "M. Collins")
+    assert parse_collector("Detlef Meyer") == ("", "Detlef Meyer")
+
+
 def test_org_keywords_do_not_eat_real_names():
     """The reason every Chinese token is at least two characters."""
     assert parse_collector("Li-Yaung Kuo (郭立園)") == ("郭立園", "Li-Yaung Kuo")
