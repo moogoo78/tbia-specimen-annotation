@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
-import { emptyFilters, type Trip } from "../api/types";
+import { emptyFilters, type SamplingEvent, type Trip } from "../api/types";
 import { MapView } from "../components/MapView";
 import { Spinner } from "../components/ui";
 
@@ -45,7 +45,7 @@ export function Collector() {
     return <div style={{ padding: 20, color: t.fgSubtle }}>{tr("career.notFound")}</div>;
   }
 
-  const { collector, summary: s, years, trips } = career.data;
+  const { collector, summary: s, years, trips, reference_events: refs } = career.data;
   const unmapped = s.n_records - s.n_geo;
   const gapFilters = { collector: { id: cid, label: collector.label }, missing_coordinates: true };
 
@@ -171,6 +171,11 @@ export function Collector() {
             ) : <MapView rows={mapRows.data!.items} />}
         </div>
       </div>
+
+      {/* The documented counterpart to the derived trips above. Deliberately a
+          separate block: these are published accounts, not something inferred
+          from this collector's records, and the two must not read as one list. */}
+      {refs.length > 0 && <ReferenceEvents events={refs} />}
     </div>
   );
 }
@@ -265,6 +270,58 @@ function TripRow({ trip, active, onClick }: { trip: Trip; active: boolean; onCli
           {trip.place}
         </div>
       )}
+    </div>
+  );
+}
+
+
+// Chronology entries naming this collector.
+//
+// Shown beside the trip list, never merged into it. A trip is inferred from the
+// dates on their records; these are what the literature reports — including for
+// years the store holds no specimen from. Overlap between the two is context for
+// the reader and nothing more: no specimen is claimed to come from an event.
+function ReferenceEvents({ events }: { events: SamplingEvent[] }) {
+  const { t: tr } = useTranslation();
+  const citation = events[0]?.location_according_to ?? "";
+  return (
+    <div style={{ background: t.panel, border: `1px solid ${t.border}`, marginTop: 14 }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: t.panelAlt,
+        borderBottom: `1px solid ${t.borderSoft}`, fontSize: 10, fontWeight: 600,
+        textTransform: "uppercase", letterSpacing: 0.3, color: t.fgMuted,
+      }}>
+        <span>{tr("career.refTitle")}</span>
+        <span style={{ fontFamily: t.mono }}>{events.length}</span>
+        <div style={{ flex: 1 }} />
+        <Link to="/history" style={{ color: t.accent, fontSize: 10, textDecoration: "underline" }}>
+          {tr("career.refViewAll")} →
+        </Link>
+      </div>
+      <div style={{
+        padding: "6px 10px", fontSize: 10, lineHeight: 1.5, color: t.fgSubtle,
+        borderBottom: `1px solid ${t.borderSoft}`, background: t.bg,
+      }}>
+        {tr("career.refBlurb")}
+        {citation && <> {tr("career.refSource")}: {citation}</>}
+      </div>
+      {events.map((e, i) => (
+        <div key={e.id} style={{
+          display: "grid", gridTemplateColumns: "96px 1fr", gap: 12, padding: "8px 10px",
+          borderTop: i === 0 ? "none" : `1px solid ${t.borderSoft}`,
+        }}>
+          <div style={{ fontFamily: t.mono, fontSize: 12, fontWeight: 600 }}>
+            {e.verbatim_event_date}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12, lineHeight: 1.6 }}>{e.narrative}</div>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 4, fontSize: 11, color: t.fgMuted }}>
+              {e.verbatim_locality && <span>{tr("hist.locality")}: {e.verbatim_locality}</span>}
+              {e.event_remarks && <span>{tr("hist.repository")}: {e.event_remarks}</span>}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,0 +1,817 @@
+{
+  "source": {
+    "title": "附錄一：台灣植物調查研究史年表",
+    "citation": "許建昌, 1975; 黃增泉, 1983, 1986",
+    "scans": [
+      "tmp/sampling-event/Screenshot From 2026-08-05 14-05-58.png",
+      "tmp/sampling-event/Screenshot From 2026-08-05 14-06-09.png",
+      "tmp/sampling-event/Screenshot From 2026-08-05 14-06-21.png"
+    ],
+    "note": "Hand-curated transcription of a scanned 1975/1983/1986 chronology. Every field is verbatim from the source; `verbatim_locality` is extracted from the 主要記事 column, whose full text is kept in `narrative`. Correct against the scans (see source_page/seq) and re-run `make seed-sampling-events`."
+  },
+  "events": [
+    {
+      "seq": 1,
+      "source_page": 1,
+      "verbatim_event_date": "1854",
+      "event_date": "1854",
+      "year_start": 1854,
+      "year_end": 1854,
+      "verbatim_locality": "淡水",
+      "event_remarks": "英國",
+      "narrative": "淡水；台灣植物採集之第一位。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "R. Fortune",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 2,
+      "source_page": 1,
+      "verbatim_event_date": "1858",
+      "event_date": "1858",
+      "year_start": 1858,
+      "year_end": 1858,
+      "verbatim_locality": "打狗(高雄)、小琉球、鵝鑾鼻、東岸蘇澳、基隆、淡水",
+      "event_remarks": "英國",
+      "narrative": "採集於打狗(高雄)、小琉球、鵝鑾鼻、東岸蘇澳、基隆、淡水之海岸附近",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "C. Wilford",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 3,
+      "source_page": 1,
+      "verbatim_event_date": "1861-1866",
+      "event_date": "1861/1866",
+      "year_start": 1861,
+      "year_end": 1866,
+      "verbatim_locality": "打狗、淡水",
+      "event_remarks": "英國",
+      "narrative": "採集於打狗、淡水；發表「台灣植物目錄」記錄 246 種(含蕨類 33 種)。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "R. Swinhoe",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 4,
+      "source_page": 1,
+      "verbatim_event_date": "1864",
+      "event_date": "1864",
+      "year_start": 1864,
+      "year_end": 1864,
+      "verbatim_locality": "淡水、基隆",
+      "event_remarks": "英國",
+      "narrative": "採集於淡水、基隆，標本送 Hance 鑑定。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "R. Oldham",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 5,
+      "source_page": 1,
+      "verbatim_event_date": "1865",
+      "event_date": "1865",
+      "year_start": 1865,
+      "year_end": 1865,
+      "verbatim_locality": "淡水",
+      "event_remarks": "英國",
+      "narrative": "採集於淡水、標本送 Hance 鑑定。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "W. Gregory",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 6,
+      "source_page": 1,
+      "verbatim_event_date": "1865",
+      "event_date": "1865",
+      "year_start": 1865,
+      "year_end": 1865,
+      "verbatim_locality": "台灣西部",
+      "event_remarks": "英國",
+      "narrative": "採集於台灣西部；標本送邱園鑑定。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "A. Schetlilig",
+          "nationality": "德",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 7,
+      "source_page": 1,
+      "verbatim_event_date": "1874",
+      "event_date": "1874",
+      "year_start": 1874,
+      "year_end": 1874,
+      "verbatim_locality": "台灣東部",
+      "event_remarks": "英國",
+      "narrative": "於台灣東部採集 600 種，存大英博物館。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "R. W. Campbell",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 8,
+      "source_page": 1,
+      "verbatim_event_date": "1874",
+      "event_date": "1874",
+      "year_start": 1874,
+      "year_end": 1874,
+      "verbatim_locality": "基隆、淡水、打狗",
+      "event_remarks": "美國",
+      "narrative": "於基隆、淡水、打狗等地採集；標本存密西根大學。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "J. B. Steer",
+          "nationality": "美",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 9,
+      "source_page": 1,
+      "verbatim_event_date": "1874",
+      "event_date": "1874",
+      "year_start": 1874,
+      "year_end": 1874,
+      "verbatim_locality": "恆春車城附近",
+      "event_remarks": "日本",
+      "narrative": "採集於恆春車城附近；發表在東京植物學雜誌。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "粟田萬次郎",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 10,
+      "source_page": 1,
+      "verbatim_event_date": "1881-1883",
+      "event_date": "1881/1883",
+      "year_start": 1881,
+      "year_end": 1883,
+      "verbatim_locality": "淡水、基隆",
+      "event_remarks": "英",
+      "narrative": "採集於淡水、基隆，標本送 Hance。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "T. Watters",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 11,
+      "source_page": 1,
+      "verbatim_event_date": "1882",
+      "event_date": "1882",
+      "year_start": 1882,
+      "year_end": 1882,
+      "verbatim_locality": "淡水",
+      "event_remarks": "英國",
+      "narrative": "於淡水採得蕨類 100 種，標本送 Maximowicz 及 Baker。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "W. Hancock",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 12,
+      "source_page": 1,
+      "verbatim_event_date": "1884",
+      "event_date": "1884",
+      "year_start": 1884,
+      "year_end": 1884,
+      "verbatim_locality": "基隆、淡水",
+      "event_remarks": "英國",
+      "narrative": "採集於基隆、淡水；時任香港植物園主任。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "C. Ford",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 13,
+      "source_page": 1,
+      "verbatim_event_date": "1888-1889",
+      "event_date": "1888/1889",
+      "year_start": 1888,
+      "year_end": 1889,
+      "verbatim_locality": "台南、打狗",
+      "event_remarks": "英國",
+      "narrative": "採集於台南、打狗，採得約 400 種。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "G. Playfair",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 14,
+      "source_page": 1,
+      "verbatim_event_date": "1892-1896",
+      "event_date": "1892/1896",
+      "year_start": 1892,
+      "year_end": 1896,
+      "verbatim_locality": "打狗、恆春",
+      "event_remarks": "英國",
+      "narrative": "於打狗、恆春採集 2,000 份以上；發表「台灣植物目錄」記載台灣植物 1429 種。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "A. Henry",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 15,
+      "source_page": 1,
+      "verbatim_event_date": "1886-1905",
+      "event_date": "1886/1905",
+      "year_start": 1886,
+      "year_end": 1905,
+      "verbatim_locality": "",
+      "event_remarks": "英國",
+      "narrative": "發表「中國植物目錄」記載台灣植物 2,000 種",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "F. B. Forbes",
+          "nationality": "英",
+          "position": 0
+        },
+        {
+          "recorded_by": "W. B. Hemsley",
+          "nationality": "英",
+          "position": 1
+        }
+      ]
+    },
+    {
+      "seq": 16,
+      "source_page": 1,
+      "verbatim_event_date": "1896",
+      "event_date": "1896",
+      "year_start": 1896,
+      "year_end": 1896,
+      "verbatim_locality": "北部地區",
+      "event_remarks": "日本",
+      "narrative": "採集於北部地區。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "牧野富太郎",
+          "nationality": "日",
+          "position": 0
+        },
+        {
+          "recorded_by": "大渡忠太郎",
+          "nationality": "日",
+          "position": 1
+        }
+      ]
+    },
+    {
+      "seq": 17,
+      "source_page": 1,
+      "verbatim_event_date": "1898-1902",
+      "event_date": "1898/1902",
+      "year_start": 1898,
+      "year_end": 1902,
+      "verbatim_locality": "基隆、淡水、圓山、新店、大屯山",
+      "event_remarks": "日本",
+      "narrative": "在基隆、淡水、圓山、新店及大屯山等地採集約二個月。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "松村任三",
+          "nationality": "日",
+          "position": 0
+        },
+        {
+          "recorded_by": "V. Faurie",
+          "nationality": "英",
+          "position": 1
+        }
+      ]
+    },
+    {
+      "seq": 18,
+      "source_page": 1,
+      "verbatim_event_date": "1903-1905",
+      "event_date": "1903/1905",
+      "year_start": 1903,
+      "year_end": 1905,
+      "verbatim_locality": "全省",
+      "event_remarks": "日本",
+      "narrative": "採集地遍及全省。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "早田文藏",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 19,
+      "source_page": 1,
+      "verbatim_event_date": "1906",
+      "event_date": "1906",
+      "year_start": 1906,
+      "year_end": 1906,
+      "verbatim_locality": "",
+      "event_remarks": "日本",
+      "narrative": "合著「台灣植物指引」，發表 32 新種及 2 新變種。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "早田文藏",
+          "nationality": "日",
+          "position": 0
+        },
+        {
+          "recorded_by": "松村任三",
+          "nationality": "日",
+          "position": 1
+        }
+      ]
+    },
+    {
+      "seq": 20,
+      "source_page": 1,
+      "verbatim_event_date": "1905-1908",
+      "event_date": "1905/1908",
+      "year_start": 1905,
+      "year_end": 1908,
+      "verbatim_locality": "高山、東部山野",
+      "event_remarks": "日本",
+      "narrative": "台灣總督府成立植物調查課川上氏首任主任，開始遠征高山及東部山野。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "川上瀧彌",
+          "nationality": "日",
+          "position": 0
+        },
+        {
+          "recorded_by": "森丑之助",
+          "nationality": "日",
+          "position": 1
+        },
+        {
+          "recorded_by": "島田彌市",
+          "nationality": "日",
+          "position": 2
+        },
+        {
+          "recorded_by": "佐佐木舜一",
+          "nationality": "日",
+          "position": 3
+        },
+        {
+          "recorded_by": "小西成章",
+          "nationality": "日",
+          "position": 4
+        },
+        {
+          "recorded_by": "鈴木力浩",
+          "nationality": "日",
+          "position": 5
+        },
+        {
+          "recorded_by": "加藤宗三",
+          "nationality": "日",
+          "position": 6
+        },
+        {
+          "recorded_by": "伊藤太佑衛門",
+          "nationality": "日",
+          "position": 7
+        },
+        {
+          "recorded_by": "永澤定一",
+          "nationality": "日",
+          "position": 8
+        },
+        {
+          "recorded_by": "藤谷與三郎",
+          "nationality": "日",
+          "position": 9
+        },
+        {
+          "recorded_by": "井上德彌",
+          "nationality": "日",
+          "position": 10
+        },
+        {
+          "recorded_by": "澤田兼吉",
+          "nationality": "日",
+          "position": 11
+        },
+        {
+          "recorded_by": "早田",
+          "nationality": "日",
+          "position": 12
+        },
+        {
+          "recorded_by": "伊藤太郎",
+          "nationality": "日",
+          "position": 13
+        },
+        {
+          "recorded_by": "草野俊介",
+          "nationality": "日",
+          "position": 14
+        }
+      ]
+    },
+    {
+      "seq": 21,
+      "source_page": 2,
+      "verbatim_event_date": "1908",
+      "event_date": "1908",
+      "year_start": 1908,
+      "year_end": 1908,
+      "verbatim_locality": "阿里山、玉山",
+      "event_remarks": "日本",
+      "narrative": "「台灣高山植物誌」(Flora Montana Formosae)共 79 科，266 屬 392 種，其中 90 種為新種。小西成章在阿里山、玉山發現台灣杉(Taiwania cryptomerioides Hayata)",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "早田文藏",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 22,
+      "source_page": 2,
+      "verbatim_event_date": "1910",
+      "event_date": "1910",
+      "year_start": 1910,
+      "year_end": 1910,
+      "verbatim_locality": "",
+      "event_remarks": "日本",
+      "narrative": "台灣植物目錄，155 科 934 屬 2,199 種(外來種 57 科 141 屬 170 種。)",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "川上瀧彌",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 23,
+      "source_page": 2,
+      "verbatim_event_date": "1911",
+      "event_date": "1911",
+      "year_start": 1911,
+      "year_end": 1911,
+      "verbatim_locality": "",
+      "event_remarks": "日本",
+      "narrative": "「台灣植物資料」(Materials for a Flora of Formosa)係 1910 年早田將所屬不明或有疑問之標本，帶往歐洲以邱園為主之各地標本館作比較研究的成果，是為「台灣植物指引」(1906)及「台灣高山植物誌」(1908)之補述。共列 109 科 343 屬 735 種；其中 2 科 72 屬 567 種，為新增加的種群。得知自生植物共達 156 科 836 屬 2,666 種。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "早田文藏",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 24,
+      "source_page": 2,
+      "verbatim_event_date": "1912",
+      "event_date": "1912",
+      "year_start": 1912,
+      "year_end": 1912,
+      "verbatim_locality": "台灣全島",
+      "event_remarks": "英",
+      "narrative": "在台灣全島進行採集 11 個月，標本典藏於邱園及大英博物館。著「台灣植物採集記」(Plant Collecting in Formosa)，1982 年由中華林學會在台北市出版。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "W. R. Price",
+          "nationality": "英",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 25,
+      "source_page": 2,
+      "verbatim_event_date": "1913-1915",
+      "event_date": "1913/1915",
+      "year_start": 1913,
+      "year_end": 1915,
+      "verbatim_locality": "台灣西部、阿里山、角板山、烏來、大屯山、花蓮",
+      "event_remarks": "歐、美、日",
+      "narrative": "客死台北，死前留下數萬份台灣西部各地的標本，分送歐美、日各國。曾登阿里山三次採集蕨類。台灣北部之角板山、烏來、大屯山都有他的足跡，亦曾在東部的花蓮採集。日本京都大學收藏有全套他的採集品。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "U. Faurie",
+          "nationality": "法",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 26,
+      "source_page": 2,
+      "verbatim_event_date": "1917",
+      "event_date": "1917",
+      "year_start": 1917,
+      "year_end": 1917,
+      "verbatim_locality": "",
+      "event_remarks": "日本",
+      "narrative": "「台灣主要樹木誌」是以木材解剖為主，嘗試作台灣樹木分類之工作。1936 之「台灣樹木誌」(Formosan Trees)日英對照有圖，是 1917 年之增訂版。奠定台灣樹木分類之基礎。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "金平亮三",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 27,
+      "source_page": 2,
+      "verbatim_event_date": "1911-1921",
+      "event_date": "1911/1921",
+      "year_start": 1911,
+      "year_end": 1921,
+      "verbatim_locality": "本省南部",
+      "event_remarks": "日本",
+      "narrative": "「台灣植物圖譜」全十卷(Icones Plantarum Formosanarum I-VI, 1911-'16; General Index to the Flora of Formosa, 1917; VII-X, 1918-'21)。洋洋 2,000 頁，多根據川上、島田彌市、佐佐木舜一，澤田兼吉及松田英二在本省南部採集的標本。共列 170 科 1,197 屬，3,658 種 79 變種。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "早田文藏",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 28,
+      "source_page": 2,
+      "verbatim_event_date": "1925-1932",
+      "event_date": "1925/1932",
+      "year_start": 1925,
+      "year_end": 1932,
+      "verbatim_locality": "太平山、南山、凡凡、角板山、浸水營、台東",
+      "event_remarks": "台北帝大植物系標本館",
+      "narrative": "「續台灣植物圖譜」全五卷 Supplementa Iconum Plantarum Formosanarum I-IV, '25-'28; V, '32 為著者 1923 年接早田文藏作植物調查以後，根據金平亮三、佐佐木、島田、澤田、松田、山田冶金、工藤彌太郎所採之標本所作。太平山、南山、凡凡、角板山及浸水營、台東等亦有在調查之列。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "山本由松",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 29,
+      "source_page": 3,
+      "verbatim_event_date": "1928",
+      "event_date": "1928",
+      "year_start": 1928,
+      "year_end": 1928,
+      "verbatim_locality": "",
+      "event_remarks": "林業部及台北帝大",
+      "narrative": "「台灣植物名彙」，係附有台灣土名高山同胞俗名之名錄、學名亦多訂正，共列蕨類 15 科 90 屬 510 種 41 變種。顯花植物 170 科 1,031 屬 2,755 種 5 亞種 271 變種。合計 185 科 1,121 屬 3,265 種，5 亞種 312 變種。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "佐佐木舜一",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 30,
+      "source_page": 3,
+      "verbatim_event_date": "1930",
+      "event_date": "1930",
+      "year_start": 1930,
+      "year_end": 1930,
+      "verbatim_locality": "台北植物園",
+      "event_remarks": "林業部",
+      "narrative": "「林業部臘葉館植物標品目錄」是目前林業試驗所在台北植物園內的臘葉標本總目錄，是早田以來台灣植物調查的最原始資料。",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "佐佐木舜一",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 31,
+      "source_page": 3,
+      "verbatim_event_date": "1936",
+      "event_date": "1936",
+      "year_start": 1936,
+      "year_end": 1936,
+      "verbatim_locality": "",
+      "event_remarks": "台北帝大",
+      "narrative": "最新台灣植物目錄，記載 3841 種",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "正宗嚴敬",
+          "nationality": "日",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 32,
+      "source_page": 3,
+      "verbatim_event_date": "1960-62",
+      "event_date": "1960/1962",
+      "year_start": 1960,
+      "year_end": 1962,
+      "verbatim_locality": "",
+      "event_remarks": "",
+      "narrative": "台灣木本植物圖誌出版",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "劉業瑞",
+          "nationality": "中",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 33,
+      "source_page": 3,
+      "verbatim_event_date": "1962",
+      "event_date": "1962",
+      "year_start": 1962,
+      "year_end": 1962,
+      "verbatim_locality": "",
+      "event_remarks": "",
+      "narrative": "「Woody Flora of Taiwan」出版",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "李惠林",
+          "nationality": "中",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 34,
+      "source_page": 3,
+      "verbatim_event_date": "1962",
+      "event_date": "1962",
+      "year_start": 1962,
+      "year_end": 1962,
+      "verbatim_locality": "",
+      "event_remarks": "",
+      "narrative": "台灣木本植物誌」出版",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "劉業經",
+          "nationality": "中",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 35,
+      "source_page": 3,
+      "verbatim_event_date": "1972-1979",
+      "event_date": "1972/1979",
+      "year_start": 1972,
+      "year_end": 1979,
+      "verbatim_locality": "",
+      "event_remarks": "",
+      "narrative": "「台灣植物誌(Flora of Taiwan)」出版",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "李惠林等",
+          "nationality": "中、美",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 36,
+      "source_page": 3,
+      "verbatim_event_date": "1985",
+      "event_date": "1985",
+      "year_start": 1985,
+      "year_end": 1985,
+      "verbatim_locality": "",
+      "event_remarks": "",
+      "narrative": "「台灣植物誌」修訂計劃開始進行",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "群體計劃",
+          "nationality": "中",
+          "position": 0
+        }
+      ]
+    },
+    {
+      "seq": 37,
+      "source_page": 3,
+      "verbatim_event_date": "1988",
+      "event_date": "1988",
+      "year_start": 1988,
+      "year_end": 1988,
+      "verbatim_locality": "",
+      "event_remarks": "",
+      "narrative": "「台灣樹木誌」出版",
+      "location_according_to": "許建昌, 1975; 黃增泉, 1983, 1986",
+      "actors": [
+        {
+          "recorded_by": "劉業經",
+          "nationality": "中",
+          "position": 0
+        },
+        {
+          "recorded_by": "呂福原",
+          "nationality": "中",
+          "position": 1
+        },
+        {
+          "recorded_by": "歐辰雄",
+          "nationality": "中",
+          "position": 2
+        }
+      ]
+    }
+  ]
+}

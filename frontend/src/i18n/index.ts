@@ -3,7 +3,7 @@ import { initReactI18next } from "react-i18next";
 
 const en = {
   app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
-  nav: { home: "Home", explore: "Explore", institutions: "Institutions", collectors: "Collectors", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  nav: { home: "Home", explore: "Explore", institutions: "Institutions", collectors: "Collectors", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
   home: {
     tagline: "Closing gaps in specimen metadata",
     blurb: "A collaborative platform for enriching TBIA natural-history specimen records. Find occurrences missing identification, coordinates, or dates — fill them by hand or with AI-assisted label transcription — and return reviewed enrichments to data providers.",
@@ -41,6 +41,21 @@ const en = {
     prev: "Previous", next: "Next",
     empty: "No collectors match.",
   },
+  hist: {
+    title: "Survey history",
+    blurb: "A chronology of botanical survey work in Taiwan, transcribed from published literature. These are documented expeditions — the upper counterpart to the trips derived from record dates on a collector's page.",
+    source: "Source",
+    era: "Period", people: "Collectors", locality: "Localities", repository: "Specimens held at",
+    account: "Record",
+    filterPlaceholder: "Search a name, locality or repository…",
+    yearFrom: "From year", yearTo: "To year",
+    clear: "Clear filters",
+    count: "{{n}} events",
+    empty: "No events match.",
+    noRepository: "not recorded",
+    unlinked: "No records under this name in the store",
+    notProvenance: "Listing an event beside a collector does not assert that any specimen came from it — the link is name and date only.",
+  },
   career: {
     timeline: "Collecting activity by year",
     legendAll: "all records", legendMapped: "with coordinates",
@@ -55,6 +70,11 @@ const en = {
     noTrips: "No dated records to group into trips.",
     noCoords: "None of this collector's records have coordinates yet.",
     noCoordsInSelection: "No georeferenced records in this selection.",
+    refTitle: "Documented survey record",
+    refBlurb: "Published accounts naming this collector. Shown beside the trips above, not merged into them: trips are inferred from record dates, these are what the literature reports.",
+    refSource: "Source",
+    refNone: "This collector does not appear in the chronology.",
+    refViewAll: "Browse the full chronology",
     notFound: "Collector not found.",
   },
   search: {
@@ -274,7 +294,7 @@ const en = {
 
 const zh: typeof en = {
   app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
-  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", collectors: "採集者", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
+  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", collectors: "採集者", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
   home: {
     tagline: "填補標本後設資料的缺口",
     blurb: "TBIA 自然史標本資料的協作標註平台。找出缺少鑑定、座標或日期的標本紀錄，以人工或 AI 輔助的標籤辨識補齊，並將審核後的補遺回饋給資料提供者。",
@@ -312,6 +332,21 @@ const zh: typeof en = {
     prev: "上一頁", next: "下一頁",
     empty: "沒有符合的採集者。",
   },
+  hist: {
+    title: "調查史",
+    blurb: "台灣植物調查研究史年表，轉錄自已出版文獻。這些是有文獻記載的調查活動——相對於採集者頁面上由紀錄日期推算出的行程，屬於更上層的概念。",
+    source: "資料來源",
+    era: "年代", people: "植物分類學者", locality: "採集地點", repository: "標本存放處",
+    account: "主要記事",
+    filterPlaceholder: "搜尋人名、地點或存放處……",
+    yearFrom: "起始年", yearTo: "結束年",
+    clear: "清除篩選",
+    count: "共 {{n}} 筆",
+    empty: "沒有符合的記事。",
+    noRepository: "未記載",
+    unlinked: "資料庫中查無此人的紀錄",
+    notProvenance: "在採集者頁面並列調查記事，並不表示任何標本來自該次調查——兩者僅以人名與年代對應。",
+  },
   career: {
     timeline: "歷年採集活動",
     legendAll: "全部紀錄", legendMapped: "有座標",
@@ -326,6 +361,11 @@ const zh: typeof en = {
     noTrips: "沒有帶日期的紀錄可歸納為行程。",
     noCoords: "這位採集者的紀錄目前都沒有座標。",
     noCoordsInSelection: "此選取範圍內沒有已定位的紀錄。",
+    refTitle: "文獻調查記事",
+    refBlurb: "文獻中提及這位採集者的記載。與上方行程並列而非合併：行程由紀錄日期推算，這些則是文獻所載。",
+    refSource: "資料來源",
+    refNone: "年表中沒有這位採集者的記載。",
+    refViewAll: "瀏覽完整年表",
     notFound: "找不到這位採集者。",
   },
   search: {

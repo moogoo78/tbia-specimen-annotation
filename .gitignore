@@ -15,6 +15,7 @@ secrets*
 /data/*
 !/data/.gitkeep
 !/data/registry.json
+!/data/sampling_events.json
 
 # --- Raw data exports & API scratch dumps at repo root (large / not source) ---
 /tbia_*.csv

@@ -8,10 +8,11 @@ import time
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, or_, select
+from sqlalchemy.orm import selectinload
 
 from .. import duck
 from ..db import SessionLocal
-from ..models import Collector, CollectorAlias
+from ..models import Collector, CollectorAlias, SamplingEvent, SamplingEventActor
 
 router = APIRouter(prefix="/api", tags=["collectors"])
 
@@ -297,6 +298,47 @@ def trips_sql(src: str) -> str:
     """
 
 
+def _reference_events(db, collector_id: int) -> list[dict]:
+    """Chronology entries naming this collector, earliest first.
+
+    The documented counterpart to the derived ``trips`` below. This is a plain
+    SQLite join -- no occurrence data is consulted, and none is associated: an
+    event overlapping a trip in time is context for the reader, not a claim that
+    any specimen belongs to it.
+    """
+    events = db.execute(
+        select(SamplingEvent)
+        .options(selectinload(SamplingEvent.actors))
+        .where(
+            SamplingEvent.id.in_(
+                select(SamplingEventActor.event_id).where(
+                    SamplingEventActor.collector_id == collector_id
+                )
+            )
+        )
+        .order_by(SamplingEvent.year_start, SamplingEvent.seq)
+    ).scalars().unique()
+    return [
+        {
+            "id": ev.id,
+            "event_date": ev.event_date,
+            "verbatim_event_date": ev.verbatim_event_date,
+            "year_start": ev.year_start,
+            "year_end": ev.year_end,
+            "verbatim_locality": ev.verbatim_locality,
+            "event_remarks": ev.event_remarks,
+            "location_according_to": ev.location_according_to,
+            "narrative": ev.narrative,
+            "actors": [
+                {"recorded_by": a.recorded_by, "nationality": a.nationality,
+                 "collector_id": a.collector_id}
+                for a in ev.actors
+            ],
+        }
+        for ev in events
+    ]
+
+
 @router.get("/collectors/{collector_id}/career")
 async def collector_career(collector_id: int, gap: int = Query(default=7, ge=1, le=365)):
     """A collector's lifetime of work: totals, plus their collecting trips.
@@ -314,6 +356,7 @@ async def collector_career(collector_id: int, gap: int = Query(default=7, ge=1, 
         if c is None:
             raise HTTPException(status_code=404, detail="Collector not found")
         collector = {"id": c.id, "name": c.name, "name_en": c.name_en, "label": _label(c)}
+        reference_events = _reference_events(db, collector_id)
 
     src, params = _career_source(collector_id)
 
@@ -343,4 +386,4 @@ async def collector_career(collector_id: int, gap: int = Query(default=7, ge=1, 
     # Echo the threshold: the page states the rule, and it must state the one
     # actually used rather than assume the default.
     return {"collector": collector, "gap": gap, "summary": summary,
-            "years": years, "trips": trips}
+            "years": years, "trips": trips, "reference_events": reference_events}

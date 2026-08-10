@@ -162,6 +162,36 @@ export interface Trip {
   n_days: number; n_records: number; n_mapped: number;
   place: string | null;
 }
+// One participant in a documented sampling event. `collector_id` is null when
+// the name matches no collector in our store — common for 19th-century
+// botanists, whose material never reached a TBIA dataset.
+export interface SamplingEventActor {
+  recorded_by: string;          // DwC recordedBy, verbatim from 植物分類學者
+  nationality: string;          // 國籍, verbatim
+  position: number;             // order the source lists them in
+  collector_id: number | null;
+  collector_label?: string | null;
+}
+
+// A collecting event as documented in published literature — the upper,
+// curated counterpart to the `Trip`s derived from record dates above. It
+// asserts no link to any specimen; overlap with a trip is context, not
+// provenance.
+export interface SamplingEvent {
+  id: number;
+  event_date: string;           // DwC eventDate — "1854" or "1861/1866"
+  verbatim_event_date: string;  // DwC verbatimEventDate — the 年代 cell as printed
+  year_start: number;
+  year_end: number;
+  verbatim_locality: string;    // DwC verbatimLocality
+  event_remarks: string;        // DwC eventRemarks — the 標本存放處 column
+  location_according_to: string;// DwC locationAccordingTo — the chronology's citation
+  narrative: string;            // the full 主要記事 text
+  source_page?: number;
+  seq?: number;
+  actors: SamplingEventActor[];
+}
+
 export interface Career {
   collector: { id: number; name: string; name_en: string; label: string };
   gap: number;   // idle days that end a trip — the threshold actually used
@@ -172,6 +202,9 @@ export interface Career {
   };
   years: { year: number; count: number; mapped: number }[];
   trips: Trip[];
+  // Chronology entries naming this collector. Reported beside `trips`, never
+  // merged into them — the two answer different questions.
+  reference_events: SamplingEvent[];
 }
 
 export interface Collector {

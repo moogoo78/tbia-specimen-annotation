@@ -82,6 +82,61 @@ def _build_duckdb() -> None:
     prepare(DUCK)
 
 
+
+# A miniature chronology, shaped like data/sampling_events.json. Covers the cases
+# the real transcription exercises: a single year, a year range, an elided
+# century, a multi-actor party, and actors that do and do not resolve to a
+# collector. The two resolving names are the fixture's own collectors (r1/r2 map
+# to 呂碧鳳, r4 to 許天銓).
+SAMPLING_EVENTS = {
+    "source": {"citation": "測試來源, 1975; 測試, 1983"},
+    "events": [
+        {
+            "seq": 1, "source_page": 1,
+            "verbatim_event_date": "1901", "event_date": "1901",
+            "year_start": 1901, "year_end": 1901,
+            "verbatim_locality": "淡水", "event_remarks": "英國",
+            "narrative": "採集於淡水。",
+            "actors": [{"recorded_by": "呂碧鳳", "nationality": "中", "position": 0}],
+        },
+        {
+            "seq": 2, "source_page": 1,
+            "verbatim_event_date": "1905-1910", "event_date": "1905/1910",
+            "year_start": 1905, "year_end": 1910,
+            "verbatim_locality": "基隆", "event_remarks": "",
+            "narrative": "遠征高山。",
+            # A party: one actor resolves, one does not. 許天銓 is deliberately
+            # left out of the whole chronology so tests have a collector that
+            # the literature never names.
+            "actors": [
+                {"recorded_by": "呂碧鳳", "nationality": "中", "position": 0},
+                {"recorded_by": "Ghost Collector", "nationality": "英", "position": 1},
+            ],
+        },
+        {
+            "seq": 3, "source_page": 2,
+            "verbatim_event_date": "1960-62", "event_date": "1960/1962",
+            "year_start": 1960, "year_end": 1962,
+            "verbatim_locality": "", "event_remarks": "林業部",
+            "narrative": "台灣木本植物圖誌出版",
+            # Deliberately per-row, overriding source.citation.
+            "location_according_to": "另一來源, 1990",
+            "actors": [{"recorded_by": "群體計劃", "nationality": "中", "position": 0}],
+        },
+    ],
+}
+
+SAMPLING_JSON = os.path.join(_tmp, "sampling_events.json")
+
+
+def write_sampling_events(doc=None) -> str:
+    """Write the fixture chronology to the temp dir; return its path."""
+    import json
+    with open(SAMPLING_JSON, "w", encoding="utf-8") as fh:
+        json.dump(doc if doc is not None else SAMPLING_EVENTS, fh, ensure_ascii=False)
+    return SAMPLING_JSON
+
+
 @pytest.fixture(scope="session")
 def client():
     _build_duckdb()
@@ -90,8 +145,11 @@ def client():
     from app.seed import seed
     from app.seed_collectors import populate
 
+    from app.seed_sampling_events import populate as populate_events
+
     seed()  # demo users
     populate()  # collector table + aliases (before the app attaches the sqlite)
+    populate_events(write_sampling_events())  # curated chronology (needs collectors)
     with TestClient(app) as c:
         yield c
 

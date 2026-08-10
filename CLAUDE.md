@@ -34,6 +34,7 @@ make inspect ZIP=tmp/tbia_x.zip        # 1. survey an export + diff vs registry.
 make build-db ZIP=tmp/tbia_x.zip DB=…  # 3. load it into a new DuckDB (~75s)
 make prepare DB=data/tbia.new.duckdb   # 4. derive flags/indexes (~12s); DB= optional
 make seed           # SQLite schema + demo users
+make seed-sampling-events   # curated chronology (data/sampling_events.json) -> SQLite
 make api            # FastAPI on :8000   (frontend proxies /api here)
 make web            # Vite dev server on :5173
 make test           # pytest (backend)
@@ -91,6 +92,46 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.jso
 - AI extraction (`app/extract.py`) is a **stub** shaped like a real vision response
   (per-field value + confidence). Swap it for a Claude vision call; the UI already consumes
   this shape.
+
+## Sampling events (the other "trip")
+
+**"Trip" names two different things in this codebase; do not merge them.**
+
+- **Derived trips** — `api/collectors.py:trips_sql` sessionizes a collector's dated
+  occurrence rows into runs separated by more than `gap` idle days. Bottom-up, inferred,
+  returned as `trips` on `GET /api/collectors/{id}/career`.
+- **Sampling events** — a *curated chronology* of documented collecting expeditions,
+  transcribed from published literature. Top-down, cited, returned as `reference_events`
+  on the same endpoint and browsable at `GET /api/sampling-events` + `/history`.
+
+The source is 附錄一：台灣植物調查研究史年表 (許建昌, 1975; 黃增泉, 1983, 1986) — 37 entries,
+1854–1988, transcribed from the scans in `tmp/sampling-event/` into
+**`data/sampling_events.json`**, which is hand-curated and **tracked in git** (see the
+`!/data/sampling_events.json` un-ignore, since `/data/*` is ignored wholesale). There is no
+runtime vision extraction; `extract.py` remains the specimen-label stub.
+
+Darwin Core mapping — `recordedBy` (植物分類學者), `eventDate` + `verbatimEventDate` (年代),
+`verbatimLocality` (places pulled out of 主要記事), **`eventRemarks` (標本存放處)**, and
+`locationAccordingTo` (the chronology's citation, stored per-row so a second source needs no
+code change). The full 主要記事 text is kept in a non-DwC `narrative` column, so the locality
+extraction stays a convenience index over the source rather than a replacement for it.
+
+Two tables (`models.py`): `sampling_event` and `sampling_event_actor`. Actors are separate
+because a row is often a *party* — the 1905–1908 entry names fifteen people — and each
+participant carries their own 國籍 and resolves to their own collector. `seed_sampling_events.py`
+matches each name against `Collector.name` / `name_en` / `CollectorAlias.recorded_by`
+(exact, then whitespace/punctuation-folded — nothing fuzzier), leaves `collector_id` null on a
+miss, and prints the misses. 32 of 57 actors currently resolve; the rest are mostly
+19th-century botanists holding no records in the export, which is expected rather than a bug.
+
+**Sampling events assert no specimen provenance.** Nothing links an occurrence row to an
+event, and nothing should: an event overlapping a derived trip is context for the reader, not
+a claim that any specimen came from that expedition. Adding such a link would manufacture
+provenance the source does not support and would flow into provider exports as curated fact.
+
+Enrichment-side data, like collectors and annotations — a `make build-db` rebuild of the
+DuckDB store never invalidates it. Re-run `make seed-sampling-events` after correcting a
+transcription; it replaces both tables, so it is idempotent.
 
 ## Data refresh
 

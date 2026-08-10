@@ -53,6 +53,7 @@ export function AppHeader() {
         {tab("/explore", tr("nav.explore"))}
         {tab("/institutions", tr("nav.institutions"))}
         {tab("/collectors", tr("nav.collectors"))}
+        {tab("/history", tr("nav.history"))}
         {tab("/contributors", tr("nav.volunteers"))}
         {tab("/dashboard", tr("nav.dashboard"))}
         {tab("/guide", tr("nav.guide"))}

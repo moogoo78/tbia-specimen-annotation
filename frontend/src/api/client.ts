@@ -76,6 +76,16 @@ export const api = {
   collectorCareer: (id: number) =>
     request<import("./types").Career>(`/collectors/${id}/career`),
 
+  samplingEvents: (p: { q?: string; year_from?: number; year_to?: number; collector_id?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (p.q?.trim()) qs.set("q", p.q.trim());
+    if (p.year_from != null) qs.set("year_from", String(p.year_from));
+    if (p.year_to != null) qs.set("year_to", String(p.year_to));
+    if (p.collector_id != null) qs.set("collector_id", String(p.collector_id));
+    const s = qs.toString();
+    return request<import("./types").SamplingEvent[]>(`/sampling-events${s ? `?${s}` : ""}`);
+  },
+
   volunteers: (range: import("./types").VolunteerRange = "all", limit = 20) =>
     request<{ range: string; items: import("./types").Volunteer[] }>(
       `/volunteers?range=${range}&limit=${limit}`),

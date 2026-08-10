@@ -136,3 +136,72 @@ class CollectorAlias(Base):
     source: Mapped[str] = mapped_column(String(16), default="auto")  # auto | curator
 
     collector: Mapped[Collector] = relationship(back_populates="aliases")
+
+
+class SamplingEvent(Base):
+    """One documented collecting event from a published chronology.
+
+    The *upper* half of the platform's two trip concepts. Trips on a collector's
+    career page are derived bottom-up by sessionizing occurrence dates
+    (``api/collectors.trips_sql``); a sampling event is the top-down counterpart,
+    transcribed from the literature, and it knows the things the specimen rows
+    cannot say -- why a collector was somewhere and where the material ended up.
+
+    Curated reference data: loaded from ``data/sampling_events.json`` by
+    ``app.seed_sampling_events``, never user-submitted, and asserting no link to
+    any occurrence row (see the change's proposal -- Non-Goals)."""
+
+    __tablename__ = "sampling_event"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # DwC eventDate: a year, or an ISO 8601 interval ("1861/1866").
+    event_date: Mapped[str] = mapped_column(String(64), default="")
+    # DwC verbatimEventDate: the 年代 cell exactly as printed ("1960-62").
+    verbatim_event_date: Mapped[str] = mapped_column(String(64), default="")
+    # Derived from event_date at seed time so range overlap is integer maths.
+    year_start: Mapped[int] = mapped_column(Integer, index=True)
+    year_end: Mapped[int] = mapped_column(Integer, index=True)
+    # DwC verbatimLocality: places pulled out of the 主要記事 column.
+    verbatim_locality: Mapped[str] = mapped_column(Text, default="")
+    # DwC eventRemarks: the 標本存放處 (specimen repository) column. Free text
+    # because the source holds countries ("歐、美、日") as often as institutions.
+    event_remarks: Mapped[str] = mapped_column(Text, default="")
+    # DwC locationAccordingTo: the chronology's own citation. Per-row, so a
+    # second source can be transcribed later without a code change.
+    location_according_to: Mapped[str] = mapped_column(Text, default="")
+    # The full 主要記事 text. Kept whole so the locality extraction above stays
+    # a convenience index over the source rather than a replacement for it.
+    narrative: Mapped[str] = mapped_column(Text, default="")
+    # Provenance back to the scan, for correcting a transcription by hand.
+    source_page: Mapped[int] = mapped_column(Integer, default=0)
+    seq: Mapped[int] = mapped_column(Integer, default=0)
+    created: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    actors: Mapped[list["SamplingEventActor"]] = relationship(
+        back_populates="event", cascade="all, delete-orphan", order_by="SamplingEventActor.position"
+    )
+
+
+class SamplingEventActor(Base):
+    """One participant in a sampling event.
+
+    A separate table because a chronology row is often a party rather than a
+    person -- the 1905-1908 entry names fifteen -- and because each participant
+    carries their own nationality (1898-1902 pairs 松村任三 (日) with V. Faurie
+    (英)) and resolves to its own collector."""
+
+    __tablename__ = "sampling_event_actor"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("sampling_event.id"), index=True)
+    # DwC recordedBy, verbatim from 植物分類學者.
+    recorded_by: Mapped[str] = mapped_column(String(255), index=True)
+    # Null when the name matches no collector -- the expected outcome for most
+    # 19th-century botanists, who hold no records in the TBIA export at all.
+    collector_id: Mapped[int | None] = mapped_column(
+        ForeignKey("collectors.id"), nullable=True, index=True
+    )
+    nationality: Mapped[str] = mapped_column(String(32), default="")  # 國籍, verbatim
+    position: Mapped[int] = mapped_column(Integer, default=0)  # source order
+
+    event: Mapped[SamplingEvent] = relationship(back_populates="actors")

@@ -1,4 +1,4 @@
-.PHONY: install backend-install frontend-install prepare inspect build-db seed seed-collectors sync-collectors api web test build clean
+.PHONY: install backend-install frontend-install prepare inspect build-db seed seed-collectors sync-collectors seed-sampling-events api web test build clean
 
 PY := backend/.venv/bin/python
 PIP := backend/.venv/bin/pip
@@ -59,6 +59,11 @@ seed-collectors:
 # Incrementally map only NEW recorded_by values after re-ingesting a fresh zip.
 sync-collectors:
 	cd backend && .venv/bin/python -m app.seed_collectors --sync
+
+# Load the curated sampling-event chronology (data/sampling_events.json) into
+# SQLite. Idempotent -- re-run after correcting a transcription.
+seed-sampling-events:
+	cd backend && .venv/bin/python -m app.seed_sampling_events
 
 # Run the API on :8000 (the Vite dev server proxies /api here).
 api:
