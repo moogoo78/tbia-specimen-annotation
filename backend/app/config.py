@@ -15,7 +15,18 @@ DEV_JWT_SECRET = "dev-secret-change-me"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="NDB_", env_file=".env", extra="ignore")
+    # The dotenv paths are absolute, anchored on the repo, because a relative
+    # ".env" is resolved against the *current working directory* -- and every
+    # Makefile target `cd backend` first, which hid the repo-root .env from all
+    # of them (`make seed`, `make seed-collectors`, `make api`, the workers).
+    # The symptom was the placeholder-secret guard below refusing to boot even
+    # though a real NDB_JWT_SECRET was sitting in .env the whole time.
+    # backend/.env is read second, so it can override the root file when present.
+    model_config = SettingsConfigDict(
+        env_prefix="NDB_",
+        env_file=(os.path.join(REPO, ".env"), os.path.join(REPO, "backend", ".env")),
+        extra="ignore",
+    )
 
     duckdb_path: str = os.path.join(DATA, "tbia.duckdb")
     sqlite_path: str = os.path.join(DATA, "annotations.sqlite")

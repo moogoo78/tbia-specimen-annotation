@@ -57,3 +57,23 @@ def test_dev_login_works_when_fully_enabled(client, monkeypatch):
     resp = client.post("/api/auth/dev-login", json={"email": "admin@tbia.test"})
     assert resp.status_code == 200
     assert resp.json()["user"]["role"] == "admin"
+
+
+def test_dotenv_paths_are_absolute_and_cwd_independent():
+    """The dotenv paths must not be relative.
+
+    Every Makefile target runs `cd backend` first, so a relative ".env" resolved
+    against the working directory and missed the repo-root file — leaving the
+    placeholder-secret guard above refusing to boot `make seed`, `make api` and
+    the workers while a real NDB_JWT_SECRET sat in .env unread.
+    """
+    import os
+
+    from app.config import REPO
+
+    env_files = Settings.model_config["env_file"]
+    assert isinstance(env_files, tuple), "expected root and backend dotenv paths"
+    assert all(os.path.isabs(p) for p in env_files), env_files
+    # The repo-root file is read, and backend/.env may override it.
+    assert env_files[0] == os.path.join(REPO, ".env")
+    assert env_files[-1] == os.path.join(REPO, "backend", ".env")
