@@ -192,6 +192,65 @@ export interface SamplingEvent {
   actors: SamplingEventActor[];
 }
 
+// ── curated stories ─────────────────────────────────────────────────────────
+// A hand-transcribed narrative (data/story_*.json) served back with the numbers
+// the occurrence store can answer for it. Counts are queries by collector +
+// date window or by species name — never a stored link to a record.
+
+export interface StorySpecies {
+  name: string;            // binomial; "" when the source gives only a Chinese name
+  authorship?: string;
+  name_zh?: string;
+  origin?: string;         // for species the story only illustrates
+  n_records: number;
+}
+
+export interface StoryTrip {
+  seq: number;
+  verbatim_date: string;   // the heading as printed, e.g. "2011.10.24–11.06"
+  date_start: string;
+  date_end: string;
+  precision: "day" | "month";
+  narrative: string;
+  party?: { name: string; name_en?: string }[];
+  notes?: { date?: string; text: string }[];
+  n_records: number;
+}
+
+export interface StoryRegion {
+  key: string;
+  name: string;            // 中文, verbatim
+  name_en: string;
+  summary?: string;
+  species_heading?: string;
+  trips: StoryTrip[];
+  species: StorySpecies[];
+}
+
+export interface Story {
+  key: string;
+  source: { title?: string; citation?: string; url?: string };
+  subject: {
+    name: string; name_en?: string; abbreviation?: string;
+    collector: { id: number; label: string; n_records: number } | null;
+  };
+  focus: { genus?: string; name_zh?: string; records: number; genus_only: number };
+  regions: StoryRegion[];
+  totals: {
+    regions: number; trips: number; species: number;
+    trip_records: number; species_records: number; species_present: number;
+  };
+}
+
+export interface StoryIndexEntry {
+  key: string;
+  title: string;
+  subject: { name: string; name_en?: string };
+  n_regions: number;
+  n_trips: number;
+  n_species: number;
+}
+
 export interface Career {
   collector: { id: number; name: string; name_en: string; label: string };
   gap: number;   // idle days that end a trip — the threshold actually used

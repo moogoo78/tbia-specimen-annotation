@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { useAuth } from "../auth";
+import { STORY_TOPICS } from "../pages/Story";
 import { ANALYTICS_ENABLED, revokeConsent, useConsent } from "../analytics";
 
 export function AppHeader() {
@@ -20,8 +21,10 @@ export function AppHeader() {
     localStorage.setItem("tbia_lang", next);
   };
 
-  const tab = (to: string, label: string) => {
-    const active = loc.pathname === to || (to !== "/" && loc.pathname.startsWith(to));
+  const tab = (to: string, label: string, also: string[] = []) => {
+    const active = loc.pathname === to
+      || (to !== "/" && loc.pathname.startsWith(to))
+      || also.some((path) => loc.pathname.startsWith(path));
     return (
       <Link to={to} style={{
         padding: "0 14px", fontSize: 12, display: "flex", alignItems: "center",
@@ -53,7 +56,8 @@ export function AppHeader() {
         {tab("/explore", tr("nav.explore"))}
         {tab("/institutions", tr("nav.institutions"))}
         {tab("/collectors", tr("nav.collectors"))}
-        {tab("/history", tr("nav.history"))}
+        {/* The chronology is a topic of the story, so /history lights this tab. */}
+        {tab("/story", tr("nav.story"), STORY_TOPICS.map((topic) => topic.path))}
         {tab("/contributors", tr("nav.volunteers"))}
         {tab("/dashboard", tr("nav.dashboard"))}
         {tab("/guide", tr("nav.guide"))}

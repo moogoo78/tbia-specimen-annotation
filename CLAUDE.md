@@ -102,7 +102,9 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.jso
   returned as `trips` on `GET /api/collectors/{id}/career`.
 - **Sampling events** — a *curated chronology* of documented collecting expeditions,
   transcribed from published literature. Top-down, cited, returned as `reference_events`
-  on the same endpoint and browsable at `GET /api/sampling-events` + `/history`.
+  on the same endpoint and browsable at `GET /api/sampling-events` + `/history`, which is
+  the first topic of `/story` (`pages/Story.tsx` — its `STORY_TOPICS` array is both the
+  index and what the navbar tab highlights on).
 
 The source is 附錄一：台灣植物調查研究史年表 (許建昌, 1975; 黃增泉, 1983, 1986) — 37 entries,
 1854–1988, transcribed from the scans in `tmp/sampling-event/` into
@@ -140,6 +142,30 @@ the same person did those years — so keep it out of the export path.
 Enrichment-side data, like collectors and annotations — a `make build-db` rebuild of the
 DuckDB store never invalidates it. Re-run `make seed-sampling-events` after correcting a
 transcription; it replaces both tables, so it is idempotent.
+
+## Curated stories (`/story`)
+
+`/story` is the narrative layer: `pages/Story.tsx` holds `STORY_TOPICS`, which is both the
+index and what the navbar tab highlights on. Two topics so far — the sampling-event
+chronology (`/history`, seeded into SQLite, above) and **彭鏡毅's Begonia expeditions**
+(`/story/begonia`).
+
+The Begonia story is a different mechanism from the chronology and deliberately lighter:
+`data/story_begonia.json` (hand-curated, tracked in git via the `!/data/story_begonia.json`
+un-ignore) is a transcription of a BRMAS digital curation — regions → trips (verbatim date,
+ISO range, `precision: day|month`, narrative, party, notes) plus the species described.
+**Nothing is seeded**; `api/stories.py` reads the file at request time, caches on its mtime,
+and answers it against the store:
+
+- `trips[].n_records` — the subject collector's records inside the trip's dates.
+- `species[].n_records` — records held under that binomial, store-wide.
+- `focus` — the subject's records in the story's genus, and how many stop at the bare genus
+  (886 of 1,468 for Peng: the identification gap, inside the story).
+
+Correct a transcription and the next request serves it — no `make` step. The same rule as
+the chronology holds: **a count is not provenance.** Records are matched by collector and
+date window, so a specimen counted under a trip is one that person collected those days, not
+one the trip is claimed to have produced.
 
 ## Data refresh
 

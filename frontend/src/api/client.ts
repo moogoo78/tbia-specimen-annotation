@@ -91,6 +91,9 @@ export const api = {
   samplingEventCounts: () =>
     request<Record<string, number>>("/sampling-events/counts"),
 
+  stories: () => request<import("./types").StoryIndexEntry[]>("/stories"),
+  story: (key: string) => request<import("./types").Story>(`/stories/${key}`),
+
   volunteers: (range: import("./types").VolunteerRange = "all", limit = 20) =>
     request<{ range: string; items: import("./types").Volunteer[] }>(
       `/volunteers?range=${range}&limit=${limit}`),

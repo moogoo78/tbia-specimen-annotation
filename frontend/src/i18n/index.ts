@@ -3,7 +3,41 @@ import { initReactI18next } from "react-i18next";
 
 const en = {
   app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
-  nav: { home: "Home", explore: "Explore", institutions: "Institutions", collectors: "Collectors", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  nav: { home: "Home", explore: "Explore", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  story: {
+    title: "Data stories",
+    blurb: "Topics that read the collection as a narrative rather than a result set: who went where, when, and what of it can still be found in the store today. Each topic works from a published source and queries the specimen data live.",
+    more: "More topics as they are transcribed.",
+    topics: {
+      history: {
+        title: "A history of botanical survey in Taiwan",
+        blurb: "The expeditions that built Taiwan's plant collections, 1854 onwards — transcribed from a published chronology, with each entry's collectors linked to the records they left behind.",
+        meta: "{{n}} entries · {{from}}–{{to}}",
+        linked: "{{n}} lead to specimens",
+      },
+      begonia: {
+        title: "Dr. Ching-I Peng | Begonias of the World",
+        blurb: "Twenty years of fieldwork on Begonia across Asia, Europe and beyond — transcribed from a digital curation, with every trip answered by the specimens Peng collected in those exact days.",
+        meta: "{{trips}} trips · {{regions}} regions · {{species}} species named",
+      },
+    },
+  },
+  storyDetail: {
+    missing: "This story is not available.",
+    subject: "Collector",
+    tripsTile: "documented trips / regions",
+    tripRecordsTile: "records collected during them",
+    focusTile: "{{genus}} records by this collector",
+    genusOnlyTile: "of those stop at the genus",
+    speciesTile: "species named here, held in the store",
+    records: "{{n}} records",
+    specimens: "{{n}} specimens",
+    species: "Species",
+    monthOnly: "month only",
+    tripHint: "Records by {{who}} between {{from}} and {{to}}. Collector and date only — not a claim that this trip produced them.",
+    noneHint: "No records in the store for these dates",
+    speciesAbsent: "No record in the store carries this name",
+  },
   home: {
     tagline: "Closing gaps in specimen metadata",
     blurb: "A collaborative platform for enriching TBIA natural-history specimen records. Find occurrences missing identification, coordinates, or dates — fill them by hand or with AI-assisted label transcription — and return reviewed enrichments to data providers.",
@@ -298,7 +332,41 @@ const en = {
 
 const zh: typeof en = {
   app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
-  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", collectors: "採集者", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
+  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
+  story: {
+    title: "資料說故事",
+    blurb: "以敘事的方式閱讀典藏，而不只是查詢結果：誰在何時去了哪裡，以及今天在資料庫裡還找得到什麼。每則故事都以已出版的文獻為本，並即時查詢標本資料。",
+    more: "之後隨轉錄陸續增加。",
+    topics: {
+      history: {
+        title: "台灣植物調查研究史",
+        blurb: "1854 年以來建立台灣植物典藏的歷次調查——轉錄自已出版的年表，並將每則記事的採集者連到他們留下的標本紀錄。",
+        meta: "{{n}} 則記事 · {{from}}–{{to}}",
+        linked: "{{n}} 則可連到標本",
+      },
+      begonia: {
+        title: "彭鏡毅博士｜世界秋海棠",
+        blurb: "橫跨亞洲、歐洲等地二十餘年的秋海棠田野調查——轉錄自數位策展，每一趟行程都以彭老師在那幾天實際採集的標本回答。",
+        meta: "{{trips}} 趟行程 · {{regions}} 個地區 · 發表 {{species}} 種",
+      },
+    },
+  },
+  storyDetail: {
+    missing: "查無此故事。",
+    subject: "採集者",
+    tripsTile: "趟記載行程 / 地區",
+    tripRecordsTile: "筆行程期間的採集紀錄",
+    focusTile: "筆{{genus}}（秋海棠）紀錄",
+    genusOnlyTile: "筆只鑑定到屬",
+    speciesTile: "種文中提及的物種存於資料庫",
+    records: "{{n}} 筆紀錄",
+    specimens: "{{n}} 筆標本",
+    species: "物種",
+    monthOnly: "僅記載至月",
+    tripHint: "{{who}} 在 {{from}} 至 {{to}} 之間的紀錄。僅以採集者與日期對應，不代表這些標本出自本趟行程。",
+    noneHint: "資料庫中查無這幾天的紀錄",
+    speciesAbsent: "資料庫中沒有以此學名登錄的紀錄",
+  },
   home: {
     tagline: "填補標本後設資料的缺口",
     blurb: "TBIA 自然史標本資料的協作標註平台。找出缺少鑑定、座標或日期的標本紀錄，以人工或 AI 輔助的標籤辨識補齊，並將審核後的補遺回饋給資料提供者。",

@@ -58,6 +58,9 @@ export function Explore() {
     const st = location.state as {
       collector?: CollectorRef; collectors?: CollectorRef[];
       years?: { from?: number; to?: number };
+      // A documented trip is a date range, not a year — see /story.
+      dates?: { from?: string; to?: string };
+      q?: string;
       sources?: string[]; bio_group?: string[];
       flags?: Partial<Pick<Filters, "missing_identification" | "missing_coordinates" | "missing_date" | "has_media">>;
     } | null;
@@ -79,6 +82,11 @@ export function Explore() {
       const yrs = st.years;
       setFilters((f) => ({ ...f, year_from: yrs.from, year_to: yrs.to }));
     }
+    if (st.dates && (st.dates.from || st.dates.to)) {
+      const d = st.dates;
+      setFilters((f) => ({ ...f, date_from: d.from, date_to: d.to }));
+    }
+    if (st.q) setQInput(st.q);
     if (st.sources?.length) {
       setSources((s) => Array.from(new Set([...s, ...st.sources!])));
     }
@@ -90,7 +98,7 @@ export function Explore() {
       const flags = st.flags;
       setFilters((f) => ({ ...f, ...flags }));
     }
-    if (handed.length || st.years || st.sources?.length || st.bio_group?.length || st.flags) {
+    if (handed.length || st.years || st.dates || st.q || st.sources?.length || st.bio_group?.length || st.flags) {
       setOffset(0);
       navigate(location.pathname, { replace: true, state: null });
     }
@@ -199,6 +207,12 @@ export function Explore() {
       }
     });
     collectors.forEach((c) => out.push({ label: c.label, onRemove: () => toggleCollector(c) }));
+    if (filters.date_from || filters.date_to) {
+      out.push({
+        label: `${filters.date_from ?? ""} → ${filters.date_to ?? ""}`,
+        onRemove: () => { setFilters((f) => ({ ...f, date_from: undefined, date_to: undefined })); setOffset(0); },
+      });
+    }
     if (filters.year_from != null || filters.year_to != null) {
       out.push({
         label: `${filters.year_from ?? ""}–${filters.year_to ?? ""}`,

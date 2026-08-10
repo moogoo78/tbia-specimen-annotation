@@ -6,6 +6,7 @@ import { t } from "../design/tokens";
 import { api } from "../api/client";
 import type { SamplingEvent, SamplingEventActor } from "../api/types";
 import { Spinner } from "../components/ui";
+import { Citation } from "../components/Citation";
 
 // The curated chronology: collecting events as published literature records
 // them. This is the upper, documented half of the platform's trip concept — the
@@ -53,7 +54,10 @@ export function History() {
 
   return (
     <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{tr("hist.title")}</h2>
+      <Link to="/story" style={{ fontSize: 11, color: t.fgMuted, textDecoration: "none" }}>
+        ← {tr("story.title")}
+      </Link>
+      <h2 style={{ fontSize: 18, fontWeight: 600, margin: "4px 0 0" }}>{tr("hist.title")}</h2>
       <p style={{ fontSize: 12, color: t.fgMuted, lineHeight: 1.6, margin: "6px 0 0", maxWidth: 760 }}>
         {tr("hist.blurb")}
       </p>
@@ -105,22 +109,6 @@ export function History() {
         </div>
       )}
     </div>
-  );
-}
-
-// The citation carries the digital object it was scanned from as a bracketed
-// URL. Render that part as a link, the rest verbatim — it is a quoted citation,
-// so nothing else about it is reformatted.
-function Citation({ text }: { text: string }) {
-  const m = text.match(/\[(https?:\/\/[^\]\s]+)\]/);
-  if (!m || m.index == null) return <>{text}</>;
-  return (
-    <>
-      {text.slice(0, m.index)}
-      <a href={m[1]} target="_blank" rel="noreferrer"
-        style={{ color: t.accent, wordBreak: "break-all" }}>{m[1]}</a>
-      {text.slice(m.index + m[0].length)}
-    </>
   );
 }
 
