@@ -129,6 +129,14 @@ event, and nothing should: an event overlapping a derived trip is context for th
 a claim that any specimen came from that expedition. Adding such a link would manufacture
 provenance the source does not support and would flow into provider exports as curated fact.
 
+`GET /api/sampling-events/counts` is the one place the chronology touches DuckDB: per event,
+how many records its *resolved* actors hold within its years — one grouped join, cached on the
+actor/year signature so a re-seed invalidates it. `/history` shows that number as the specimen
+column and links it into Explore (collectors + `year_from/year_to`, `has_media` cleared so the
+result matches the count); zero renders as an em dash rather than a link into nothing. It
+stores nothing and associates nothing — a counted record may well come from other fieldwork
+the same person did those years — so keep it out of the export path.
+
 Enrichment-side data, like collectors and annotations — a `make build-db` rebuild of the
 DuckDB store never invalidates it. Re-run `make seed-sampling-events` after correcting a
 transcription; it replaces both tables, so it is idempotent.

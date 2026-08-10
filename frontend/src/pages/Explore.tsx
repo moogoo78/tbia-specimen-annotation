@@ -48,20 +48,36 @@ export function Explore() {
     return { ...filters, tbia_dataset_id: [...ids], collector_id: collectors.map((c) => c.id) };
   }, [filters, sources, collectors]);
 
-  // Filters handed over via navigation (a collector from a record/row, source
-  // datasets from the institutions page, or completeness flags from the home
-  // page's Get-started block): apply once per navigation, then consume.
+  // Filters handed over via navigation (a collector from a record/row, a
+  // sampling event's collectors + years from the history page, source datasets
+  // from the institutions page, or completeness flags from the home page's
+  // Get-started block): apply once per navigation, then consume.
   const location = useLocation();
   const navigate = useNavigate();
   useEffect(() => {
     const st = location.state as {
-      collector?: CollectorRef; sources?: string[]; bio_group?: string[];
+      collector?: CollectorRef; collectors?: CollectorRef[];
+      years?: { from?: number; to?: number };
+      sources?: string[]; bio_group?: string[];
       flags?: Partial<Pick<Filters, "missing_identification" | "missing_coordinates" | "missing_date" | "has_media">>;
     } | null;
     if (!st) return;
-    if (st.collector) {
-      const c = st.collector;
-      setCollectors((cs) => cs.some((x) => x.id === c.id) ? cs : [...cs, c]);
+    const handed = [...(st.collector ? [st.collector] : []), ...(st.collectors ?? [])];
+    if (handed.length) {
+      setCollectors((cs) => {
+        const seen = new Set(cs.map((x) => x.id));
+        const add: CollectorRef[] = [];
+        for (const c of handed) {
+          if (seen.has(c.id)) continue;
+          seen.add(c.id);
+          add.push(c);
+        }
+        return add.length ? [...cs, ...add] : cs;
+      });
+    }
+    if (st.years && (st.years.from != null || st.years.to != null)) {
+      const yrs = st.years;
+      setFilters((f) => ({ ...f, year_from: yrs.from, year_to: yrs.to }));
     }
     if (st.sources?.length) {
       setSources((s) => Array.from(new Set([...s, ...st.sources!])));
@@ -74,7 +90,7 @@ export function Explore() {
       const flags = st.flags;
       setFilters((f) => ({ ...f, ...flags }));
     }
-    if (st.collector || st.sources?.length || st.bio_group?.length || st.flags) {
+    if (handed.length || st.years || st.sources?.length || st.bio_group?.length || st.flags) {
       setOffset(0);
       navigate(location.pathname, { replace: true, state: null });
     }
@@ -183,6 +199,12 @@ export function Explore() {
       }
     });
     collectors.forEach((c) => out.push({ label: c.label, onRemove: () => toggleCollector(c) }));
+    if (filters.year_from != null || filters.year_to != null) {
+      out.push({
+        label: `${filters.year_from ?? ""}–${filters.year_to ?? ""}`,
+        onRemove: () => { setFilters((f) => ({ ...f, year_from: undefined, year_to: undefined })); setOffset(0); },
+      });
+    }
     if (filters.record_number_from != null || filters.record_number_to != null) {
       out.push({
         label: `# ${filters.record_number_from ?? ""}–${filters.record_number_to ?? ""}`,

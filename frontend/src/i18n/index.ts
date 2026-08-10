@@ -55,6 +55,10 @@ const en = {
     noRepository: "not recorded",
     unlinked: "No records under this name in the store",
     notProvenance: "Listing an event beside a collector does not assert that any specimen came from it — the link is name and date only.",
+    specimens: "{{n}} records",
+    specimensHint: "Records held by {{who}}, {{from}}–{{to}}. Name and date only — not a claim that these specimens came from this event.",
+    specimensNone: "No collector on this entry resolves to one in the store",
+    specimensZero: "No records from these collectors in these years",
   },
   career: {
     timeline: "Collecting activity by year",
@@ -346,6 +350,10 @@ const zh: typeof en = {
     noRepository: "未記載",
     unlinked: "資料庫中查無此人的紀錄",
     notProvenance: "在採集者頁面並列調查記事，並不表示任何標本來自該次調查——兩者僅以人名與年代對應。",
+    specimens: "{{n}} 筆標本",
+    specimensHint: "「{{who}}」在 {{from}}–{{to}} 年的紀錄。僅以人名與年代對應，不代表這些標本採自該次調查。",
+    specimensNone: "此筆記事的採集者在資料庫中查無對應",
+    specimensZero: "此年代內查無這些採集者的紀錄",
   },
   career: {
     timeline: "歷年採集活動",

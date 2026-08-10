@@ -77,6 +77,85 @@ def test_single_event_and_404(client):
     assert client.get("/api/sampling-events/999999").status_code == 404
 
 
+# ── specimen counts ─────────────────────────────────────────────────────────
+
+def test_counts_cover_every_event_including_the_empty_ones(client):
+    counts = client.get("/api/sampling-events/counts").json()
+    ids = {str(e["id"]) for e in client.get("/api/sampling-events").json()}
+    assert set(counts) == ids
+    # The fixture chronology is 1901-1962; the fixture records are 2004-2021.
+    assert set(counts.values()) == {0}
+
+
+def test_counts_are_the_collector_and_year_query(client):
+    """An event over the years its collector actually worked counts those rows.
+
+    r1 (2004, 'Pi-Fong Lu (呂碧鳳)') and r2 (no date, '呂碧鳳') are the same
+    collector; only the dated one can fall inside a year range.
+    """
+    doc = {"source": {"citation": "x"}, "events": [
+        {"seq": 1, "verbatim_event_date": "2000-2010", "narrative": "n",
+         "actors": [{"recorded_by": "呂碧鳳"}]},
+        {"seq": 2, "verbatim_event_date": "1990", "narrative": "n",
+         "actors": [{"recorded_by": "呂碧鳳"}]},
+        {"seq": 3, "verbatim_event_date": "2000-2010", "narrative": "n",
+         "actors": [{"recorded_by": "Ghost Collector"}]},
+    ]}
+    populate_events(write_sampling_events(doc))
+    try:
+        events = {e["seq"]: e for e in client.get("/api/sampling-events").json()}
+        counts = client.get("/api/sampling-events/counts").json()
+        assert counts[str(events[1]["id"])] == 1   # the dated record, in range
+        assert counts[str(events[2]["id"])] == 0   # right person, wrong years
+        assert counts[str(events[3]["id"])] == 0   # unresolved actor counts nothing
+    finally:
+        populate_events(write_sampling_events())  # restore
+
+
+def test_counts_follow_a_reseed_rather_than_the_cache(client):
+    """A transcription fix must show up without a restart."""
+    before = client.get("/api/sampling-events/counts").json()
+    assert set(before.values()) == {0}
+
+    doc = {"source": {"citation": "x"}, "events": [
+        {"seq": 1, "verbatim_event_date": "2000-2010", "narrative": "n",
+         "actors": [{"recorded_by": "呂碧鳳"}]},
+    ]}
+    populate_events(write_sampling_events(doc))
+    try:
+        assert set(client.get("/api/sampling-events/counts").json().values()) == {1}
+    finally:
+        populate_events(write_sampling_events())
+    assert set(client.get("/api/sampling-events/counts").json().values()) == {0}
+
+
+def test_counts_survive_a_missing_sqlite_attach(client, monkeypatch):
+    """Same answer through the Python-side alias fallback."""
+    from app import duck
+    from app.api import sampling_events as se
+
+    doc = {"source": {"citation": "x"}, "events": [
+        {"seq": 1, "verbatim_event_date": "2000-2010", "narrative": "n",
+         "actors": [{"recorded_by": "呂碧鳳"}]},
+    ]}
+    populate_events(write_sampling_events(doc))
+    monkeypatch.setattr(duck, "annotations_attached", lambda: False)
+    se._COUNTS = None       # the cache would otherwise answer from the ATTACHed run
+    try:
+        assert set(client.get("/api/sampling-events/counts").json().values()) == {1}
+    finally:
+        se._COUNTS = None
+        populate_events(write_sampling_events())
+
+
+def test_counting_does_not_associate_a_record_with_an_event(client):
+    """The count is a query, not a link: no endpoint hands back occurrence ids
+    for an event, and the event payload gains no occurrence field."""
+    ev = client.get("/api/sampling-events").json()[0]
+    assert "occurrences" not in ev and "occurrence_ids" not in ev
+    assert client.get(f"/api/sampling-events/{ev['id']}/occurrences").status_code == 404
+
+
 # ── actors ──────────────────────────────────────────────────────────────────
 
 def test_a_party_keeps_every_participant_in_source_order(client):
