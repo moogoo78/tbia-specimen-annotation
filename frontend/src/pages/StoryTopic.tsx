@@ -183,12 +183,7 @@ function Trip({ trip, story }: { trip: StoryTrip; story: Story }) {
         <p style={{ fontSize: 12, lineHeight: 1.8, margin: 0 }}>{trip.narrative}</p>
         {trip.party && trip.party.length > 0 && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
-            {trip.party.map((m) => (
-              <span key={m.name} style={{
-                fontSize: 11, color: t.fgMuted, background: t.panelAlt,
-                border: `1px solid ${t.borderSoft}`, padding: "1px 6px",
-              }}>{m.name}{m.name_en ? ` ${m.name_en}` : ""}</span>
-            ))}
+            {trip.party.map((m) => <Member key={m.name} m={m} />)}
           </div>
         )}
         {trip.notes?.map((note, i) => (
@@ -199,6 +194,25 @@ function Trip({ trip, story }: { trip: StoryTrip; story: Story }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// A companion links to their own career page when the name resolves to a
+// collector; the overseas hosts and students who hold no records here stay
+// plain text rather than becoming dead links.
+function Member({ m }: { m: NonNullable<StoryTrip["party"]>[number] }) {
+  const { t: tr } = useTranslation();
+  const chip = {
+    fontSize: 11, background: t.panelAlt, border: `1px solid ${t.borderSoft}`,
+    padding: "1px 6px", textDecoration: "none",
+  } as const;
+  const text = `${m.name}${m.name_en ? ` ${m.name_en}` : ""}`;
+  if (m.collector_id == null) {
+    return <span style={{ ...chip, color: t.fgMuted }} title={tr("hist.unlinked")}>{text}</span>;
+  }
+  return (
+    <Link to={`/collectors/${m.collector_id}`} style={{ ...chip, color: t.accent }}
+      title={m.collector_label ?? undefined}>{text}</Link>
   );
 }
 

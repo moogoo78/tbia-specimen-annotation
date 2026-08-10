@@ -30,6 +30,7 @@ from sqlalchemy import or_, select
 from .. import duck
 from ..db import SessionLocal
 from ..models import Collector, CollectorAlias
+from ..names import collector_index, fold
 
 router = APIRouter(prefix="/api", tags=["stories"])
 
@@ -55,6 +56,10 @@ def _load(key: str) -> dict:
     return _docs[key][1]
 
 
+def _label(c: Collector) -> str:
+    return " ".join(p for p in (c.name, c.name_en) if p)
+
+
 def _subject(doc: dict) -> dict | None:
     """The story's collector, resolved against the collector table."""
     s = doc.get("subject") or {}
@@ -76,10 +81,46 @@ def _subject(doc: dict) -> dict | None:
         "id": c.id,
         "name": c.name,
         "name_en": c.name_en,
-        "label": " ".join(p for p in (c.name, c.name_en) if p),
+        "label": _label(c),
         "n_records": c.n_records,
         "aliases": list(aliases),
     }
+
+
+def _resolve_party(doc: dict) -> dict[str, dict | None]:
+    """Every party member named anywhere in the story -> their collector, or None.
+
+    Same conservative matching as the chronology's actors (``app/names.py``): a
+    fold of spacing and punctuation, nothing fuzzier. A miss is expected and
+    kept — several of these are overseas hosts and students who hold no records
+    in a Taiwanese aggregation — and the UI renders it as plain text.
+    """
+    wanted: dict[str, list[str]] = {}
+    for region in doc.get("regions", []):
+        for trip in region.get("trips", []):
+            for m in trip.get("party", []) or []:
+                names = [n for n in (m.get("name"), m.get("name_en")) if n]
+                if names:
+                    wanted[m["name"]] = names
+    if not wanted:
+        return {}
+
+    out: dict[str, dict | None] = {}
+    with SessionLocal() as db:
+        index = collector_index(db)
+        ids = {}
+        for key, names in wanted.items():
+            cid = next((index[k] for k in map(fold, names) if k in index), None)
+            ids[key] = cid
+        found = {
+            c.id: {"collector_id": c.id, "collector_label": _label(c)}
+            for c in db.execute(
+                select(Collector).where(Collector.id.in_({i for i in ids.values() if i}))
+            ).scalars()
+        }
+    for key, cid in ids.items():
+        out[key] = found.get(cid) if cid else None
+    return out
 
 
 def _trips(doc: dict) -> list[tuple[str, str, str, str]]:
@@ -235,11 +276,20 @@ async def get_story(key: str) -> dict:
             answers = {"trips": trips, "species": species, "focus": focus}
             _answers[key] = (mtime, time.monotonic(), answers)
 
+    party = _resolve_party(doc)
     regions = []
     for region in doc.get("regions", []):
         r = dict(region)
         r["trips"] = [
-            {**trip, "n_records": answers["trips"].get(f"{region['key']}/{trip['seq']}", 0)}
+            {
+                **trip,
+                "n_records": answers["trips"].get(f"{region['key']}/{trip['seq']}", 0),
+                "party": [
+                    {**m, "collector_id": None, "collector_label": None,
+                     **(party.get(m.get("name")) or {})}
+                    for m in trip.get("party", []) or []
+                ],
+            }
             for trip in region.get("trips", [])
         ]
         r["species"] = [
@@ -262,5 +312,7 @@ async def get_story(key: str) -> dict:
             "species_records": sum(answers["species"].values()),
             # Species the store holds under a name the story names.
             "species_present": sum(1 for v in answers["species"].values() if v),
+            "party": len(party),
+            "party_resolved": sum(1 for v in party.values() if v),
         },
     }

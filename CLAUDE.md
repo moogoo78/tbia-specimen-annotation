@@ -161,6 +161,10 @@ and answers it against the store:
 - `species[].n_records` — records held under that binomial, store-wide.
 - `focus` — the subject's records in the story's genus, and how many stop at the bare genus
   (886 of 1,468 for Peng: the identification gap, inside the story).
+- `trips[].party[].collector_id` — companions matched to collectors by `app/names.py`
+  (`fold` + `collector_index`, shared with the chronology seeder, which keeps them under
+  their old `_norm`/`_resolver` names). 12 of 18 resolve; the misses are the overseas hosts
+  and are kept verbatim, exactly as an unresolved chronology actor is.
 
 Correct a transcription and the next request serves it — no `make` step. The same rule as
 the chronology holds: **a count is not provenance.** Records are matched by collector and

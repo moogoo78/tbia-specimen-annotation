@@ -24,7 +24,7 @@ FIXTURE = {
                 # r1 falls inside; r2 has no date and can fall in nothing.
                 {"seq": 1, "verbatim_date": "2004.09", "date_start": "2004-09-01",
                  "date_end": "2004-09-30", "precision": "month", "narrative": "n1",
-                 "party": [{"name": "Someone"}]},
+                 "party": [{"name": "呂碧鳳"}, {"name": "Someone"}]},
                 {"seq": 2, "verbatim_date": "2019.08.14", "date_start": "2019-08-14",
                  "date_end": "2019-08-14", "precision": "day", "narrative": "n2"},
             ],
@@ -74,7 +74,20 @@ def test_trip_counts_are_the_collector_and_date_window(client, story):
     assert trips[1]["n_records"] == 0   # that day belongs to another collector
     # The transcription itself comes back untouched.
     assert trips[0]["narrative"] == "n1" and trips[0]["precision"] == "month"
-    assert trips[0]["party"] == [{"name": "Someone"}]
+
+
+def test_party_members_resolve_to_collectors_where_they_can(client, story):
+    """A name that matches a collector becomes a link; a name that does not is
+    kept verbatim rather than dropped — the overseas hosts hold no records here."""
+    party = client.get("/api/stories/test").json()["regions"][0]["trips"][0]["party"]
+    known, unknown = party[0], party[1]
+    assert known["name"] == "呂碧鳳" and known["collector_id"] is not None
+    assert "呂碧鳳" in known["collector_label"]
+    assert unknown["name"] == "Someone"
+    assert unknown["collector_id"] is None and unknown["collector_label"] is None
+
+    totals = client.get("/api/stories/test").json()["totals"]
+    assert totals["party"] == 2 and totals["party_resolved"] == 1
 
 
 def test_species_counts_are_store_wide_and_absent_names_are_zero(client, story):

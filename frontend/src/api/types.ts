@@ -212,7 +212,12 @@ export interface StoryTrip {
   date_end: string;
   precision: "day" | "month";
   narrative: string;
-  party?: { name: string; name_en?: string }[];
+  // Resolved against the collector table where possible; a miss stays plain
+  // text — several party members are overseas hosts with no records here.
+  party?: {
+    name: string; name_en?: string;
+    collector_id?: number | null; collector_label?: string | null;
+  }[];
   notes?: { date?: string; text: string }[];
   n_records: number;
 }
