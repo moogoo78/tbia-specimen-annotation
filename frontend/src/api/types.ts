@@ -192,6 +192,70 @@ export interface SamplingEvent {
   actors: SamplingEventActor[];
 }
 
+// ── curated stories ─────────────────────────────────────────────────────────
+// A hand-transcribed narrative (data/story_*.json) served back with the numbers
+// the occurrence store can answer for it. Counts are queries by collector +
+// date window or by species name — never a stored link to a record.
+
+export interface StorySpecies {
+  name: string;            // binomial; "" when the source gives only a Chinese name
+  authorship?: string;
+  name_zh?: string;
+  origin?: string;         // for species the story only illustrates
+  n_records: number;
+}
+
+export interface StoryTrip {
+  seq: number;
+  verbatim_date: string;   // the heading as printed, e.g. "2011.10.24–11.06"
+  date_start: string;
+  date_end: string;
+  precision: "day" | "month";
+  narrative: string;
+  // Resolved against the collector table where possible; a miss stays plain
+  // text — several party members are overseas hosts with no records here.
+  party?: {
+    name: string; name_en?: string;
+    collector_id?: number | null; collector_label?: string | null;
+  }[];
+  notes?: { date?: string; text: string }[];
+  n_records: number;
+}
+
+export interface StoryRegion {
+  key: string;
+  name: string;            // 中文, verbatim
+  name_en: string;
+  summary?: string;
+  species_heading?: string;
+  trips: StoryTrip[];
+  species: StorySpecies[];
+}
+
+export interface Story {
+  key: string;
+  source: { title?: string; citation?: string; url?: string };
+  subject: {
+    name: string; name_en?: string; abbreviation?: string;
+    collector: { id: number; label: string; n_records: number } | null;
+  };
+  focus: { genus?: string; name_zh?: string; records: number; genus_only: number };
+  regions: StoryRegion[];
+  totals: {
+    regions: number; trips: number; species: number;
+    trip_records: number; species_records: number; species_present: number;
+  };
+}
+
+export interface StoryIndexEntry {
+  key: string;
+  title: string;
+  subject: { name: string; name_en?: string };
+  n_regions: number;
+  n_trips: number;
+  n_species: number;
+}
+
 export interface Career {
   collector: { id: number; name: string; name_en: string; label: string };
   gap: number;   // idle days that end a trip — the threshold actually used
@@ -234,6 +298,38 @@ export interface CollectorBoard {
   totals: { collectors: number; records: number; mapped: number };  // unfiltered
 }
 
+// The taxonomic index. A row is a *name as the store holds it*, not a resolved
+// taxon: synonyms are not merged, spelling variants stay separate, and a name
+// used under two kingdoms is one row (n_kingdoms > 1) covering every record
+// carrying the string.
+export interface SpeciesRow {
+  name: string;
+  n_records: number;
+  n_identified: number;   // records flagged has_identification (rank species-or-below)
+  taxon_rank: string;
+  family: string | null;
+  genus: string | null;
+  kingdom_c: string | null;
+  common_name_c: string;
+  n_counties: number;
+  n_kingdoms: number;
+  year_min: number | null;
+  year_max: number | null;
+  n_geo: number;
+  n_media: number;
+  n_type: number;
+}
+export type SpeciesScope = "species" | "all";
+export type SpeciesSort = "records" | "name";
+export interface SpeciesList {
+  total: number;      // names matching the current scope + search
+  items: SpeciesRow[];
+  limit: number;
+  offset: number;
+  scope: SpeciesScope;
+  totals: { names: number; records: number };  // the whole index
+}
+
 export interface RegistryDataset { code?: string; name: string; groups: string[]; gbif?: string; }
 export interface RegistryEntry { name: string; datasets: Record<string, RegistryDataset>; }
 export interface Registry {
@@ -248,6 +344,7 @@ export interface Filters {
   kingdom_c: string[];
   county: string[];
   taxon_rank: string[];
+  scientific_name: string[];   // exact match — the species index's link into Explore
   basis_of_record: string[];
   type_status: string[];
   dataset_name: string[];
@@ -268,7 +365,7 @@ export interface Filters {
 }
 
 export const emptyFilters = (): Filters => ({
-  bio_group: [], kingdom_c: [], county: [], taxon_rank: [],
+  bio_group: [], kingdom_c: [], county: [], taxon_rank: [], scientific_name: [],
   basis_of_record: [], type_status: [], dataset_name: [], tbia_dataset_id: [],
   collector_id: [],
   missing_coordinates: false, missing_date: false,

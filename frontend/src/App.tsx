@@ -5,11 +5,14 @@ import { AppHeader } from "./components/AppHeader";
 import { CookieConsent } from "./components/CookieConsent";
 import { Home } from "./pages/Home";
 import { Explore } from "./pages/Explore";
+import { Species } from "./pages/Species";
 import { Institutions } from "./pages/Institutions";
 import { Volunteers } from "./pages/Volunteers";
 import { Collector } from "./pages/Collector";
 import { Collectors } from "./pages/Collectors";
 import { History } from "./pages/History";
+import { Story } from "./pages/Story";
+import { StoryTopic } from "./pages/StoryTopic";
 import { RecordDetail } from "./pages/RecordDetail";
 import { Dashboard } from "./pages/Dashboard";
 import { Guide } from "./pages/Guide";
@@ -25,12 +28,17 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/explore" element={<Explore />} />
+        <Route path="/species" element={<Species />} />
         <Route path="/institutions" element={<Institutions />} />
         <Route path="/contributors" element={<Volunteers />} />
         {/* The board was /volunteers (志工) until the rename; keep old links working. */}
         <Route path="/volunteers" element={<Navigate to="/contributors" replace />} />
         <Route path="/collectors" element={<Collectors />} />
         <Route path="/collectors/:id" element={<Collector />} />
+        <Route path="/story" element={<Story />} />
+        <Route path="/story/:key" element={<StoryTopic />} />
+        {/* A topic of /story, but keeps its own route — it is deep-linked from
+            collector pages and from the chronology's own citation. */}
         <Route path="/history" element={<History />} />
         <Route path="/record/:id" element={<RecordDetail />} />
         <Route path="/dashboard" element={<Dashboard />} />

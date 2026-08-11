@@ -6,6 +6,7 @@ import { t } from "../design/tokens";
 import { api } from "../api/client";
 import type { SamplingEvent, SamplingEventActor } from "../api/types";
 import { Spinner } from "../components/ui";
+import { Citation } from "../components/Citation";
 
 // The curated chronology: collecting events as published literature records
 // them. This is the upper, documented half of the platform's trip concept — the
@@ -23,6 +24,12 @@ export function History() {
   const events = useQuery({
     queryKey: ["sampling-events"],
     queryFn: () => api.samplingEvents(),
+  });
+  // Separate query: the chronology renders without it, and the counts cost a
+  // scan of the occurrence store.
+  const counts = useQuery({
+    queryKey: ["sampling-event-counts"],
+    queryFn: () => api.samplingEventCounts(),
   });
 
   const rows = useMemo(() => {
@@ -47,14 +54,17 @@ export function History() {
 
   return (
     <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{tr("hist.title")}</h2>
+      <Link to="/story" style={{ fontSize: 11, color: t.fgMuted, textDecoration: "none" }}>
+        ← {tr("story.title")}
+      </Link>
+      <h2 style={{ fontSize: 18, fontWeight: 600, margin: "4px 0 0" }}>{tr("hist.title")}</h2>
       <p style={{ fontSize: 12, color: t.fgMuted, lineHeight: 1.6, margin: "6px 0 0", maxWidth: 760 }}>
         {tr("hist.blurb")}
       </p>
       {/* Provenance of everything on this page — DwC locationAccordingTo. */}
       {citation && (
-        <p style={{ fontSize: 11, color: t.fgSubtle, margin: "6px 0 0", fontFamily: t.mono }}>
-          {tr("hist.source")}: {citation}
+        <p style={{ fontSize: 11, color: t.fgSubtle, margin: "6px 0 0", maxWidth: 760, lineHeight: 1.6 }}>
+          {tr("hist.source")}: <Citation text={citation} />
         </p>
       )}
 
@@ -94,7 +104,7 @@ export function History() {
       ) : (
         <div style={{ background: t.panel, border: `1px solid ${t.border}` }}>
           {rows.map((e, i) => (
-            <EventRow key={e.id} ev={e} first={i === 0} />
+            <EventRow key={e.id} ev={e} first={i === 0} n={counts.data?.[String(e.id)]} />
           ))}
         </div>
       )}
@@ -102,11 +112,11 @@ export function History() {
   );
 }
 
-function EventRow({ ev, first }: { ev: SamplingEvent; first: boolean }) {
+function EventRow({ ev, first, n }: { ev: SamplingEvent; first: boolean; n?: number }) {
   const { t: tr } = useTranslation();
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: "96px minmax(140px, 200px) 1fr",
+      display: "grid", gridTemplateColumns: "96px minmax(140px, 200px) 1fr 136px",
       gap: 12, padding: "10px 12px",
       borderTop: first ? "none" : `1px solid ${t.borderSoft}`,
     }}>
@@ -135,7 +145,50 @@ function EventRow({ ev, first }: { ev: SamplingEvent; first: boolean }) {
           </span>
         </div>
       </div>
+
+      {/* 標本紀錄 — a query, not a link in the data */}
+      <Specimens ev={ev} n={n} />
     </div>
+  );
+}
+
+// Explore, pre-filtered to the event's resolved collectors within its years.
+// This is a *search* over the store built from two things the chronology does
+// state — who collected and when — not an association: no row of `occurrence`
+// is tied to a sampling event, and the tooltip says so. Actors that never
+// resolved to a collector are simply absent from the query.
+//
+// `n` is the same query counted server-side. Until it arrives the cell is
+// blank, and a zero stays a plain "—" rather than a link into an empty result.
+function Specimens({ ev, n }: { ev: SamplingEvent; n?: number }) {
+  const { t: tr } = useTranslation();
+  const resolved = ev.actors.filter((a) => a.collector_id != null);
+  const none = (title: string) => (
+    <div style={{ fontSize: 11, color: t.fgSubtle }} title={title}>—</div>
+  );
+  if (resolved.length === 0) return none(tr("hist.specimensNone"));
+  if (n == null) return <div />;
+  if (n === 0) return none(tr("hist.specimensZero"));
+
+  const who = resolved.map((a) => a.collector_label || a.recorded_by).join("、");
+  return (
+    <Link
+      to="/explore"
+      state={{
+        collectors: resolved.map((a) => ({
+          id: a.collector_id as number,
+          label: a.collector_label || a.recorded_by,
+        })),
+        years: { from: ev.year_start, to: ev.year_end },
+        // The count is unfiltered by media, so the landing page must be too —
+        // Explore otherwise defaults to records that carry an image.
+        flags: { has_media: false },
+      }}
+      title={tr("hist.specimensHint", { who, from: ev.year_start, to: ev.year_end })}
+      style={{ fontSize: 11, color: t.accent, textDecoration: "none", whiteSpace: "nowrap" }}
+    >
+      {tr("hist.specimens", { n })} →
+    </Link>
   );
 }
 

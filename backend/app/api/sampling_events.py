@@ -2,20 +2,29 @@
 
 The *upper* trip layer: documented collecting events transcribed from published
 literature, as opposed to the trips `api/collectors.py` derives by sessionizing a
-collector's occurrence dates. Pure SQLite -- there is no DuckDB join here,
-because the chronology asserts no link to any occurrence row (see the change's
-proposal -- Non-Goals). Any pairing a page shows rests on collector identity plus
-date overlap, and is presented as context, never as provenance.
+collector's occurrence dates. The chronology asserts no link to any occurrence
+row (see the change's proposal -- Non-Goals): nothing here is stored against a
+specimen, and the two endpoints that serve the events themselves read SQLite
+only. Any pairing a page shows rests on collector identity plus date overlap,
+and is presented as context, never as provenance.
+
+The one exception is `/sampling-events/counts`, which *queries* DuckDB for how
+many records each event's collectors hold within its years -- see its docstring
+for why a live count is still not an association.
 """
 
 from __future__ import annotations
+
+import asyncio
+import time
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
+from .. import duck
 from ..db import SessionLocal
-from ..models import Collector, SamplingEvent, SamplingEventActor
+from ..models import Collector, CollectorAlias, SamplingEvent, SamplingEventActor
 
 router = APIRouter(prefix="/api", tags=["sampling-events"])
 
@@ -113,6 +122,116 @@ def list_sampling_events(
         events = list(db.execute(stmt).scalars().unique())
         labels = _labels(db, events)
         return [_serialize(ev, labels) for ev in events]
+
+
+# ── specimen counts ─────────────────────────────────────────────────────────
+#
+# How many occurrence rows each event's collectors hold within its years. This
+# is a *query* over two things the source does state -- who collected, and when
+# -- run so the UI can label its link and drop it when the answer is zero. It
+# still associates nothing: no row is written, an occurrence in the count may
+# well have come from other fieldwork the same person did those years, and the
+# page says so. Keep it out of the export path.
+
+_COUNTS: dict | None = None       # {"key": pairs signature, "at": monotonic, "counts": {...}}
+_COUNTS_TTL = 600.0
+_counts_lock = asyncio.Lock()
+
+
+def _event_collector_years() -> list[tuple[int, int, int, int]]:
+    """(event_id, collector_id, year_start, year_end) for every resolved actor.
+
+    Deduplicated: an event that names the same collector twice must not count
+    its records twice.
+    """
+    with SessionLocal() as db:
+        rows = db.execute(
+            select(
+                SamplingEventActor.event_id,
+                SamplingEventActor.collector_id,
+                SamplingEvent.year_start,
+                SamplingEvent.year_end,
+            )
+            .join(SamplingEvent, SamplingEvent.id == SamplingEventActor.event_id)
+            .where(SamplingEventActor.collector_id.is_not(None))
+        ).all()
+    return sorted({(int(e), int(c), int(y0), int(y1)) for e, c, y0, y1 in rows})
+
+
+async def _count_by_event(pairs: list[tuple[int, int, int, int]]) -> dict[int, int]:
+    """One scan: every event's records in a single grouped join."""
+    if not pairs:
+        return {}
+
+    values = ", ".join(["(?, ?, ?, ?)"] * len(pairs))
+    params: list = [v for pair in pairs for v in pair]
+
+    if duck.annotations_attached():
+        rows = await duck.query(
+            f"""WITH ev(event_id, collector_id, y0, y1) AS (VALUES {values})
+                SELECT ev.event_id AS event_id, count(*) AS n
+                FROM occurrence o
+                JOIN ann.collector_alias a ON a.recorded_by = o.recorded_by
+                JOIN ev ON ev.collector_id = a.collector_id
+                       AND o.year BETWEEN ev.y0 AND ev.y1
+                GROUP BY ev.event_id""",
+            params,
+        )
+        return {int(r["event_id"]): int(r["n"]) for r in rows}
+
+    # No ATTACH: bring the alias map over from SQLite and join on the raw string,
+    # exactly as `search._collector_clause` and `collectors._occurrence_rollup` do.
+    with SessionLocal() as db:
+        aliases = db.execute(
+            select(CollectorAlias.collector_id, CollectorAlias.recorded_by).where(
+                CollectorAlias.collector_id.in_({c for _, c, _, _ in pairs})
+            )
+        ).all()
+    if not aliases:
+        return {}
+    alias_values = ", ".join(["(?, ?)"] * len(aliases))
+    alias_params: list = [v for cid, name in aliases for v in (int(cid), name)]
+    rows = await duck.query(
+        f"""WITH ev(event_id, collector_id, y0, y1) AS (VALUES {values}),
+                 al(collector_id, recorded_by) AS (VALUES {alias_values})
+            SELECT ev.event_id AS event_id, count(*) AS n
+            FROM occurrence o
+            JOIN al ON al.recorded_by = o.recorded_by
+            JOIN ev ON ev.collector_id = al.collector_id
+                   AND o.year BETWEEN ev.y0 AND ev.y1
+            GROUP BY ev.event_id""",
+        params + alias_params,
+    )
+    return {int(r["event_id"]): int(r["n"]) for r in rows}
+
+
+@router.get("/sampling-events/counts")
+async def sampling_event_counts() -> dict[str, int]:
+    """Records held by each event's collectors within its years, keyed by event id.
+
+    Every event is present, zeros included, so a caller can tell "none" apart
+    from "not loaded yet". Cached on the actor/year signature, so a re-seed after
+    a transcription fix is reflected at once while repeat page loads are free.
+    """
+    global _COUNTS
+    pairs = _event_collector_years()
+    key = tuple(pairs)
+
+    async with _counts_lock:
+        cached = _COUNTS
+        if (
+            cached is not None
+            and cached["key"] == key
+            and time.monotonic() - cached["at"] < _COUNTS_TTL
+        ):
+            counts = cached["counts"]
+        else:
+            counts = await _count_by_event(pairs)
+            _COUNTS = {"key": key, "at": time.monotonic(), "counts": counts}
+
+    with SessionLocal() as db:
+        ids = db.execute(select(SamplingEvent.id)).scalars().all()
+    return {str(i): counts.get(i, 0) for i in ids}
 
 
 @router.get("/sampling-events/{event_id}")

@@ -20,27 +20,17 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import unicodedata
 from pathlib import Path
 
 from sqlalchemy import delete, select
 
 from .db import SessionLocal, init_db
-from .models import Collector, CollectorAlias, SamplingEvent, SamplingEventActor
+from .models import SamplingEvent, SamplingEventActor
+from .names import collector_index as _resolver
+from .names import fold as _norm
 
 # repo root: backend/app/seed_sampling_events.py -> backend/app -> backend -> repo
 DEFAULT_JSON = Path(__file__).resolve().parents[2] / "data" / "sampling_events.json"
-
-
-def _norm(name: str) -> str:
-    """Fold a name for comparison: NFKC, case, and all spacing/punctuation.
-
-    Deliberately conservative -- it closes 'R. Fortune' vs 'R.Fortune' and no
-    more. Anything fuzzier risks tying a historical figure to an unrelated modern
-    collector, which is worse than leaving the actor unresolved.
-    """
-    s = unicodedata.normalize("NFKC", name).casefold()
-    return re.sub(r"[\s.,;:'\-()\[\]]+", "", s)
 
 
 def parse_years(verbatim: str) -> tuple[int, int] | None:
@@ -116,25 +106,6 @@ def _validate(events: list[dict]) -> None:
         for a in actors:
             if not str(a.get("recorded_by", "")).strip():
                 raise SeedError(f"{where}: an actor has no recorded_by")
-
-
-def _resolver(db) -> dict[str, int]:
-    """Normalized name -> collector id, from aliases and canonical names.
-
-    Canonical names are indexed last so they win a collision with a raw alias
-    string, which may carry a whole party ('A, B') rather than one person.
-    """
-    idx: dict[str, int] = {}
-    for raw, cid in db.execute(
-        select(CollectorAlias.recorded_by, CollectorAlias.collector_id)
-    ).all():
-        idx.setdefault(_norm(raw), cid)
-    for c in db.execute(select(Collector)).scalars():
-        for n in (c.name, c.name_en):
-            if n:
-                idx[_norm(n)] = c.id
-    idx.pop("", None)
-    return idx
 
 
 def populate(json_path: Path | str | None = None, dry_run: bool = False) -> dict:

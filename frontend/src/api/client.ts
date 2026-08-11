@@ -38,7 +38,7 @@ export class ApiError extends Error {
 export function filtersToParams(f: Filters): URLSearchParams {
   const p = new URLSearchParams();
   if (f.q) p.set("q", f.q);
-  for (const key of ["bio_group", "kingdom_c", "county", "taxon_rank",
+  for (const key of ["bio_group", "kingdom_c", "county", "taxon_rank", "scientific_name",
     "basis_of_record", "type_status", "dataset_name", "tbia_dataset_id"] as const) {
     for (const v of f[key]) p.append(key, v);
   }
@@ -86,6 +86,14 @@ export const api = {
     return request<import("./types").SamplingEvent[]>(`/sampling-events${s ? `?${s}` : ""}`);
   },
 
+  // Records each event's collectors hold within its years, keyed by event id
+  // (as a string — it comes off JSON). A count, not an association.
+  samplingEventCounts: () =>
+    request<Record<string, number>>("/sampling-events/counts"),
+
+  stories: () => request<import("./types").StoryIndexEntry[]>("/stories"),
+  story: (key: string) => request<import("./types").Story>(`/stories/${key}`),
+
   volunteers: (range: import("./types").VolunteerRange = "all", limit = 20) =>
     request<{ range: string; items: import("./types").Volunteer[] }>(
       `/volunteers?range=${range}&limit=${limit}`),
@@ -109,6 +117,23 @@ export const api = {
   detail: (id: string) => request<import("./types").OccurrenceDetail>(`/occurrences/${id}`),
   datasets: (limit = 200) => request<import("./types").Dataset[]>(`/datasets?limit=${limit}`),
   registry: () => request<import("./types").Registry>(`/registry`),
+
+  // The taxonomic index — one row per distinct scientific_name in the store.
+  species: (opts: {
+    q?: string; scope?: import("./types").SpeciesScope;
+    sort?: import("./types").SpeciesSort; order?: "asc" | "desc";
+    limit?: number; offset?: number;
+  } = {}) => {
+    const p = new URLSearchParams({
+      scope: opts.scope ?? "species",
+      sort: opts.sort ?? "records",
+      order: opts.order ?? "desc",
+      limit: String(opts.limit ?? 50),
+      offset: String(opts.offset ?? 0),
+    });
+    if (opts.q) p.set("q", opts.q);
+    return request<import("./types").SpeciesList>(`/species?${p}`);
+  },
 
   collectors: (q = "", limit = 25) => {
     const p = new URLSearchParams({ limit: String(limit) });

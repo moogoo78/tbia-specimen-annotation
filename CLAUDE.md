@@ -14,7 +14,7 @@ transcription, and reviewed enrichments are exported back to data providers.
 Occurrence data is **read-only**; enrichment lives only as annotations. Hence two stores:
 
 - **DuckDB** (`data/tbia.duckdb`) — built from a downloaded TBIA export by
-  `backend/ingest/` (see *Data refresh*): table `occurrence` (~1.89M rows, 942 datasets)
+  `backend/ingest/` (see *Data refresh*): table `occurrence` (~2.08M rows, 945 datasets)
   + table `dataset` (one row per `tbia_dataset_id`). Read-only at serve time; columnar →
   fast facets/completeness aggregation; queries run in a threadpool (`app/duck.py`).
   `build.py` loads the export's own columns; `make prepare` adds the derived ones.
@@ -102,7 +102,9 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.jso
   returned as `trips` on `GET /api/collectors/{id}/career`.
 - **Sampling events** — a *curated chronology* of documented collecting expeditions,
   transcribed from published literature. Top-down, cited, returned as `reference_events`
-  on the same endpoint and browsable at `GET /api/sampling-events` + `/history`.
+  on the same endpoint and browsable at `GET /api/sampling-events` + `/history`, which is
+  the first topic of `/story` (`pages/Story.tsx` — its `STORY_TOPICS` array is both the
+  index and what the navbar tab highlights on).
 
 The source is 附錄一：台灣植物調查研究史年表 (許建昌, 1975; 黃增泉, 1983, 1986) — 37 entries,
 1854–1988, transcribed from the scans in `tmp/sampling-event/` into
@@ -129,9 +131,77 @@ event, and nothing should: an event overlapping a derived trip is context for th
 a claim that any specimen came from that expedition. Adding such a link would manufacture
 provenance the source does not support and would flow into provider exports as curated fact.
 
+`GET /api/sampling-events/counts` is the one place the chronology touches DuckDB: per event,
+how many records its *resolved* actors hold within its years — one grouped join, cached on the
+actor/year signature so a re-seed invalidates it. `/history` shows that number as the specimen
+column and links it into Explore (collectors + `year_from/year_to`, `has_media` cleared so the
+result matches the count); zero renders as an em dash rather than a link into nothing. It
+stores nothing and associates nothing — a counted record may well come from other fieldwork
+the same person did those years — so keep it out of the export path.
+
 Enrichment-side data, like collectors and annotations — a `make build-db` rebuild of the
 DuckDB store never invalidates it. Re-run `make seed-sampling-events` after correcting a
 transcription; it replaces both tables, so it is idempotent.
+
+## The species index (`/species`)
+
+The taxonomic index: one row per distinct `scientific_name` in the store (44,874 of them;
+33,810 identified to species rank or below), searchable, sortable and paged, reached from
+its own navbar tab. `api/species.py` rolls the whole thing up in **one grouped scan (~2.2s,
+of which the modal descriptive columns are ~1.2s)**, caches it on a TTL behind a lock, and
+applies scope / search / sort / paging in memory — the `collector_board` pattern, for the
+same reason: DuckDB cannot page a grouped aggregate without first computing the whole
+grouping, so paging in SQL would pay the full scan per request. Nothing is persisted, so a
+`make build-db` rebuild cannot leave it stale and there is no seeding step.
+
+- **A name is not a taxon.** Names are listed exactly as the store holds them. Nothing is
+  reconciled against TaiCOL, WCVP or any other checklist: synonyms are not merged
+  (`Lycopersicon esculentum` stays its own row), spelling and gender variants stay separate
+  (`Trema orientalis` / `Trema orientale`), and a string used under two kingdoms is **one**
+  row — because the row's link filters on the name alone, so grouping any finer would print
+  a count no link could reproduce. `n_kingdoms > 1` flags those 21 names in the UI.
+- **The default scope filters on `has_identification`, not on a rank list of its own.** That
+  flag already means "rank species-or-below with a name" (`ingest/common.py`
+  `SPECIES_RANKS`), so the index and the completeness gap can never disagree about what
+  counts as identified. Widening to all ranks is what surfaces the 319,916 genus-level and
+  123,821 family-level identifications — the identification gap, seen taxonomically.
+- Descriptive columns (rank, family, genus, kingdom, common name) come from each name's
+  **most-numerous** group (`mode`), never an arbitrary `any_value`.
+
+`scientific_name` is an **exact, multi-valued filter** on the occurrence search
+(`search.py` `Filters` + `build_where`, so list/count/facet all get it) and is deliberately
+**not** in `FACET_COLUMNS` — 44,874 values is not a facet list, and the species page is the
+picker. A row links into Explore through router `state` (the `/history` mechanism) and must
+clear `has_media`, which `emptyFilters()` defaults to `true`; without that the landing page
+would report fewer records than the row it was opened from.
+
+## Curated stories (`/story`)
+
+`/story` is the narrative layer: `pages/Story.tsx` holds `STORY_TOPICS`, which is both the
+index and what the navbar tab highlights on. Two topics so far — the sampling-event
+chronology (`/history`, seeded into SQLite, above) and **彭鏡毅's Begonia expeditions**
+(`/story/begonia`).
+
+The Begonia story is a different mechanism from the chronology and deliberately lighter:
+`data/story_begonia.json` (hand-curated, tracked in git via the `!/data/story_begonia.json`
+un-ignore) is a transcription of a BRMAS digital curation — regions → trips (verbatim date,
+ISO range, `precision: day|month`, narrative, party, notes) plus the species described.
+**Nothing is seeded**; `api/stories.py` reads the file at request time, caches on its mtime,
+and answers it against the store:
+
+- `trips[].n_records` — the subject collector's records inside the trip's dates.
+- `species[].n_records` — records held under that binomial, store-wide.
+- `focus` — the subject's records in the story's genus, and how many stop at the bare genus
+  (886 of 1,468 for Peng: the identification gap, inside the story).
+- `trips[].party[].collector_id` — companions matched to collectors by `app/names.py`
+  (`fold` + `collector_index`, shared with the chronology seeder, which keeps them under
+  their old `_norm`/`_resolver` names). 12 of 18 resolve; the misses are the overseas hosts
+  and are kept verbatim, exactly as an unresolved chronology actor is.
+
+Correct a transcription and the next request serves it — no `make` step. The same rule as
+the chronology holds: **a count is not provenance.** Records are matched by collector and
+date window, so a specimen counted under a trip is one that person collected those days, not
+one the trip is claimed to have produced.
 
 ## Data refresh
 
@@ -155,7 +225,7 @@ mv data/tbia.new.duckdb data/tbia.duckdb                      # swap in
 - Downloaded exports live in `tmp/`; `find_zip()` looks there first, then the repo root.
 
 The 2026-08-05 export (`tbia_6a72e385d2fb88001772ccd4`): 2,113,068 rows / 1,018 datasets /
-66 columns in, **1,889,955 rows / 942 datasets** (17 curated + 925 GBIF) out.
+66 columns in, **2,079,798 rows / 945 datasets** (20 curated + 925 GBIF) out.
 
 ## registry.json
 
@@ -164,8 +234,8 @@ The 2026-08-05 export (`tbia_6a72e385d2fb88001772ccd4`): 2,113,068 rows / 1,018 
 `groups` vocabulary: `Aves, Amphibia, Reptilia, Mammalia, Actinopterygii, Mollusca,
 Arachnida, Insecta, Plantae, Fungi, Protozoa` (plus `Zoology`/`Other` used as broad tags).
 
-It is **hand-curated (tracked in git), holds only the 17 stable institution datasets**
-across 8 institutions, and **decides what gets ingested**: `build.py` keeps a row only if
+It is **hand-curated (tracked in git), holds only the 20 stable institution datasets**
+across 9 institutions, and **decides what gets ingested**: `build.py` keeps a row only if
 its `tbiaDatasetID` is listed here or its `rightsHolder` is `GBIF`. Deleting an entry
 deletes those records from the next store, so edit it from `make inspect`'s report rather
 than from memory. The GBIF
@@ -189,12 +259,15 @@ anything not listed there or held by GBIF), while `data/registry.json` gates whi
 exported records reach *our store*. The dependency is one-way — an institution dropped
 upstream never appears in the export, and no edit here brings it back.
 
-Reconciled against the 2026-08-05 list (8 institutions / 17 datasets): NMNS gained the
+Reconciled against the 2026-08-05 list (now 9 institutions / 20 datasets): NMNS gained the
 鳥獸學門 mammal + bird and 古生物學門 datasets, `NTU` (TAI) was added, 林業試驗所 is split
 back into `TAIF` (herbarium) and `TFRI` (insect museum) — same display name, two entries —
 NMNS dataset codes went Chinese→Latin (`維管束`→`TNM`, `昆蟲`→`ENT`, …), the 農業部 prefix
-was dropped from names, and `TBRI` (TESRI moth + the two TAIE sets, ~138k rows) is gone
-from the institution list, so those records drop out of the next export.
+was dropped from names. `TBRI` (TESRI moth + the two TAIE sets) is gone from the *upstream*
+list, but its three datasets are still in the export — held by 台灣生物多樣性網絡 TBN, not by
+TBRI — so only their absence here excluded them; they are curated back in and contribute
+189,843 rows. Upstream absence therefore does not by itself mean a source is unavailable:
+check the export before dropping an entry.
 
 The Explore **Source** facet is driven by that merged response; selecting a source
 expands to the union of its `tbia_dataset_id`s.
