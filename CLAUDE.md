@@ -328,6 +328,16 @@ consumers read it —
   client-side navigation — what Google's rendered pass reads, and what `analytics.ts`
   reports as `page_title` (before it, every GA pageview carried the same static title).
 
+**The OG cards in `public/og/` are committed PNGs, not a build product.**
+`scripts/og-image.mjs` renders one per page from the same `pages.json`, through headless
+Chromium — which production does not have and should not grow — so it is a dev-time tool
+you re-run and commit after changing a title or description. Exactly 1200×630, the size
+`prerender.mjs` declares, so the file and the declaration cannot disagree. `card.title`
+overrides the headline for titles that do not set at card size (the home page's full name
+wraps for one character); it does not touch the page's real `<title>`. An `og:image` must
+be absolute, so with `VITE_SITE_URL` unset the tags fall back to the text-only
+`summary` card rather than naming an image nobody can fetch.
+
 It is JSON rather than i18n keys because the prerender has to read it from Node with no
 TypeScript build; it stays bilingual all the same, prerender emitting `zh` to match
 `<html lang="zh-Hant">`.

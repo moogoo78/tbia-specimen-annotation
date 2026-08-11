@@ -23,6 +23,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { slugFor } from "./og-slug.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = resolve(here, "..", "dist");
@@ -59,6 +60,11 @@ function headFor(page, { canonical }) {
   const url = SITE ? SITE + (page.path === "/" ? "/" : page.path) : null;
   const type = page.path.startsWith("/story/") || page.path === "/history" ? "article" : "website";
 
+  // The card lives at an absolute URL or not at all — every unfurler rejects a
+  // relative og:image — so with no origin configured we fall back to the small
+  // text-only card rather than advertising an image nobody can fetch.
+  const image = SITE ? `${SITE}/og/${slugFor(page.path)}.png` : null;
+
   const tags = [
     `<meta name="description" content="${attr(desc)}" />`,
     `<meta property="og:type" content="${type}" />`,
@@ -66,10 +72,19 @@ function headFor(page, { canonical }) {
     `<meta property="og:locale" content="zh_TW" />`,
     `<meta property="og:title" content="${attr(title)}" />`,
     `<meta property="og:description" content="${attr(desc)}" />`,
-    `<meta name="twitter:card" content="summary" />`,
+    `<meta name="twitter:card" content="${image ? "summary_large_image" : "summary"}" />`,
     `<meta name="twitter:title" content="${attr(title)}" />`,
     `<meta name="twitter:description" content="${attr(desc)}" />`,
   ];
+  if (image) {
+    tags.push(
+      `<meta property="og:image" content="${attr(image)}" />`,
+      `<meta property="og:image:width" content="1200" />`,
+      `<meta property="og:image:height" content="630" />`,
+      `<meta property="og:image:alt" content="${attr(title)}" />`,
+      `<meta name="twitter:image" content="${attr(image)}" />`,
+    );
+  }
   // The root file is also the SPA fallback for every unlisted route (/record/:id,
   // /collectors/:id), so a canonical baked into it would claim those pages are
   // the home page. Emit it only on the per-route copies; useSeo.ts sets it

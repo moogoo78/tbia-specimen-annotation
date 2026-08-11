@@ -9,7 +9,10 @@
     "prerender emits `zh` to match <html lang=\"zh-Hant\">, the hook follows the active language.",
     "",
     "Only indexable routes belong here. /explore, /record/:id, /dashboard and /login are",
-    "excluded from crawling in public/robots.txt and get no entry."
+    "excluded from crawling in public/robots.txt and get no entry.",
+    "",
+    "Optional `card.title` overrides the headline on the OG image only (scripts/og-image.mjs),",
+    "for titles that are too long to set at card size. The page's real <title> is unaffected."
   ],
   "pages": [
     {
@@ -22,6 +25,7 @@
         "en": "A collaborative platform for enriching TBIA natural-history specimen records. Find occurrences missing identification, coordinates or dates, fill them by hand or with AI-assisted label transcription, and return reviewed enrichments to data providers.",
         "zh": "TBIA 自然史標本資料的協作標註平台。找出缺少鑑定、座標或日期的標本紀錄，以人工或 AI 輔助的標籤辨識補齊，並將審核後的補遺回饋給資料提供者。"
       },
+      "card": { "title": "填補標本後設資料的缺口" },
       "schema": {
         "@type": "Dataset",
         "name": "TBIA 自然史標本探索與標註平台",
