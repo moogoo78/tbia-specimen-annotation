@@ -1,0 +1,32 @@
+# Crawl policy. See CLAUDE.md "Serving public traffic".
+#
+# The occurrence records are NOT indexable here on purpose: TBIA's own portal and
+# GBIF are canonical for them, so /record/ pages would be a thin duplicate of
+# upstream — and crawling 2M of them is precisely the load this origin cannot
+# absorb (NDB_DUCK_MAX_CONCURRENCY is 2 in production; over the cap a request
+# queues, then gets a 503). /explore is excluded for the same reason: its filter
+# permutations are unbounded, so every crawl of one is a cache miss into DuckDB.
+#
+# What is left allowed is the narrative layer, which is the part that is ours:
+# /, /history, /story, /species, /collectors, /institutions, /contributors, /guide.
+#
+# `Sitemap:` requires an absolute URL, so scripts/prerender.mjs appends it at
+# build time from VITE_SITE_URL. Unset -> no Sitemap line, rather than a wrong one.
+
+User-agent: *
+Disallow: /api/
+Disallow: /record/
+Disallow: /explore
+Disallow: /dashboard
+Disallow: /login
+Disallow: /auth/
+Crawl-delay: 10
+
+# The one remaining exposure, left allowed on purpose: /collectors/<id> is ~17k
+# URLs, and each one runs the trip sessionisation in api/collectors.py. That is
+# the /record/ problem at 1/100th the scale — real content worth finding, but
+# still a crawl this origin would feel. Google ignores Crawl-delay, so if the
+# access log shows it biting, set the crawl rate in Search Console or uncomment
+# the line below (which blocks the profiles without blocking the /collectors
+# index page, since it has no trailing slash).
+# Disallow: /collectors/

@@ -42,6 +42,11 @@ services:
         # Baked into the JS bundle at build time — re-run `up -d --build` after
         # changing it. Unset -> no analytics.
         VITE_GA_MEASUREMENT_ID: ${VITE_GA_MEASUREMENT_ID:-}
+        # Deployed origin (https://your-domain.org) for canonical / og:url /
+        # sitemap.xml. Unset -> the prerender emits none of those, which is the
+        # safe default; a canonical pointing at the wrong origin is worse than
+        # no canonical. Usually the same value as SITE_ADDRESS below.
+        VITE_SITE_URL: ${VITE_SITE_URL:-}
     restart: always
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}

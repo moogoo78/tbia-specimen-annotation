@@ -258,8 +258,9 @@ in the JWT is not what's enforced), so the user only needs to reload the page.
 
 The read API is open — no sign-in, no rate limit — and a facet or species
 rollup is a grouped scan over ~2M rows. One search-engine crawler working
-through the site is enough to keep several of those running at once, so two
-things stand between an audience and a flat box.
+through the site is enough to keep several of those running at once, so three
+things stand between an audience and a flat box: what may be cached, how much
+may run at once, and what may be crawled at all.
 
 **Responses now say how long they may be cached.** Every read on the allowlist
 in `backend/app/cache.py` carries `Cache-Control: public, s-maxage=3600` (60s
@@ -300,6 +301,47 @@ and any single scan running past `NDB_DUCK_QUERY_TIMEOUT` (30s) is interrupted
 with **504**. Both are deliberate: a crawler reads `Retry-After` and backs off,
 where an unbounded queue turns a spike into an outage. Seeing 503s in the logs
 means the cap is working — raise it only if the box has headroom.
+
+**And the crawl is bounded before it starts.** `frontend/public/robots.txt`
+excludes the two paths that would generate unbounded cache misses:
+`/record/` (2.08M URLs) and `/explore` (unbounded filter permutations). Neither
+is worth indexing anyway — TBIA's own portal and GBIF are canonical for the
+occurrence records, so ours would be a thin duplicate of upstream. What is left
+crawlable is the narrative layer, which is the part that is ours: `/`,
+`/history`, `/story`, `/species`, `/collectors`, `/institutions`,
+`/contributors`, `/guide`. Read the file before changing it — the reasoning per
+line is in it, including the commented `Disallow: /collectors/` to flip if the
+17k collector profiles turn out to bite.
+
+## 8. Site metadata (titles, link previews, sitemap)
+
+`npm run build` runs `frontend/scripts/prerender.mjs`, which copies the built
+`index.html` once per indexable route (listed in `frontend/src/seo/pages.json`)
+with `<title>`, description, OG/Twitter tags and — on `/` , `/history` and
+`/story/begonia` — schema.org JSON-LD baked into the HTML. This exists because
+**link unfurlers do not execute JavaScript**: a title set from React fixes what
+Google eventually renders, but a `/story/begonia` link pasted into Slack, LINE
+or Twitter can only unfurl from tags already present in the served response.
+
+Set **`VITE_SITE_URL`** to the deployed origin (see `.env.example`). It is a
+*build* arg like `VITE_GA_MEASUREMENT_ID`, so changing it needs
+`up -d --build web`. Unset is safe but degraded: titles, descriptions and OG
+tags still ship, while canonical, `og:url` and `sitemap.xml` are skipped rather
+than pointed at a guessed origin.
+
+Caddy serves the per-route copies through `try_files {path} {path}/index.html
+/index.html` — anything unlisted (a record, a collector) still falls through to
+the SPA shell. Verify after a deploy, with no JavaScript involved:
+
+```bash
+curl -s https://your-domain.org/robots.txt | tail -3      # ends with the Sitemap line
+curl -s https://your-domain.org/sitemap.xml | grep -c '<loc>'   # 9
+curl -s https://your-domain.org/story/begonia | grep -iE 'og:title|canonical'
+curl -s https://your-domain.org/record/abc | grep -o '<title>[^<]*</title>'  # SPA shell
+```
+
+Then in Google Search Console: submit the sitemap, and URL-inspect a `/record/`
+path to confirm it reports as blocked by robots.txt.
 
 ## Operations
 

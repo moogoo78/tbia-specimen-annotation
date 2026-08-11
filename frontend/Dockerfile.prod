@@ -11,6 +11,11 @@ COPY . .
 # arg (not a runtime env var). Empty -> analytics compiles out to a no-op.
 ARG VITE_GA_MEASUREMENT_ID=""
 ENV VITE_GA_MEASUREMENT_ID=$VITE_GA_MEASUREMENT_ID
+# Deployed origin, e.g. https://example.org. Build-time for the same reason:
+# scripts/prerender.mjs (run by `npm run build`) needs it for canonical, og:url
+# and sitemap.xml. Empty -> those are skipped, never guessed.
+ARG VITE_SITE_URL=""
+ENV VITE_SITE_URL=$VITE_SITE_URL
 RUN npm run build
 
 FROM caddy:2-alpine

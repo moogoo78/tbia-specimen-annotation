@@ -296,8 +296,48 @@ change the policy there, not at the endpoints.
   → 504. Both are plain `RuntimeError`s so `worker.py` and `import_results.py` see normal
   errors; `main.py` maps them to responses.
 
+- **`frontend/public/robots.txt`** bounds the crawl before it starts, which the two
+  mechanisms above cannot: a crawler's whole job is requesting URLs nobody has requested
+  yet, so it is structurally a cache-miss generator. `/record/` (2.08M URLs) and
+  `/explore` (unbounded filter permutations) are disallowed. That costs nothing worth
+  having — TBIA's own portal and GBIF are canonical for the occurrence records, so ours
+  would be a thin duplicate of upstream. The narrative layer stays crawlable, and it is
+  the only part that is uniquely ours.
+
 A CDN in front does nothing for `/api/*` until it is told to honour these headers, and
 after an ETL refresh or a re-seed the edge must be purged — see DEPLOY.md step 7.
+
+## Page metadata (`src/seo/`)
+
+The app is client-rendered, so the served HTML is one shell for all 17 routes. **Link
+unfurlers (Slack, LINE, Twitter, Facebook) never run JavaScript**, so a title set from
+React is invisible to them — which is the whole reason there is a build step here rather
+than just a hook.
+
+`src/seo/pages.json` is the single source: one entry per indexable route, `title` and
+`description` in both languages, plus optional schema.org `schema` for JSON-LD. Two
+consumers read it —
+
+- **`scripts/prerender.mjs`** (run by `npm run build`) copies `dist/index.html` to
+  `dist/<path>/index.html` with the head filled in, and writes `sitemap.xml` +
+  robots.txt's absolute `Sitemap:` line. Injected tags are fenced in `<!-- seo:start -->`
+  so a re-run replaces them rather than stacking a second copy. Caddy reaches the copies
+  via `try_files {path} {path}/index.html /index.html`; unlisted routes still fall
+  through to the SPA shell.
+- **`src/seo/useSeo.ts`**, called once in `App.tsx`, keeps the title right after
+  client-side navigation — what Google's rendered pass reads, and what `analytics.ts`
+  reports as `page_title` (before it, every GA pageview carried the same static title).
+
+It is JSON rather than i18n keys because the prerender has to read it from Node with no
+TypeScript build; it stays bilingual all the same, prerender emitting `zh` to match
+`<html lang="zh-Hant">`.
+
+**`VITE_SITE_URL` is a build arg**, like `VITE_GA_MEASUREMENT_ID` — Vite inlines it, and
+the prerender needs an absolute origin. Unset degrades deliberately: titles and OG tags
+still ship, canonical/`og:url`/`sitemap.xml` are skipped rather than guessed at a wrong
+origin. **The root `dist/index.html` gets no canonical** for the same reason: it is also
+the fallback for every unlisted route, so a canonical there would claim `/record/x` is
+the home page. `useSeo` sets the real one client-side.
 
 ## Gotchas
 
