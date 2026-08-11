@@ -143,6 +143,38 @@ Enrichment-side data, like collectors and annotations — a `make build-db` rebu
 DuckDB store never invalidates it. Re-run `make seed-sampling-events` after correcting a
 transcription; it replaces both tables, so it is idempotent.
 
+## The species index (`/species`)
+
+The taxonomic index: one row per distinct `scientific_name` in the store (44,874 of them;
+33,810 identified to species rank or below), searchable, sortable and paged, reached from
+its own navbar tab. `api/species.py` rolls the whole thing up in **one grouped scan (~2.2s,
+of which the modal descriptive columns are ~1.2s)**, caches it on a TTL behind a lock, and
+applies scope / search / sort / paging in memory — the `collector_board` pattern, for the
+same reason: DuckDB cannot page a grouped aggregate without first computing the whole
+grouping, so paging in SQL would pay the full scan per request. Nothing is persisted, so a
+`make build-db` rebuild cannot leave it stale and there is no seeding step.
+
+- **A name is not a taxon.** Names are listed exactly as the store holds them. Nothing is
+  reconciled against TaiCOL, WCVP or any other checklist: synonyms are not merged
+  (`Lycopersicon esculentum` stays its own row), spelling and gender variants stay separate
+  (`Trema orientalis` / `Trema orientale`), and a string used under two kingdoms is **one**
+  row — because the row's link filters on the name alone, so grouping any finer would print
+  a count no link could reproduce. `n_kingdoms > 1` flags those 21 names in the UI.
+- **The default scope filters on `has_identification`, not on a rank list of its own.** That
+  flag already means "rank species-or-below with a name" (`ingest/common.py`
+  `SPECIES_RANKS`), so the index and the completeness gap can never disagree about what
+  counts as identified. Widening to all ranks is what surfaces the 319,916 genus-level and
+  123,821 family-level identifications — the identification gap, seen taxonomically.
+- Descriptive columns (rank, family, genus, kingdom, common name) come from each name's
+  **most-numerous** group (`mode`), never an arbitrary `any_value`.
+
+`scientific_name` is an **exact, multi-valued filter** on the occurrence search
+(`search.py` `Filters` + `build_where`, so list/count/facet all get it) and is deliberately
+**not** in `FACET_COLUMNS` — 44,874 values is not a facet list, and the species page is the
+picker. A row links into Explore through router `state` (the `/history` mechanism) and must
+clear `has_media`, which `emptyFilters()` defaults to `true`; without that the landing page
+would report fewer records than the row it was opened from.
+
 ## Curated stories (`/story`)
 
 `/story` is the narrative layer: `pages/Story.tsx` holds `STORY_TOPICS`, which is both the

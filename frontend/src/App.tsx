@@ -5,6 +5,7 @@ import { AppHeader } from "./components/AppHeader";
 import { CookieConsent } from "./components/CookieConsent";
 import { Home } from "./pages/Home";
 import { Explore } from "./pages/Explore";
+import { Species } from "./pages/Species";
 import { Institutions } from "./pages/Institutions";
 import { Volunteers } from "./pages/Volunteers";
 import { Collector } from "./pages/Collector";
@@ -27,6 +28,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/explore" element={<Explore />} />
+        <Route path="/species" element={<Species />} />
         <Route path="/institutions" element={<Institutions />} />
         <Route path="/contributors" element={<Volunteers />} />
         {/* The board was /volunteers (志工) until the rename; keep old links working. */}

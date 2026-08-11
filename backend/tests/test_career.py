@@ -148,12 +148,13 @@ def test_career_gap_param_is_bounded(client, lu_id):
 
 
 def test_date_range_filters_occurrences(client):
-    """r1 2004-09-16, r3 2019-08-14, r4 2021-06-03; r2/r5 undated."""
+    """r1 2004-09-16, r3 2019-08-14, r6 2018-05-02, r7 2020-07-01,
+    r4 2021-06-03; r2/r5 undated."""
     def ids(**params):
         return {r["id"] for r in client.get("/api/occurrences", params=params).json()["items"]}
 
-    assert ids(date_from="2019-01-01") == {"r3", "r4"}
-    assert ids(date_to="2019-12-31") == {"r1", "r3"}
+    assert ids(date_from="2019-01-01") == {"r3", "r4", "r7"}
+    assert ids(date_to="2019-12-31") == {"r1", "r3", "r6"}
     assert ids(date_from="2019-01-01", date_to="2019-12-31") == {"r3"}
     # inclusive on both ends
     assert ids(date_from="2004-09-16", date_to="2004-09-16") == {"r1"}

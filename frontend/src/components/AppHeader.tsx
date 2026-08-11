@@ -54,6 +54,7 @@ export function AppHeader() {
       <div style={{ display: "flex", alignItems: "stretch" }}>
         {tab("/", tr("nav.home"))}
         {tab("/explore", tr("nav.explore"))}
+        {tab("/species", tr("nav.species"))}
         {tab("/institutions", tr("nav.institutions"))}
         {tab("/collectors", tr("nav.collectors"))}
         {/* The chronology is a topic of the story, so /history lights this tab. */}

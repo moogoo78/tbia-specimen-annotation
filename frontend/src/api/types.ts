@@ -298,6 +298,38 @@ export interface CollectorBoard {
   totals: { collectors: number; records: number; mapped: number };  // unfiltered
 }
 
+// The taxonomic index. A row is a *name as the store holds it*, not a resolved
+// taxon: synonyms are not merged, spelling variants stay separate, and a name
+// used under two kingdoms is one row (n_kingdoms > 1) covering every record
+// carrying the string.
+export interface SpeciesRow {
+  name: string;
+  n_records: number;
+  n_identified: number;   // records flagged has_identification (rank species-or-below)
+  taxon_rank: string;
+  family: string | null;
+  genus: string | null;
+  kingdom_c: string | null;
+  common_name_c: string;
+  n_counties: number;
+  n_kingdoms: number;
+  year_min: number | null;
+  year_max: number | null;
+  n_geo: number;
+  n_media: number;
+  n_type: number;
+}
+export type SpeciesScope = "species" | "all";
+export type SpeciesSort = "records" | "name";
+export interface SpeciesList {
+  total: number;      // names matching the current scope + search
+  items: SpeciesRow[];
+  limit: number;
+  offset: number;
+  scope: SpeciesScope;
+  totals: { names: number; records: number };  // the whole index
+}
+
 export interface RegistryDataset { code?: string; name: string; groups: string[]; gbif?: string; }
 export interface RegistryEntry { name: string; datasets: Record<string, RegistryDataset>; }
 export interface Registry {
@@ -312,6 +344,7 @@ export interface Filters {
   kingdom_c: string[];
   county: string[];
   taxon_rank: string[];
+  scientific_name: string[];   // exact match — the species index's link into Explore
   basis_of_record: string[];
   type_status: string[];
   dataset_name: string[];
@@ -332,7 +365,7 @@ export interface Filters {
 }
 
 export const emptyFilters = (): Filters => ({
-  bio_group: [], kingdom_c: [], county: [], taxon_rank: [],
+  bio_group: [], kingdom_c: [], county: [], taxon_rank: [], scientific_name: [],
   basis_of_record: [], type_status: [], dataset_name: [], tbia_dataset_id: [],
   collector_id: [],
   missing_coordinates: false, missing_date: false,

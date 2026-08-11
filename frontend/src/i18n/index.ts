@@ -3,7 +3,7 @@ import { initReactI18next } from "react-i18next";
 
 const en = {
   app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
-  nav: { home: "Home", explore: "Explore", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  nav: { home: "Home", explore: "Explore", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
   story: {
     title: "Data stories",
     blurb: "Topics that read the collection as a narrative rather than a result set: who went where, when, and what of it can still be found in the store today. Each topic works from a published source and queries the specimen data live.",
@@ -62,6 +62,20 @@ const en = {
     optInHint: "Off by default. When off you appear as \"Unnamed contributor #<id>\"; your contribution counts are shown either way.",
     empty: "No contributions yet.",
     homeTitle: "Top contributors", viewAll: "View the full ranking",
+  },
+  sp: {
+    title: "Species",
+    blurb: "{{names}} distinct scientific names across {{records}} identified records.",
+    disclaimer: "Names are listed as the store holds them. Nothing here is reconciled against TaiCOL, WCVP or any other checklist: synonyms are not merged, spelling and gender variants stay separate rows, and a name used under more than one kingdom is a single row covering every record carrying it.",
+    searchPlaceholder: "Search a scientific or common name…",
+    sort_records: "Most records", sort_name: "Name",
+    allRanks: "All ranks",
+    name: "Scientific name", rank: "Rank", family: "Family", records: "Records", years: "Years",
+    openHint: "Open the {{n}} records identified as {{name}}",
+    homonym: "2 kingdoms",
+    homonymHint: "This name is used under more than one kingdom. The row counts every record carrying the string — it does not claim they are one taxon.",
+    prev: "Previous", next: "Next",
+    empty: "No names match.",
   },
   coll: {
     title: "Collectors",
@@ -332,7 +346,7 @@ const en = {
 
 const zh: typeof en = {
   app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
-  nav: { home: "首頁", explore: "探索", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
+  nav: { home: "首頁", explore: "探索", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
   story: {
     title: "資料說故事",
     blurb: "以敘事的方式閱讀典藏，而不只是查詢結果：誰在何時去了哪裡，以及今天在資料庫裡還找得到什麼。每則故事都以已出版的文獻為本，並即時查詢標本資料。",
@@ -391,6 +405,20 @@ const zh: typeof en = {
     optInHint: "預設為關閉。關閉時顯示為「未具名貢獻者 #<id>」；無論是否開啟，貢獻數字都會列出。",
     empty: "尚無貢獻紀錄。",
     homeTitle: "貢獻者排行", viewAll: "查看完整排行",
+  },
+  sp: {
+    title: "物種",
+    blurb: "共 {{names}} 個學名、{{records}} 筆有鑑定的紀錄。",
+    disclaimer: "此處的學名照資料庫原樣列出，未與 TaiCOL、WCVP 或任何名錄比對：不合併同物異名，拼寫與字尾變體各自成列；同一字串若橫跨不同界，仍為一列並涵蓋所有使用該字串的紀錄。",
+    searchPlaceholder: "搜尋學名或中文名……",
+    sort_records: "紀錄最多", sort_name: "學名",
+    allRanks: "所有階層",
+    name: "學名", rank: "階層", family: "科", records: "紀錄數", years: "年代",
+    openHint: "檢視鑑定為 {{name}} 的 {{n}} 筆紀錄",
+    homonym: "跨界同名",
+    homonymHint: "此學名在一個以上的界中使用。本列統計所有使用該字串的紀錄，並不主張它們屬於同一分類群。",
+    prev: "上一頁", next: "下一頁",
+    empty: "沒有符合的學名。",
   },
   coll: {
     title: "採集者",

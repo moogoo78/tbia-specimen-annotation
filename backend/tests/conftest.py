@@ -24,6 +24,11 @@ ROWS = [
     ("r3", "C-003", "Helianthus annuus", "species", "維管束植物", "南投縣", "Forest", 23.9, 120.9, "2019-08-14", "DS-B", ""),
     ("r4", "C-004", "Rosa canina", "species", "維管束植物", None, None, None, None, "2021-06-03", "DS-B", "http://x/img4.jpg"),
     ("r5", "C-005", None, "genus", "昆蟲", "屏東縣", "Kenting", 22.0, 120.8, None, "DS-A", ""),
+    # r6/r7 exist for the species index: r6 is a *named* genus-rank row (r2 and
+    # r5 are coarse but unnamed, so neither reaches the index), and r7 repeats
+    # r3's name so one index row has to cover two records.
+    ("r6", "C-006", "Begonia", "genus", "維管束植物", "南投縣", "Forest", 23.8, 120.8, "2018-05-02", "DS-B", ""),
+    ("r7", "C-007", "Helianthus annuus", "species", "維管束植物", "台中市", "Farm", 24.1, 120.7, "2020-07-01", "DS-B", ""),
 ]
 
 

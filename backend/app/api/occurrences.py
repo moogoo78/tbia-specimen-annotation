@@ -82,6 +82,7 @@ def filters_dep(
     kingdom_c: list[str] = Query(default=[]),
     county: list[str] = Query(default=[]),
     taxon_rank: list[str] = Query(default=[]),
+    scientific_name: list[str] = Query(default=[]),
     basis_of_record: list[str] = Query(default=[]),
     type_status: list[str] = Query(default=[]),
     dataset_name: list[str] = Query(default=[]),
@@ -102,7 +103,8 @@ def filters_dep(
 ) -> Filters:
     return Filters(
         q=q, bio_group=bio_group, kingdom_c=kingdom_c, county=county,
-        taxon_rank=taxon_rank, basis_of_record=basis_of_record, type_status=type_status,
+        taxon_rank=taxon_rank, scientific_name=scientific_name,
+        basis_of_record=basis_of_record, type_status=type_status,
         dataset_name=dataset_name, tbia_dataset_id=tbia_dataset_id, collector_id=collector_id,
         record_number_from=record_number_from, record_number_to=record_number_to,
         record_number=record_number,

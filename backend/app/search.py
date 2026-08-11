@@ -66,6 +66,9 @@ class Filters:
     kingdom_c: list[str] = field(default_factory=list)
     county: list[str] = field(default_factory=list)
     taxon_rank: list[str] = field(default_factory=list)
+    # Exact name match, for the species index's link into Explore. Deliberately
+    # not a facet — the store holds 44,874 distinct names.
+    scientific_name: list[str] = field(default_factory=list)
     basis_of_record: list[str] = field(default_factory=list)
     type_status: list[str] = field(default_factory=list)
     dataset_name: list[str] = field(default_factory=list)
@@ -139,6 +142,7 @@ def build_where(f: Filters) -> tuple[str, list[Any]]:
     _in_clause("kingdom_c", f.kingdom_c, where, params)
     _in_clause("county", f.county, where, params)
     _in_clause("taxon_rank", f.taxon_rank, where, params)
+    _in_clause("scientific_name", f.scientific_name, where, params)
     _in_clause("basis_of_record", f.basis_of_record, where, params)
     _in_clause("type_status", f.type_status, where, params)
     _in_clause("dataset_name", f.dataset_name, where, params)

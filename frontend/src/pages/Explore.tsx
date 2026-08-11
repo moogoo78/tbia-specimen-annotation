@@ -61,6 +61,8 @@ export function Explore() {
       // A documented trip is a date range, not a year — see /story.
       dates?: { from?: string; to?: string };
       q?: string;
+      // The species index hands an exact name, not free text — see /species.
+      scientific_name?: string[];
       sources?: string[]; bio_group?: string[];
       flags?: Partial<Pick<Filters, "missing_identification" | "missing_coordinates" | "missing_date" | "has_media">>;
     } | null;
@@ -94,11 +96,18 @@ export function Explore() {
       const groups = st.bio_group;
       setFilters((f) => ({ ...f, bio_group: Array.from(new Set([...f.bio_group, ...groups])) }));
     }
+    if (st.scientific_name?.length) {
+      const names = st.scientific_name;
+      setFilters((f) => ({
+        ...f, scientific_name: Array.from(new Set([...f.scientific_name, ...names])),
+      }));
+    }
     if (st.flags) {
       const flags = st.flags;
       setFilters((f) => ({ ...f, ...flags }));
     }
-    if (handed.length || st.years || st.dates || st.q || st.sources?.length || st.bio_group?.length || st.flags) {
+    if (handed.length || st.years || st.dates || st.q || st.sources?.length
+        || st.bio_group?.length || st.scientific_name?.length || st.flags) {
       setOffset(0);
       navigate(location.pathname, { replace: true, state: null });
     }
@@ -228,6 +237,15 @@ export function Explore() {
     if (filters.record_number) {
       out.push({ label: `# ${filters.record_number}`, onRemove: () => setRecordText(undefined) });
     }
+    // Its own chip rather than a member of ArrayKey: scientific_name is an exact
+    // filter with no facet behind it, so `toggle` has nothing to toggle against.
+    filters.scientific_name.forEach((name) => out.push({
+      label: name,
+      onRemove: () => {
+        setFilters((f) => ({ ...f, scientific_name: f.scientific_name.filter((x) => x !== name) }));
+        setOffset(0);
+      },
+    }));
     (["missing_identification", "missing_coordinates", "missing_date", "has_media"] as FlagKey[])
       .forEach((f) => filters[f] && out.push({ label: tr(`facet.${f}`), onRemove: () => toggleFlag(f) }));
     (["bio_group", "kingdom_c", "county", "taxon_rank", "type_status", "dataset_name"] as ArrayKey[])
