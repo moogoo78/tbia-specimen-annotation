@@ -254,6 +254,53 @@ Roles are `contributor | reviewer | admin`. A role change takes effect without
 re-issuing tokens: every request resolves the user from SQLite (the `role` claim
 in the JWT is not what's enforced), so the user only needs to reload the page.
 
+## 7. Serving public traffic
+
+The read API is open — no sign-in, no rate limit — and a facet or species
+rollup is a grouped scan over ~2M rows. One search-engine crawler working
+through the site is enough to keep several of those running at once, so two
+things stand between an audience and a flat box.
+
+**Responses now say how long they may be cached.** Every read on the allowlist
+in `backend/app/cache.py` carries `Cache-Control: public, s-maxage=3600` (60s
+for `/api/volunteers`, which moves as people annotate); everything else —
+`/api/auth/*`, annotations, export, and any request arriving with an
+`Authorization` header — is `private, no-store`. Tune with `NDB_CACHE_STATIC_TTL`
+/ `NDB_CACHE_LIVE_TTL` / `NDB_CACHE_BROWSER_TTL`; `0` disables a tier.
+
+**Cloudflare ignores all of that by default.** Its cache is keyed on file
+extension, so JSON under `/api/*` is a straight bypass however the origin
+labels it. To get any benefit, add a Cache Rule:
+
+- **Rules → Caching → Create rule**, matching `URI Path starts with /api/`
+- **Cache eligibility: Eligible for cache**
+- **Edge TTL: Use cache-control header if present** — the point of the work
+  above; do *not* pin a fixed TTL, or `/api/volunteers` gets the hour too
+- **Browser TTL: Respect origin**
+
+Verify from off-box: `curl -sI https://your-domain.org/api/registry | grep -i
+'cache-control\|cf-cache-status'`. The second request should report
+`cf-cache-status: HIT`.
+
+**Cloudflare only protects what it sits in front of.** The origin's Elastic IP
+is discoverable through Certificate Transparency logs and historical DNS, so
+anyone who finds it can skip the edge entirely. If Cloudflare is your protection
+layer, restrict the security group's :443 to
+[Cloudflare's IP ranges](https://www.cloudflare.com/ips/) rather than
+`0.0.0.0/0`.
+
+**Leave Bot Fight Mode off.** It challenges indiscriminately and will suppress
+the indexing you presumably want. Super Bot Fight Mode's verified-bot allowance
+is the safe form.
+
+**The backend sheds load rather than queueing it.** `NDB_DUCK_MAX_CONCURRENCY`
+(2 in the prod compose, for 2 vCPU) caps simultaneous scans; past that a request
+waits `NDB_DUCK_QUEUE_TIMEOUT` (10s) and then gets **503 + `Retry-After: 30`**,
+and any single scan running past `NDB_DUCK_QUERY_TIMEOUT` (30s) is interrupted
+with **504**. Both are deliberate: a crawler reads `Retry-After` and backs off,
+where an unbounded queue turns a spike into an outage. Seeing 503s in the logs
+means the cap is working — raise it only if the box has headroom.
+
 ## Operations
 
 | Task | Command |
@@ -274,6 +321,20 @@ enough; everything else (DuckDB) is regenerable from the source export.
 DuckDB is rebuilt from scratch by the TBIA ETL. Take the fresh export, run
 `make prepare` over it on your laptop, `scp` the new `tbia.duckdb` up, then
 `docker compose -f docker-compose.prod.yml restart backend`.
+
+**Then purge the cache.** The `s-maxage=3600` on the read API is what makes a
+refresh look like it didn't take: the new store is live, and the edge keeps
+serving the old counts for up to an hour. Cloudflare dashboard → **Caching →
+Configuration → Purge Everything**, or restrict it to the API:
+
+```bash
+curl -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/purge_cache" \
+  -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+  --data '{"prefixes":["your-domain.org/api/"]}'
+```
+
+The same applies after re-seeding curated data, since `/api/collectors*`,
+`/api/sampling-events*` and `/api/stories*` are all on the long tier.
 
 ## Updating the curated data
 
@@ -332,6 +393,15 @@ from the same mounted directory per request, so `git pull` is the whole update.
   ```
   Do **not** re-`scp` your laptop's `annotations.sqlite` — that overwrites live
   users and annotations.
+- **503 "Server busy" / 504 "Query took too long"** — admission control doing
+  its job (step 7), not a fault. A steady stream of them means real demand
+  exceeds `NDB_DUCK_MAX_CONCURRENCY`; check whether the CDN is actually caching
+  (`cf-cache-status`) before raising it, since a bypassed cache is the usual
+  cause.
+- **The site shows old counts after a data refresh** — the edge is still serving
+  the pre-refresh copy for up to `NDB_CACHE_STATIC_TTL`. Purge (see *Updating
+  the occurrence data*). `curl -sI` the origin directly to confirm it is only
+  the cache.
 - **OOM / container killed** — confirm swap is on (`free -h`) and that only the
   Docker path is running (not also a systemd uvicorn).
 - **`database is locked`** — keep the backend at `--workers 1` (already set);

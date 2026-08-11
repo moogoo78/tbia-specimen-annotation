@@ -60,6 +60,7 @@ local dev + tests have deterministic users; tests mint JWTs directly via `auth.c
 
 ```
 backend/app/        main.py, duck.py, db.py, models.py, search.py, extract.py, auth.py, config.py
+                    cache.py (Cache-Control allowlist for the public read API)
 backend/app/api/    occurrences.py, annotations.py, auth.py, export.py
 backend/ingest/     common.py (export access, registry, column baseline), inspect.py
                     (survey an export), build.py (export -> DuckDB), prepare.py
@@ -271,6 +272,32 @@ check the export before dropping an entry.
 
 The Explore **Source** facet is driven by that merged response; selecting a source
 expands to the union of its `tbia_dataset_id`s.
+
+## Serving public traffic
+
+Reads are unauthenticated and expensive (a facet rollup scans ~2M rows), so two
+mechanisms bound what an open audience can cost. Both are policy in one file each —
+change the policy there, not at the endpoints.
+
+- **`app/cache.py`** stamps `Cache-Control` on every response from an **allowlist of
+  route templates**, defaulting to `private, no-store`. A new endpoint is therefore
+  uncached until it is added to `STATIC_ROUTES` (occurrence-store reads and seeded data,
+  `s-maxage=3600`) or `LIVE_ROUTES` (moves as people annotate, 60s). `test_cache.py`
+  asserts every listed template still matches a mounted route, so a rename fails the
+  suite instead of quietly becoming origin load. Two invariants: a request carrying
+  `Authorization` never gets a `public` response (so a shared cache can never store one
+  produced under credentials, even if a listed route later grows per-user content), and
+  non-200s are never cached (an error would outlive its cause at the edge).
+- **`app/duck.py`** caps *concurrent* scans (`NDB_DUCK_MAX_CONCURRENCY`) rather than
+  requests per client — the load that hurts arrives from many IPs at once, which per-IP
+  limiting cannot see. Over the cap, a request waits `NDB_DUCK_QUEUE_TIMEOUT` then raises
+  `DuckOverloaded` → 503 + `Retry-After`; a scan past `NDB_DUCK_QUERY_TIMEOUT` is
+  cancelled via DuckDB's `interrupt()` (there is no `statement_timeout`) → `DuckTimeout`
+  → 504. Both are plain `RuntimeError`s so `worker.py` and `import_results.py` see normal
+  errors; `main.py` maps them to responses.
+
+A CDN in front does nothing for `/api/*` until it is told to honour these headers, and
+after an ETL refresh or a re-seed the edge must be purged — see DEPLOY.md step 7.
 
 ## Gotchas
 

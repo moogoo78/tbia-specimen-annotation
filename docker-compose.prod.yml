@@ -23,6 +23,10 @@ services:
       NDB_DUCK_TEMP_DIR: /data/duck-tmp
       NDB_DUCK_THREADS: "2"
       NDB_DUCK_MEMORY_LIMIT: 1GB
+      # Concurrent DuckDB scans. Two vCPU at NDB_DUCK_THREADS=2 is fully
+      # committed by two of them, so a third would only make all three slower;
+      # requests past that wait briefly, then get a 503 with Retry-After.
+      NDB_DUCK_MAX_CONCURRENCY: "2"
     volumes:
       - ./data:/data
     mem_limit: 1400m
