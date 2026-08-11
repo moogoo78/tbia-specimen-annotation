@@ -35,13 +35,21 @@ don't have one, build it from a TBIA export first — see
 [Refreshing the data](#refreshing-the-data).
 
 ```bash
-make install        # python venv + npm install
-make seed           # create SQLite schema + demo users
-make api            # terminal 1: FastAPI on :8000
-make web            # terminal 2: Vite dev server on :5173
+make install               # python venv + npm install
+make seed                  # SQLite schema + demo users
+make seed-collectors       # collector index, parsed out of recorded_by
+make seed-sampling-events  # the curated survey chronology behind /history
+make api                   # terminal 1: FastAPI on :8000
+make web                   # terminal 2: Vite dev server on :5173
 ```
 
 Open http://localhost:5173.
+
+`make seed` sets up the schema and demo users and nothing more. The last two
+seeders fill tables that the first one only creates, so skipping them leaves
+`/collectors` and `/history` rendering as empty pages rather than as errors.
+Both read from the DuckDB store or from a git-tracked JSON file, both are safe
+to re-run, and neither touches annotations.
 
 **Sign-in is ORCID-only.** Copy `.env.example` to `.env` and fill in
 `ORCID_CLIENT_ID` / `ORCID_CLIENT_SECRET` (register a client at
@@ -51,7 +59,7 @@ redirect URI `http://localhost:5173/auth/orcid/callback`). List your own ORCID i
 `contributor`. Until a client id is set, `/api/auth/orcid/*` returns 503.
 
 ### Docker (alternative)
-`make seed` on the host (with a store already at `data/tbia.duckdb`), then
+Run the three seeders on the host (with a store already at `data/tbia.duckdb`), then
 `docker compose up` (serves API on :8000 and the frontend on :5173). The embedded
 DuckDB/SQLite files in `./data` are mounted in.
 

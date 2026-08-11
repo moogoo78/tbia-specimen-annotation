@@ -74,9 +74,26 @@ Build the DBs **on your laptop** (don't run the ~2 M-row ingest on the small
 box) and copy them up:
 
 ```bash
-# on your laptop, after `make prepare && make seed`
+# on your laptop — all four, in this order
+make prepare                 # completeness flags on the DuckDB store
+make seed                    # SQLite schema + demo user rows
+make seed-collectors         # ~17k collectors + their recorded_by aliases
+make seed-sampling-events    # the 37-entry survey chronology (/history)
+
 scp data/tbia.duckdb data/annotations.sqlite ubuntu@<elastic-ip>:$APP/data/
 ```
+
+`make seed` alone creates the schema and three demo users and **nothing else**.
+The collector index and the chronology live in the same SQLite file but are
+written by their own seeders, so skipping them ships a database whose tables
+exist and are empty — `/collectors` and `/history` then render blank rather than
+erroring, which is easy to miss until someone asks why a page has no data.
+
+> **The `scp` above is for the FIRST deploy only.** `annotations.sqlite` is the
+> only read-write store: once the site is live it holds every ORCID account and
+> every annotation. Copying your laptop's copy over it destroys all of that.
+> To add or correct seeded data on a running deployment, re-run the seeder
+> *in the container* instead — see [Updating the curated data](#updating-the-curated-data).
 
 Verify on the box:
 
@@ -246,6 +263,7 @@ in the JWT is not what's enforced), so the user only needs to reload the page.
 | Update code | `git pull && docker compose -f docker-compose.prod.yml up -d --build` |
 | Stop | `docker compose -f docker-compose.prod.yml down` |
 | Backup state | `cp data/annotations.sqlite data/annotations.$(date +%F).sqlite` (only mutable store) |
+| Reseed curated data | `exec backend python -m app.seed_sampling_events` (see *Updating the curated data*) |
 
 `restart: always` brings the stack back up after a reboot (Docker starts on
 boot). Back up `annotations.sqlite` regularly — a nightly cron copy to S3 is
@@ -256,6 +274,36 @@ enough; everything else (DuckDB) is regenerable from the source export.
 DuckDB is rebuilt from scratch by the TBIA ETL. Take the fresh export, run
 `make prepare` over it on your laptop, `scp` the new `tbia.duckdb` up, then
 `docker compose -f docker-compose.prod.yml restart backend`.
+
+## Updating the curated data
+
+The collector index and the survey chronology are seeded into
+`annotations.sqlite` — the live, read-write store — so they are **never** updated
+by copying a file up. Run the seeder inside the running backend:
+
+```bash
+git pull                     # data/sampling_events.json is tracked in git
+docker compose -f docker-compose.prod.yml exec backend python -m app.seed_sampling_events
+docker compose -f docker-compose.prod.yml exec backend python -m app.seed_collectors --sync
+```
+
+The chronology seeder replaces its own two tables in one transaction, so it is
+idempotent — re-run it after correcting a transcription. It reads
+`/data/sampling_events.json`, which is the mounted `./data` from this checkout,
+and prints how many actors resolved to a collector (32 of 57 is expected; the
+rest are 19th-century botanists holding no records in the export).
+
+> **Use `--sync` for collectors on a live box, never the bare seeder.** Without
+> the flag `seed_collectors` deletes both collector tables and rebuilds them from
+> `recorded_by`, discarding any mapping a curator has corrected by hand. `--sync`
+> maps only the `recorded_by` values it has not seen before and leaves existing
+> rows alone. The bare form belongs to the first build on your laptop (step 3),
+> where there is nothing to lose.
+
+Neither seeder touches users or annotations.
+
+`data/story_begonia.json` needs no seeding at all — `/story/begonia` reads it
+from the same mounted directory per request, so `git pull` is the whole update.
 
 ## Troubleshooting
 
@@ -273,6 +321,17 @@ DuckDB is rebuilt from scratch by the TBIA ETL. Take the fresh export, run
 - **ORCID returns `redirect_uri mismatch`** — `ORCID_REDIRECT_URI` must match the
   Redirect URI registered on the ORCID client *byte for byte*, and point at the
   production domain (`https://your-domain.org/auth/orcid/callback`).
+- **`/history` (採集史) or `/collectors` renders empty** — the SQLite file was
+  built with `make seed` only, which seeds users and nothing else. The tables
+  exist (created at startup) and hold no rows, so the API returns `[]` and the
+  page is blank rather than broken. Confirm, then fix in place:
+  ```bash
+  docker compose -f docker-compose.prod.yml exec backend python -c \
+    "import sqlite3; print(sqlite3.connect('/data/annotations.sqlite').execute('select count(*) from sampling_event').fetchone())"
+  docker compose -f docker-compose.prod.yml exec backend python -m app.seed_sampling_events
+  ```
+  Do **not** re-`scp` your laptop's `annotations.sqlite` — that overwrites live
+  users and annotations.
 - **OOM / container killed** — confirm swap is on (`free -h`) and that only the
   Docker path is running (not also a systemd uvicorn).
 - **`database is locked`** — keep the backend at `--workers 1` (already set);
