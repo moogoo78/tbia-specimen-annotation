@@ -14,7 +14,7 @@ transcription, and reviewed enrichments are exported back to data providers.
 Occurrence data is **read-only**; enrichment lives only as annotations. Hence two stores:
 
 - **DuckDB** (`data/tbia.duckdb`) — built from a downloaded TBIA export by
-  `backend/ingest/` (see *Data refresh*): table `occurrence` (~1.89M rows, 942 datasets)
+  `backend/ingest/` (see *Data refresh*): table `occurrence` (~2.08M rows, 945 datasets)
   + table `dataset` (one row per `tbia_dataset_id`). Read-only at serve time; columnar →
   fast facets/completeness aggregation; queries run in a threadpool (`app/duck.py`).
   `build.py` loads the export's own columns; `make prepare` adds the derived ones.
@@ -193,7 +193,7 @@ mv data/tbia.new.duckdb data/tbia.duckdb                      # swap in
 - Downloaded exports live in `tmp/`; `find_zip()` looks there first, then the repo root.
 
 The 2026-08-05 export (`tbia_6a72e385d2fb88001772ccd4`): 2,113,068 rows / 1,018 datasets /
-66 columns in, **1,889,955 rows / 942 datasets** (17 curated + 925 GBIF) out.
+66 columns in, **2,079,798 rows / 945 datasets** (20 curated + 925 GBIF) out.
 
 ## registry.json
 
@@ -202,8 +202,8 @@ The 2026-08-05 export (`tbia_6a72e385d2fb88001772ccd4`): 2,113,068 rows / 1,018 
 `groups` vocabulary: `Aves, Amphibia, Reptilia, Mammalia, Actinopterygii, Mollusca,
 Arachnida, Insecta, Plantae, Fungi, Protozoa` (plus `Zoology`/`Other` used as broad tags).
 
-It is **hand-curated (tracked in git), holds only the 17 stable institution datasets**
-across 8 institutions, and **decides what gets ingested**: `build.py` keeps a row only if
+It is **hand-curated (tracked in git), holds only the 20 stable institution datasets**
+across 9 institutions, and **decides what gets ingested**: `build.py` keeps a row only if
 its `tbiaDatasetID` is listed here or its `rightsHolder` is `GBIF`. Deleting an entry
 deletes those records from the next store, so edit it from `make inspect`'s report rather
 than from memory. The GBIF
@@ -227,12 +227,15 @@ anything not listed there or held by GBIF), while `data/registry.json` gates whi
 exported records reach *our store*. The dependency is one-way — an institution dropped
 upstream never appears in the export, and no edit here brings it back.
 
-Reconciled against the 2026-08-05 list (8 institutions / 17 datasets): NMNS gained the
+Reconciled against the 2026-08-05 list (now 9 institutions / 20 datasets): NMNS gained the
 鳥獸學門 mammal + bird and 古生物學門 datasets, `NTU` (TAI) was added, 林業試驗所 is split
 back into `TAIF` (herbarium) and `TFRI` (insect museum) — same display name, two entries —
 NMNS dataset codes went Chinese→Latin (`維管束`→`TNM`, `昆蟲`→`ENT`, …), the 農業部 prefix
-was dropped from names, and `TBRI` (TESRI moth + the two TAIE sets, ~138k rows) is gone
-from the institution list, so those records drop out of the next export.
+was dropped from names. `TBRI` (TESRI moth + the two TAIE sets) is gone from the *upstream*
+list, but its three datasets are still in the export — held by 台灣生物多樣性網絡 TBN, not by
+TBRI — so only their absence here excluded them; they are curated back in and contribute
+189,843 rows. Upstream absence therefore does not by itself mean a source is unavailable:
+check the export before dropping an entry.
 
 The Explore **Source** facet is driven by that merged response; selecting a source
 expands to the union of its `tbia_dataset_id`s.
