@@ -7,6 +7,7 @@ import { Icon } from "../design/Icon";
 import { api } from "../api/client";
 import type { Dataset, RegistryEntry, SourceKind } from "../api/types";
 import { Spinner } from "../components/ui";
+import { exploreUrl } from "./exploreUrl";
 
 // Every dataset here is a TBIA dataset, so its id addresses the provider-facing
 // page on the TBIA portal.
@@ -79,7 +80,7 @@ function OrgCard({ kind, code, ent, statsById, defaultOpen }: {
   const pct = total ? Math.round((weighted / total) * 100) : 0;
 
   // Drill into Explore filtered to one or more source datasets ("kind:code/id").
-  const drill = (childKeys: string[]) => nav("/explore", { state: { sources: childKeys } });
+  const drill = (childKeys: string[]) => nav(exploreUrl({ sources: childKeys }));
   const allKeys = ids.map((id) => `${kind}:${code}/${id}`);
 
   return (

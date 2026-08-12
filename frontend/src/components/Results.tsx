@@ -4,6 +4,7 @@ import { t } from "../design/tokens";
 import { api } from "../api/client";
 import type { OccurrenceRow } from "../api/types";
 import { CompletenessDots, GroupTag } from "./ui";
+import { exploreUrl } from "../pages/exploreUrl";
 
 // Collector name as a link: resolves the raw recorded_by to a collector on click
 // (lazily, to avoid one request per row) and filters Explore to its records.
@@ -15,7 +16,7 @@ function CollectorLink({ value }: { value: string | null }) {
     e.stopPropagation();
     try {
       const c = await api.resolveCollector(value);
-      if (c) nav("/explore", { state: { collector: { id: c.id, label: c.label } } });
+      if (c) nav(exploreUrl({ collector: { id: c.id, label: c.label } }));
     } catch { /* unmapped (org/unknown) — no-op */ }
   };
   return (

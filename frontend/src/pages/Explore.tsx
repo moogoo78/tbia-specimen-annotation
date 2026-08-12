@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
-import { emptyFilters, type Filters } from "../api/types";
+import { type Filters } from "../api/types";
+import {
+  emptyExplore, exploreParams, parseExplore, type ExploreState, type View,
+} from "./exploreUrl";
 import { FacetPanel } from "../components/FacetPanel";
 import type { CollectorRef } from "../components/CollectorSelect";
 import { TableView, GridView, SplitList } from "../components/Results";
@@ -13,7 +16,6 @@ import { MapView } from "../components/MapView";
 import { RecordDetailView } from "./RecordDetail";
 import { Spinner } from "../components/ui";
 
-type View = "table" | "grid" | "map" | "split";
 type ArrayKey = "bio_group" | "kingdom_c" | "county" | "taxon_rank" | "basis_of_record" | "type_status" | "dataset_name";
 type FlagKey = "missing_coordinates" | "missing_date" | "missing_identification" | "has_media";
 
@@ -21,20 +23,51 @@ const PAGE = 100;
 
 export function Explore() {
   const { t: tr } = useTranslation();
-  const [filters, setFilters] = useState<Filters>(emptyFilters());
-  const [qInput, setQInput] = useState("");
-  const [view, setView] = useState<View>("table");
+
+  // The filter state lives in the URL, so a filtered view can be reloaded,
+  // shared, and returned to with the back button. `parseExplore` reads it;
+  // every setter below writes it back through `update`. Edits `replace` rather
+  // than push, so the back button leaves the page instead of stepping through
+  // every checkbox — while a record opened from here still returns to the
+  // search that found it.
+  const [sp, setSp] = useSearchParams();
+  const state = useMemo(() => parseExplore(sp), [sp]);
+  const { filters, sources, sort, offset, view } = state;
+
+  const update = useCallback(
+    (patch: (s: ExploreState) => Partial<ExploreState>) => {
+      setSp(exploreParams({ ...state, ...patch(state) }), { replace: true });
+    },
+    [state, setSp],
+  );
+  // Same signatures the component body already used, so only their backing
+  // store changed: each of these now edits the URL.
+  const setFilters = useCallback(
+    (u: Filters | ((f: Filters) => Filters)) =>
+      update((s) => ({ filters: typeof u === "function" ? u(s.filters) : u })),
+    [update],
+  );
+  const setSources = useCallback(
+    (u: string[] | ((v: string[]) => string[])) =>
+      update((s) => ({ sources: typeof u === "function" ? u(s.sources) : u })),
+    [update],
+  );
+  const setOffset = useCallback((n: number) => update(() => ({ offset: n })), [update]);
+  const setSort = useCallback((v: string) => update(() => ({ sort: v, offset: 0 })), [update]);
+  const setView = useCallback((v: View) => update(() => ({ view: v })), [update]);
+
+  const [qInput, setQInput] = useState(() => state.filters.q ?? "");
   const [showFacets, setShowFacets] = useState(true);
   // Split view: collapse the record list so the detail pane gets the full width.
   const [splitListOpen, setSplitListOpen] = useState(true);
-  const [sort, setSort] = useState("completeness_score");
-  const [offset, setOffset] = useState(0);
   const [activeId, setActiveId] = useState<string | undefined>();
-  // Source selection is stored at child granularity: "institutions:BRMAS/<datasetId>".
-  // A parent (institution) checkbox simply selects/clears all of its children.
-  const [sources, setSources] = useState<string[]>([]);
-  // Selected collectors kept as {id,label} so chips can show names; ids feed the filter.
-  const [collectors, setCollectors] = useState<CollectorRef[]>([]);
+  // Collector chips show names, but only ids are in the URL — a shared link
+  // carries no labels — so they are resolved on arrival and remembered here.
+  const [labels, setLabels] = useState<Record<number, string>>({});
+  const collectors = useMemo<CollectorRef[]>(
+    () => state.collectorIds.map((id) => ({ id, label: labels[id] ?? `#${id}` })),
+    [state.collectorIds, labels],
+  );
 
   const registry = useQuery({ queryKey: ["registry"], queryFn: () => api.registry(), staleTime: Infinity });
 
@@ -48,79 +81,35 @@ export function Explore() {
     return { ...filters, tbia_dataset_id: [...ids], collector_id: collectors.map((c) => c.id) };
   }, [filters, sources, collectors]);
 
-  // Filters handed over via navigation (a collector from a record/row, a
-  // sampling event's collectors + years from the history page, source datasets
-  // from the institutions page, or completeness flags from the home page's
-  // Get-started block): apply once per navigation, then consume.
-  const location = useLocation();
-  const navigate = useNavigate();
+  // Collector labels for the ids in the URL. A link into Explore used to hand
+  // over {id,label} pairs through router state; the URL carries ids alone, so
+  // the names the chips show are fetched once per id and cached.
   useEffect(() => {
-    const st = location.state as {
-      collector?: CollectorRef; collectors?: CollectorRef[];
-      years?: { from?: number; to?: number };
-      // A documented trip is a date range, not a year — see /story.
-      dates?: { from?: string; to?: string };
-      q?: string;
-      // The species index hands an exact name, not free text — see /species.
-      scientific_name?: string[];
-      sources?: string[]; bio_group?: string[];
-      flags?: Partial<Pick<Filters, "missing_identification" | "missing_coordinates" | "missing_date" | "has_media">>;
-    } | null;
-    if (!st) return;
-    const handed = [...(st.collector ? [st.collector] : []), ...(st.collectors ?? [])];
-    if (handed.length) {
-      setCollectors((cs) => {
-        const seen = new Set(cs.map((x) => x.id));
-        const add: CollectorRef[] = [];
-        for (const c of handed) {
-          if (seen.has(c.id)) continue;
-          seen.add(c.id);
-          add.push(c);
-        }
-        return add.length ? [...cs, ...add] : cs;
-      });
-    }
-    if (st.years && (st.years.from != null || st.years.to != null)) {
-      const yrs = st.years;
-      setFilters((f) => ({ ...f, year_from: yrs.from, year_to: yrs.to }));
-    }
-    if (st.dates && (st.dates.from || st.dates.to)) {
-      const d = st.dates;
-      setFilters((f) => ({ ...f, date_from: d.from, date_to: d.to }));
-    }
-    if (st.q) setQInput(st.q);
-    if (st.sources?.length) {
-      setSources((s) => Array.from(new Set([...s, ...st.sources!])));
-    }
-    if (st.bio_group?.length) {
-      const groups = st.bio_group;
-      setFilters((f) => ({ ...f, bio_group: Array.from(new Set([...f.bio_group, ...groups])) }));
-    }
-    if (st.scientific_name?.length) {
-      const names = st.scientific_name;
-      setFilters((f) => ({
-        ...f, scientific_name: Array.from(new Set([...f.scientific_name, ...names])),
-      }));
-    }
-    if (st.flags) {
-      const flags = st.flags;
-      setFilters((f) => ({ ...f, ...flags }));
-    }
-    if (handed.length || st.years || st.dates || st.q || st.sources?.length
-        || st.bio_group?.length || st.scientific_name?.length || st.flags) {
-      setOffset(0);
-      navigate(location.pathname, { replace: true, state: null });
-    }
-  }, [location.key]);
+    const missing = state.collectorIds.filter((id) => !(id in labels));
+    if (!missing.length) return;
+    let alive = true;
+    Promise.all(missing.map((id) => api.collector(id).catch(() => null))).then((rs) => {
+      if (!alive) return;
+      const found: Record<number, string> = {};
+      rs.forEach((c, i) => { found[missing[i]] = c?.label || `#${missing[i]}`; });
+      setLabels((prev) => ({ ...prev, ...found }));
+    });
+    return () => { alive = false; };
+  }, [state.collectorIds, labels]);
 
-  // Debounce the free-text box into the filter set.
+  // Keep the box in step when the URL changes from outside it — a link in, or
+  // the back button.
+  useEffect(() => { setQInput(filters.q ?? ""); }, [filters.q]);
+
+  // Debounce the free-text box into the URL. The guard matters: without it the
+  // initially empty box would write itself over a `q` that arrived in the link.
   useEffect(() => {
+    if ((filters.q ?? "") === qInput) return;
     const h = setTimeout(() => {
-      setFilters((f) => ({ ...f, q: qInput || undefined }));
-      setOffset(0);
+      update((s) => ({ filters: { ...s.filters, q: qInput || undefined }, offset: 0 }));
     }, 350);
     return () => clearTimeout(h);
-  }, [qInput]);
+  }, [qInput, filters.q, update]);
 
   const order = sort === "scientific_name" || sort === "catalog_number" ? "asc" : "asc";
   // The map can only plot georeferenced records; without this the gaps-first
@@ -169,10 +158,18 @@ export function Explore() {
     setOffset(0);
   };
   const toggleCollector = (c: CollectorRef) => {
-    setCollectors((cs) => cs.some((x) => x.id === c.id) ? cs.filter((x) => x.id !== c.id) : [...cs, c]);
-    setOffset(0);
+    setLabels((l) => ({ ...l, [c.id]: c.label }));
+    update((s) => ({
+      collectorIds: s.collectorIds.includes(c.id)
+        ? s.collectorIds.filter((x) => x !== c.id)
+        : [...s.collectorIds, c.id],
+      offset: 0,
+    }));
   };
-  const clear = () => { setFilters(emptyFilters()); setQInput(""); setSources([]); setCollectors([]); setOffset(0); };
+  const clear = () => {
+    setQInput("");
+    setSp(exploreParams(emptyExplore()), { replace: true });
+  };
 
   const total = search.data?.total ?? 0;
   const rows = search.data?.items ?? [];
