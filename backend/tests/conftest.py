@@ -13,8 +13,10 @@ import pytest
 _tmp = tempfile.mkdtemp(prefix="tbia_test_")
 DUCK = os.path.join(_tmp, "occ.duckdb")
 SQLITE = os.path.join(_tmp, "ann.sqlite")
+REFERENCE = os.path.join(_tmp, "ref.sqlite")
 os.environ["NDB_DUCKDB_PATH"] = DUCK
 os.environ["NDB_SQLITE_PATH"] = SQLITE
+os.environ["NDB_REFERENCE_PATH"] = REFERENCE
 os.environ["NDB_JWT_SECRET"] = "test-secret"
 
 # (id, catalog, sci, rank, group, county, locality, lat, lon, date, dataset, media)

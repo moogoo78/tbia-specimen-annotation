@@ -19,8 +19,9 @@ walkthrough there is a slide deck in both languages:
 | Concern | Choice |
 |---|---|
 | Occurrence store (read-only, ~2.08M rows) | **DuckDB** — built from a TBIA export by `backend/ingest/`; columnar, so faceting / completeness aggregation stays fast |
-| Annotations + users (shared writes) | **SQLite** via SQLAlchemy |
-| Federated joins (dashboard / provider export) | DuckDB `ATTACH`es the SQLite file (`sqlite_scanner`, read-only) → one SQL query |
+| Annotations + users (shared writes) | **SQLite** via SQLAlchemy — `annotations.sqlite` |
+| Seeded reference data (collectors, chronology) | A **second SQLite** file, `reference.sqlite`: every row is rebuilt by a seeder, so it is disposable, backups are one small file, and a re-seed cannot reach user work |
+| Federated joins (dashboard / provider export) | DuckDB `ATTACH`es both SQLite files (`sqlite_scanner`, read-only) → one SQL query |
 | API | **FastAPI** (DuckDB queries run in a threadpool; JWT auth with contributor/reviewer/admin roles) |
 | Frontend | **React + Vite + TypeScript**, bilingual zh-TW / English (i18next) |
 | AI label transcription | Two-stage Claude vision pipeline (`backend/app/pipeline.py`): Sonnet OCRs the label, Opus turns that text into schema fields. Run as a batched queue by the platform, or by the contributor in their own AI chat via a copy-paste prompt |
@@ -49,7 +50,8 @@ Open http://localhost:5173.
 seeders fill tables that the first one only creates, so skipping them leaves
 `/collectors` and `/history` rendering as empty pages rather than as errors.
 Both read from the DuckDB store or from a git-tracked JSON file, both are safe
-to re-run, and neither touches annotations.
+to re-run, and neither *can* touch annotations — they write `reference.sqlite`,
+and users and annotations live in `annotations.sqlite`.
 
 **Sign-in is ORCID-only.** Copy `.env.example` to `.env` and fill in
 `ORCID_CLIENT_ID` / `ORCID_CLIENT_SECRET` (register a client at
@@ -160,7 +162,7 @@ If a column the app depends on was renamed or dropped, update `backend/app/searc
 ```
 backend/   FastAPI app (app/), the export -> DuckDB pipeline (ingest/), pytest (tests/)
 frontend/  React + Vite + TS (src/: components, pages, api, i18n, design)
-data/      tbia.duckdb (built by ingest/) + annotations.sqlite + registry.json
+data/      tbia.duckdb (built by ingest/) + annotations.sqlite + reference.sqlite + registry.json
 tmp/       downloaded TBIA exports and inspect reports (gitignored)
 ```
 

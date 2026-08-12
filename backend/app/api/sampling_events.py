@@ -23,7 +23,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from .. import duck
-from ..db import SessionLocal
+from ..db import RefSessionLocal
 from ..models import Collector, CollectorAlias, SamplingEvent, SamplingEventActor
 
 router = APIRouter(prefix="/api", tags=["sampling-events"])
@@ -78,7 +78,7 @@ def list_sampling_events(
     offset: int = 0,
 ):
     """The chronology, earliest first."""
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         stmt = select(SamplingEvent).options(selectinload(SamplingEvent.actors))
 
         # Overlap, not containment: an event running 1861-1866 must surface for a
@@ -144,7 +144,7 @@ def _event_collector_years() -> list[tuple[int, int, int, int]]:
     Deduplicated: an event that names the same collector twice must not count
     its records twice.
     """
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         rows = db.execute(
             select(
                 SamplingEventActor.event_id,
@@ -166,12 +166,12 @@ async def _count_by_event(pairs: list[tuple[int, int, int, int]]) -> dict[int, i
     values = ", ".join(["(?, ?, ?, ?)"] * len(pairs))
     params: list = [v for pair in pairs for v in pair]
 
-    if duck.annotations_attached():
+    if duck.reference_attached():
         rows = await duck.query(
             f"""WITH ev(event_id, collector_id, y0, y1) AS (VALUES {values})
                 SELECT ev.event_id AS event_id, count(*) AS n
                 FROM occurrence o
-                JOIN ann.collector_alias a ON a.recorded_by = o.recorded_by
+                JOIN ref.collector_alias a ON a.recorded_by = o.recorded_by
                 JOIN ev ON ev.collector_id = a.collector_id
                        AND o.year BETWEEN ev.y0 AND ev.y1
                 GROUP BY ev.event_id""",
@@ -181,7 +181,7 @@ async def _count_by_event(pairs: list[tuple[int, int, int, int]]) -> dict[int, i
 
     # No ATTACH: bring the alias map over from SQLite and join on the raw string,
     # exactly as `search._collector_clause` and `collectors._occurrence_rollup` do.
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         aliases = db.execute(
             select(CollectorAlias.collector_id, CollectorAlias.recorded_by).where(
                 CollectorAlias.collector_id.in_({c for _, c, _, _ in pairs})
@@ -229,14 +229,14 @@ async def sampling_event_counts() -> dict[str, int]:
             counts = await _count_by_event(pairs)
             _COUNTS = {"key": key, "at": time.monotonic(), "counts": counts}
 
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         ids = db.execute(select(SamplingEvent.id)).scalars().all()
     return {str(i): counts.get(i, 0) for i in ids}
 
 
 @router.get("/sampling-events/{event_id}")
 def get_sampling_event(event_id: int):
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         ev = db.execute(
             select(SamplingEvent)
             .options(selectinload(SamplingEvent.actors))

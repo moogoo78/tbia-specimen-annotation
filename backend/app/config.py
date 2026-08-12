@@ -29,7 +29,14 @@ class Settings(BaseSettings):
     )
 
     duckdb_path: str = os.path.join(DATA, "tbia.duckdb")
+    # Two SQLite files, split by what it costs to lose them. `sqlite_path` holds
+    # what no one can regenerate — users, annotations, transcribe requests — and
+    # is the file to back up. `reference_path` holds what the seeders rebuild
+    # (collectors + aliases from DuckDB, the chronology from its tracked JSON),
+    # so it can be deleted and re-seeded, and a re-seed can never reach the
+    # annotations because it is writing a different file.
     sqlite_path: str = os.path.join(DATA, "annotations.sqlite")
+    reference_path: str = os.path.join(DATA, "reference.sqlite")
 
     # DuckDB resource caps. Defaults preserve prior local behavior (4 threads,
     # DuckDB's own ~80%-of-RAM memory limit). On a small instance (e.g. t3.small)
@@ -146,6 +153,10 @@ class Settings(BaseSettings):
     @property
     def sqlite_url(self) -> str:
         return f"sqlite:///{self.sqlite_path}"
+
+    @property
+    def reference_url(self) -> str:
+        return f"sqlite:///{self.reference_path}"
 
     @property
     def cors_list(self) -> list[str]:

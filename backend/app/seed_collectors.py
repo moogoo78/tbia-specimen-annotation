@@ -1,4 +1,4 @@
-"""Populate the SQLite collector tables from the DuckDB occurrence store.
+"""Populate the collector tables in the reference store from DuckDB.
 
     python -m app.seed_collectors          # full (re)build of collectors + aliases
     python -m app.seed_collectors --sync   # incremental: map only NEW recorded_by
@@ -20,7 +20,7 @@ from sqlalchemy import delete, func, select
 
 from .collectors_parse import parse_collector
 from .config import settings
-from .db import SessionLocal, init_db
+from .db import RefSessionLocal, init_db
 from .models import Collector, CollectorAlias
 
 
@@ -46,7 +46,7 @@ def populate(sync: bool = False, db_path: str | None = None) -> dict:
     db_path = db_path or settings.duckdb_path
     raws = _distinct_recorded_by(db_path)
 
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         if not sync:
             db.execute(delete(CollectorAlias))
             db.execute(delete(Collector))

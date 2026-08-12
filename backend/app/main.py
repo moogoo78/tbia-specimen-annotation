@@ -55,7 +55,14 @@ async def _query_timeout(request: Request, exc: duck.DuckTimeout) -> JSONRespons
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "annotations_attached": duck.annotations_attached()}
+    # Both stores are reported: a blank /collectors or /history is almost always
+    # a reference store that was never seeded, and this is where you see that
+    # without shelling into the box.
+    return {
+        "status": "ok",
+        "annotations_attached": duck.annotations_attached(),
+        "reference_attached": duck.reference_attached(),
+    }
 
 
 def _mount_routers() -> None:

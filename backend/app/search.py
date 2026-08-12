@@ -101,10 +101,10 @@ def _collector_aliases(collector_ids: list[int]) -> list[str]:
     fallback for when the annotations sqlite is not ATTACHed to DuckDB)."""
     from sqlalchemy import select
 
-    from .db import SessionLocal
+    from .db import RefSessionLocal
     from .models import CollectorAlias
 
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         return list(
             db.execute(
                 select(CollectorAlias.recorded_by).where(
@@ -119,11 +119,11 @@ def _collector_clause(ids: list[int], where: list[str], params: list[Any]) -> No
     on the raw recorded_by value via the collector_alias map."""
     if not ids:
         return
-    if duck.annotations_attached():
+    if duck.reference_attached():
         ph = ", ".join(["?"] * len(ids))
         where.append(
             "recorded_by IN "
-            f"(SELECT recorded_by FROM ann.collector_alias WHERE collector_id IN ({ph}))"
+            f"(SELECT recorded_by FROM ref.collector_alias WHERE collector_id IN ({ph}))"
         )
         params.extend(ids)
     else:

@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from app.db import SessionLocal
+from app.db import RefSessionLocal
 from app.models import SamplingEvent, SamplingEventActor
 from app.seed_sampling_events import SeedError, _norm, parse_years
 from app.seed_sampling_events import populate as populate_events
@@ -266,7 +266,7 @@ def test_date_parsing_covers_single_range_and_elided_century(client):
 def test_reseeding_is_idempotent(client):
     """Re-running after a hand correction must leave exactly the file's contents."""
     def snapshot():
-        with SessionLocal() as db:
+        with RefSessionLocal() as db:
             return [
                 (e.seq, e.event_date, e.verbatim_locality, e.event_remarks,
                  tuple((a.recorded_by, a.position, a.collector_id) for a in e.actors))
@@ -278,7 +278,7 @@ def test_reseeding_is_idempotent(client):
     assert r["events"] == 3 and r["actors"] == 4
     assert snapshot() == before
 
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         assert db.query(SamplingEvent).count() == 3
         assert db.query(SamplingEventActor).count() == 4
 
@@ -290,12 +290,12 @@ def test_seed_reports_resolution_and_names_the_misses(client):
 
 
 def test_dry_run_writes_nothing(client):
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         before = db.query(SamplingEvent).count()
     doc = {"source": {"citation": "x"}, "events": [dict(SAMPLING_EVENTS["events"][0], seq=99)]}
     r = populate_events(write_sampling_events(doc), dry_run=True)
     assert r["dry_run"] and r["events"] == 1
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         assert db.query(SamplingEvent).count() == before
     populate_events(write_sampling_events())  # restore the fixture state
 

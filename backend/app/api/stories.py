@@ -28,7 +28,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import or_, select
 
 from .. import duck
-from ..db import SessionLocal
+from ..db import RefSessionLocal
 from ..models import Collector, CollectorAlias
 from ..names import collector_index, fold
 
@@ -66,7 +66,7 @@ def _subject(doc: dict) -> dict | None:
     names = [n for n in (s.get("name"), s.get("name_en")) if n]
     if not names:
         return None
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         c = db.execute(
             select(Collector).where(
                 or_(Collector.name.in_(names), Collector.name_en.in_(names))
@@ -106,7 +106,7 @@ def _resolve_party(doc: dict) -> dict[str, dict | None]:
         return {}
 
     out: dict[str, dict | None] = {}
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         index = collector_index(db)
         ids = {}
         for key, names in wanted.items():
@@ -150,13 +150,13 @@ def _collector_source(collector_id: int) -> tuple[str, list[Any]]:
     Mirrors ``collectors._career_source`` — the alias join belongs in DuckDB when
     the sqlite is attached, and is inlined as raw strings when it is not.
     """
-    if duck.annotations_attached():
+    if duck.reference_attached():
         return (
-            "FROM occurrence o JOIN ann.collector_alias a ON a.recorded_by = o.recorded_by "
+            "FROM occurrence o JOIN ref.collector_alias a ON a.recorded_by = o.recorded_by "
             "WHERE a.collector_id = ?",
             [collector_id],
         )
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         aliases = list(db.execute(
             select(CollectorAlias.recorded_by).where(
                 CollectorAlias.collector_id == collector_id

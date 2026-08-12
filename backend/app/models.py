@@ -14,7 +14,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .db import Base
+# Which base a table inherits decides which file it lives in: `Base` is the
+# annotation store (user work, backed up), `RefBase` the reference store (seeded,
+# disposable). See db.py. Nothing may declare a ForeignKey across the two.
+from .db import Base, RefBase
 
 # Annotation workflow states.
 STATUSES = ("draft", "submitted", "accepted", "rejected", "merged")
@@ -104,7 +107,7 @@ class TranscribeRequest(Base):
     field_model: Mapped[str | None] = mapped_column(String(64))
 
 
-class Collector(Base):
+class Collector(RefBase):
     """A canonical collector (person). Enrichment over the read-only occurrence
     store: occurrences map in via ``CollectorAlias.recorded_by`` (the raw string),
     so this survives a fresh ``make ingest`` of the DuckDB occurrences."""
@@ -123,7 +126,7 @@ class Collector(Base):
     aliases: Mapped[list["CollectorAlias"]] = relationship(back_populates="collector")
 
 
-class CollectorAlias(Base):
+class CollectorAlias(RefBase):
     """Maps one raw ``recorded_by`` value to a collector (the first listed person).
 
     Keyed on the raw string -- intrinsic to the occurrence data, not a DuckDB row
@@ -138,7 +141,7 @@ class CollectorAlias(Base):
     collector: Mapped[Collector] = relationship(back_populates="aliases")
 
 
-class SamplingEvent(Base):
+class SamplingEvent(RefBase):
     """One documented collecting event from a published chronology.
 
     The *upper* half of the platform's two trip concepts. Trips on a collector's
@@ -182,7 +185,7 @@ class SamplingEvent(Base):
     )
 
 
-class SamplingEventActor(Base):
+class SamplingEventActor(RefBase):
     """One participant in a sampling event.
 
     A separate table because a chronology row is often a party rather than a

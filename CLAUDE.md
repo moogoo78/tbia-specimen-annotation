@@ -18,9 +18,25 @@ Occurrence data is **read-only**; enrichment lives only as annotations. Hence tw
   + table `dataset` (one row per `tbia_dataset_id`). Read-only at serve time; columnar →
   fast facets/completeness aggregation; queries run in a threadpool (`app/duck.py`).
   `build.py` loads the export's own columns; `make prepare` adds the derived ones.
-- **SQLite** (`data/annotations.sqlite`) — annotations + users (writes) via SQLAlchemy.
-- **Federated joins**: DuckDB `ATTACH`es the SQLite file (`sqlite_scanner`, read-only) so
-  dashboard/export queries join occurrences ↔ annotations in one SQL pass.
+- **SQLite ×2** (`app/db.py`), split by **what it costs to lose the file**:
+  - `data/annotations.sqlite` — `users`, `annotations`, `transcribe_requests`
+    (`Base` / `SessionLocal`). Irreplaceable; this is the one to back up, and it stays
+    small (tens of KB until annotations accumulate).
+  - `data/reference.sqlite` — `collectors`, `collector_alias`, `sampling_event`,
+    `sampling_event_actor` (`RefBase` / `RefSessionLocal`). ~2.5 MB, and every row is
+    rebuilt by `make seed-collectors` / `make seed-sampling-events`, so the file is
+    disposable — delete it and re-seed. A seeder therefore **cannot** reach user work:
+    it is writing a different file. Which `Base` a model inherits is what decides
+    which file it lands in, and **no ForeignKey may cross the two**.
+  - Deployments created before the split are migrated in place at startup by
+    `db._move_reference_tables()` (copy → verify counts → drop → vacuum), in the same
+    style as `_migrate_users()`. Idempotent; a restart is the whole upgrade.
+- **Federated joins**: DuckDB `ATTACH`es both files read-only (`sqlite_scanner`) as
+  `ann` and `ref`, so dashboard/export queries join occurrences ↔ annotations, and
+  collector/story/search queries join occurrences ↔ `ref.collector_alias`, in one SQL
+  pass. Each attaches independently — guard `ann.*` queries on `duck.annotations_attached()`
+  and `ref.*` queries on `duck.reference_attached()`, or a missing file sends a caller
+  into a query against a table DuckDB cannot see instead of its Python fallback.
 - **Backend**: FastAPI, JWT auth, roles `contributor | reviewer | admin`.
 - **Frontend**: React + Vite + TS, bilingual zh-TW / English (i18next). Reuses the design
   tokens/components ported from the `naturedb-portal.zip` mockup.
@@ -69,7 +85,8 @@ backend/ingest/     common.py (export access, registry, column baseline), inspec
 backend/tests/      conftest.py builds a tiny DuckDB+SQLite; test_search, test_annotations
 frontend/src/       pages/ (Explore + exploreUrl.ts, RecordDetail, Dashboard, Login), components/,
                     api/, i18n/, design/, seo/ (pages.json + useSeo.ts)
-data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.json (gitignored)
+data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
+                    reference.sqlite (seeded) + registry.json (gitignored)
 ```
 
 ## Conventions
@@ -421,12 +438,14 @@ the home page. `useSeo` sets the real one client-side.
 - Password hashing uses **pbkdf2_sha256** (not bcrypt) — passlib+bcrypt 4.x is broken here.
 - `LoginRequest.email` is plain `str`, not `EmailStr` — demo `.test` TLD is rejected by
   email-validator.
-- SQLite schema is created via `metadata.create_all` at startup (no Alembic yet).
+- SQLite schema is created via `metadata.create_all` at startup (no Alembic yet) — on
+  **both** metadatas, `Base` and `RefBase`.
 - `init_db()` must run before `duck.connect()` (lifespan order in `main.py`) so the ATTACH
-  finds the SQLite file; otherwise `annotations_attached` is false and export falls back to
-  a Python-side join.
+  finds the SQLite files; otherwise `annotations_attached` / `reference_attached` are false
+  and those callers fall back to a Python-side join.
 - Settings via env with `NDB_` prefix (`app/config.py`): `NDB_DUCKDB_PATH` (defaults to
-  `data/tbia.duckdb`), `NDB_SQLITE_PATH`, `NDB_JWT_SECRET`, `NDB_CORS_ORIGINS`.
+  `data/tbia.duckdb`), `NDB_SQLITE_PATH`, `NDB_REFERENCE_PATH`, `NDB_JWT_SECRET`,
+  `NDB_CORS_ORIGINS`.
 - **`NDB_DEV_MODE` is the "throwaway local environment" switch, default off.** It
   permits the placeholder `NDB_JWT_SECRET` (the repo is public, so a deploy that
   keeps it is trivially forgeable — `Settings` raises at import otherwise) and is

@@ -11,7 +11,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
 from .. import duck
-from ..db import SessionLocal
+from ..db import RefSessionLocal
 from ..models import Collector, CollectorAlias, SamplingEvent, SamplingEventActor
 
 router = APIRouter(prefix="/api", tags=["collectors"])
@@ -28,7 +28,7 @@ def list_collectors(
     offset: int = 0,
 ):
     """Collectors for the dropdown, most-prolific first."""
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         stmt = select(Collector)
         if q:
             like = f"%{q.strip()}%"
@@ -54,7 +54,7 @@ def list_collectors(
 def resolve_collector(recorded_by: str):
     """The collector a raw ``recorded_by`` value maps to, or null if unmapped
     (organization / unknown). Used to make the record-detail collector clickable."""
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         alias = db.get(CollectorAlias, recorded_by)
         if alias is None:
             return None
@@ -87,12 +87,12 @@ BOARD_SORTS = ("records", "gap", "recent", "random")
 
 async def _occurrence_rollup() -> dict[int, dict]:
     """Per-collector record / georeferenced / year-span counts, keyed by id."""
-    if duck.annotations_attached():
+    if duck.reference_attached():
         rows = await duck.query(
             """SELECT a.collector_id AS id, count(*) AS n_records,
                       count(*) FILTER (WHERE o.has_coordinates) AS n_geo,
                       min(o.year) AS year_min, max(o.year) AS year_max
-               FROM occurrence o JOIN ann.collector_alias a ON a.recorded_by = o.recorded_by
+               FROM occurrence o JOIN ref.collector_alias a ON a.recorded_by = o.recorded_by
                GROUP BY a.collector_id"""
         )
         return {r["id"]: r for r in rows}
@@ -106,7 +106,7 @@ async def _occurrence_rollup() -> dict[int, dict]:
     )
     by_raw = {r["recorded_by"]: r for r in raw}
     out: dict[int, dict] = {}
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         aliases = db.execute(
             select(CollectorAlias.collector_id, CollectorAlias.recorded_by)
         ).all()
@@ -133,7 +133,7 @@ async def _board_rows() -> list[dict]:
             return _BOARD
 
         stats = await _occurrence_rollup()
-        with SessionLocal() as db:
+        with RefSessionLocal() as db:
             collectors = db.execute(
                 select(Collector.id, Collector.name, Collector.name_en, Collector.n_records)
             ).all()
@@ -220,7 +220,7 @@ async def collector_board(
 def get_collector(collector_id: int):
     """A collector plus its raw ``recorded_by`` aliases (use these to filter
     occurrences: ``WHERE recorded_by IN (aliases)``)."""
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         c = db.get(Collector, collector_id)
         if c is None:
             raise HTTPException(status_code=404, detail="Collector not found")
@@ -246,13 +246,13 @@ def _career_source(collector_id: int) -> tuple[str, list]:
     Prefers the ATTACHed sqlite so the alias join happens inside DuckDB; falls
     back to inlining the raw strings, exactly as ``search._collector_clause``.
     """
-    if duck.annotations_attached():
+    if duck.reference_attached():
         return (
-            "FROM occurrence o JOIN ann.collector_alias a ON a.recorded_by = o.recorded_by "
+            "FROM occurrence o JOIN ref.collector_alias a ON a.recorded_by = o.recorded_by "
             "WHERE a.collector_id = ?",
             [collector_id],
         )
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         aliases = list(db.execute(
             select(CollectorAlias.recorded_by).where(
                 CollectorAlias.collector_id == collector_id
@@ -351,7 +351,7 @@ async def collector_career(collector_id: int, gap: int = Query(default=7, ge=1, 
     Undated records cannot belong to a trip; they stay in ``summary`` as
     ``n_undated`` rather than disappearing.
     """
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         c = db.get(Collector, collector_id)
         if c is None:
             raise HTTPException(status_code=404, detail="Collector not found")

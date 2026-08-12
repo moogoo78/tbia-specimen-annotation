@@ -1,4 +1,4 @@
-"""Load the curated sampling-event chronology into SQLite.
+"""Load the curated sampling-event chronology into the reference store.
 
     python -m app.seed_sampling_events            # replace both tables from the JSON
     python -m app.seed_sampling_events --json …   # from a different file
@@ -24,7 +24,7 @@ from pathlib import Path
 
 from sqlalchemy import delete, select
 
-from .db import SessionLocal, init_db
+from .db import RefSessionLocal, init_db
 from .models import SamplingEvent, SamplingEventActor
 from .names import collector_index as _resolver
 from .names import fold as _norm
@@ -118,7 +118,7 @@ def populate(json_path: Path | str | None = None, dry_run: bool = False) -> dict
     unmatched: list[str] = []
     n_actors = n_resolved = 0
 
-    with SessionLocal() as db:
+    with RefSessionLocal() as db:
         index = _resolver(db)
 
         # Replace wholesale in one transaction: re-running after a correction

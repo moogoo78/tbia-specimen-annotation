@@ -16,6 +16,7 @@ migrate the SQLite annotation store to a managed database.
                          └─ /api/* ─> backend (uvicorn, 1 worker) ── mounts ./data
                                                                      tbia.duckdb (ro)
                                                                      annotations.sqlite (rw)
+                                                                     reference.sqlite (rw)
 ```
 
 The frontend calls a **relative `/api`** and the backend serves no static files,
@@ -80,25 +81,28 @@ make seed                    # SQLite schema + demo user rows
 make seed-collectors         # ~17k collectors + their recorded_by aliases
 make seed-sampling-events    # the 37-entry survey chronology (/history)
 
-scp data/tbia.duckdb data/annotations.sqlite ubuntu@<elastic-ip>:$APP/data/
+scp data/tbia.duckdb data/annotations.sqlite data/reference.sqlite ubuntu@<elastic-ip>:$APP/data/
 ```
 
 `make seed` alone creates the schema and three demo users and **nothing else**.
-The collector index and the chronology live in the same SQLite file but are
-written by their own seeders, so skipping them ships a database whose tables
-exist and are empty — `/collectors` and `/history` then render blank rather than
-erroring, which is easy to miss until someone asks why a page has no data.
+The collector index and the chronology live in the *other* SQLite file
+(`reference.sqlite`) and are written by their own seeders, so skipping them
+ships a database whose tables exist and are empty — `/collectors` and `/history`
+then render blank rather than erroring, which is easy to miss until someone asks
+why a page has no data. `curl /api/health` reports `reference_attached` for
+exactly this reason.
 
-> **The `scp` above is for the FIRST deploy only.** `annotations.sqlite` is the
-> only read-write store: once the site is live it holds every ORCID account and
-> every annotation. Copying your laptop's copy over it destroys all of that.
-> To add or correct seeded data on a running deployment, re-run the seeder
-> *in the container* instead — see [Updating the curated data](#updating-the-curated-data).
+> **The `scp` of `annotations.sqlite` is for the FIRST deploy only.** Once the
+> site is live that file holds every ORCID account and every annotation, and
+> copying your laptop's copy over it destroys all of that. `reference.sqlite`
+> carries no user work — it is rebuilt by the seeders — so it is safe to replace,
+> though re-running the seeders on the box is usually easier than copying. See
+> [Updating the curated data](#updating-the-curated-data).
 
 Verify on the box:
 
 ```bash
-ls -lh data/tbia.duckdb data/annotations.sqlite
+ls -lh data/tbia.duckdb data/annotations.sqlite data/reference.sqlite
 ```
 
 ## 4. Create the secrets file (`backend/.env`)
@@ -366,12 +370,27 @@ path to confirm it reports as blocked by robots.txt.
 | Restart | `docker compose -f docker-compose.prod.yml restart` |
 | Update code | `git pull && docker compose -f docker-compose.prod.yml up -d --build` |
 | Stop | `docker compose -f docker-compose.prod.yml down` |
-| Backup state | `cp data/annotations.sqlite data/annotations.$(date +%F).sqlite` (only mutable store) |
+| Backup state | `sqlite3 data/annotations.sqlite "VACUUM INTO 'data/annotations.$(date +%F).sqlite'"` (the only irreplaceable store) |
 | Reseed curated data | `exec backend python -m app.seed_sampling_events` (see *Updating the curated data*) |
 
 `restart: always` brings the stack back up after a reboot (Docker starts on
-boot). Back up `annotations.sqlite` regularly — a nightly cron copy to S3 is
-enough; everything else (DuckDB) is regenerable from the source export.
+boot). Back up `annotations.sqlite` regularly — a nightly copy to S3 is enough,
+and it is a small file (tens of KB until annotations accumulate). Everything
+else is regenerable: `reference.sqlite` from the seeders, `tbia.duckdb` from the
+source export.
+
+**Use `VACUUM INTO`, not `cp`.** The stores run in SQLite's default rollback
+journal mode, so a plain copy taken while the backend is mid-write can capture a
+torn file that restores to nothing. `VACUUM INTO` takes a consistent snapshot
+under concurrent writes and compacts it on the way out.
+
+> **Upgrading a deployment created before the two-store split.** Nothing to run:
+> the first restart on the new code moves `collectors`, `collector_alias`,
+> `sampling_event` and `sampling_event_actor` into `reference.sqlite`, verifies
+> the row counts, drops them from `annotations.sqlite` and vacuums it. The log
+> line is `[db] moved to reference store: …`. It copies before it drops and is
+> idempotent, so an interrupted run just repeats on the next start. Take a
+> backup first anyway — it is one command, above.
 
 ## Updating the occurrence data
 
@@ -395,9 +414,9 @@ The same applies after re-seeding curated data, since `/api/collectors*`,
 
 ## Updating the curated data
 
-The collector index and the survey chronology are seeded into
-`annotations.sqlite` — the live, read-write store — so they are **never** updated
-by copying a file up. Run the seeder inside the running backend:
+The collector index and the survey chronology live in `reference.sqlite`, which
+the backend writes, so they are **never** updated by copying a file up. Run the
+seeder inside the running backend:
 
 ```bash
 git pull                     # data/sampling_events.json is tracked in git
@@ -418,7 +437,9 @@ rest are 19th-century botanists holding no records in the export).
 > rows alone. The bare form belongs to the first build on your laptop (step 3),
 > where there is nothing to lose.
 
-Neither seeder touches users or annotations.
+Neither seeder can touch users or annotations: they write `reference.sqlite`,
+and those tables are in `annotations.sqlite`. That is the point of the split —
+the worst a mis-run seeder can do is cost you a re-seed.
 
 `data/story_begonia.json` needs no seeding at all — `/story/begonia` reads it
 from the same mounted directory per request, so `git pull` is the whole update.
@@ -444,12 +465,13 @@ from the same mounted directory per request, so `git pull` is the whole update.
   exist (created at startup) and hold no rows, so the API returns `[]` and the
   page is blank rather than broken. Confirm, then fix in place:
   ```bash
+  curl -s https://your-domain.org/api/health   # reference_attached: true?
   docker compose -f docker-compose.prod.yml exec backend python -c \
-    "import sqlite3; print(sqlite3.connect('/data/annotations.sqlite').execute('select count(*) from sampling_event').fetchone())"
+    "import sqlite3; print(sqlite3.connect('/data/reference.sqlite').execute('select count(*) from sampling_event').fetchone())"
   docker compose -f docker-compose.prod.yml exec backend python -m app.seed_sampling_events
   ```
-  Do **not** re-`scp` your laptop's `annotations.sqlite` — that overwrites live
-  users and annotations.
+  Re-`scp`ing your laptop's `reference.sqlite` is also safe — it holds no user
+  work. Never do that with `annotations.sqlite`, which holds all of it.
 - **503 "Server busy" / 504 "Query took too long"** — admission control doing
   its job (step 7), not a fault. A steady stream of them means real demand
   exceeds `NDB_DUCK_MAX_CONCURRENCY`; check whether the CDN is actually caching

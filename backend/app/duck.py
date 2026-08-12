@@ -2,8 +2,11 @@
 
 A single read-only connection is opened at startup; each query uses an
 independent ``cursor()`` (safe across threads) and runs in the threadpool so it
-never blocks the event loop. The SQLite annotation DB is ATTACHed read-only so
-dashboard/export queries can join occurrences against annotations in one pass.
+never blocks the event loop. Both SQLite stores are ATTACHed read-only — ``ann``
+(users, annotations) and ``ref`` (collectors, sampling events) — so dashboard,
+export and collector queries can join occurrences against them in one pass.
+Each is attached and reported independently: a missing ``ref`` must not make an
+export think annotations are unavailable, or the other way round.
 
 **Concurrency is capped here, not upstream.** Reads are public and
 unauthenticated, and a facet or species rollup is a grouped scan over ~2M rows,
@@ -38,7 +41,8 @@ from anyio import to_thread
 from .config import settings
 
 _con: duckdb.DuckDBPyConnection | None = None
-_attached = False
+_attached = False      # annotations store (users, annotations)
+_ref_attached = False  # reference store (collectors, sampling events)
 
 
 class DuckOverloaded(RuntimeError):
@@ -70,8 +74,8 @@ def _limiter() -> anyio.CapacityLimiter:
 
 
 def connect() -> None:
-    """Open the read-only DuckDB connection and attach the annotation DB."""
-    global _con, _attached
+    """Open the read-only DuckDB connection and attach both SQLite stores."""
+    global _con
     if not os.path.exists(settings.duckdb_path):
         raise RuntimeError(
             f"DuckDB not found at {settings.duckdb_path}. Run `make prepare` first."
@@ -84,32 +88,41 @@ def connect() -> None:
         _con.execute(f"PRAGMA memory_limit='{settings.duck_memory_limit}'")
     if settings.duck_temp_dir:
         _con.execute(f"PRAGMA temp_directory='{settings.duck_temp_dir}'")
-    _attach_annotations()
+    _attach_stores()
 
 
-def _attach_annotations() -> None:
-    global _attached
-    if _con is None or _attached:
+def _attach_stores() -> None:
+    """Attach both SQLite stores, each on its own so one missing file only
+    disables the queries that actually read it."""
+    global _attached, _ref_attached
+    if _con is None:
         return
-    if not os.path.exists(settings.sqlite_path):
-        return  # annotations DB not created yet; search still works
+    if not _attached:
+        _attached = _attach_one(settings.sqlite_path, "ann")
+    if not _ref_attached:
+        _ref_attached = _attach_one(settings.reference_path, "ref")
+
+
+def _attach_one(path: str, alias: str) -> bool:
+    if not os.path.exists(path):
+        return False  # store not created yet; search still works
     try:
         _con.execute("INSTALL sqlite")
         _con.execute("LOAD sqlite")
-        _con.execute(
-            f"ATTACH '{settings.sqlite_path}' AS ann (TYPE sqlite, READ_ONLY)"
-        )
-        _attached = True
+        _con.execute(f"ATTACH '{path}' AS {alias} (TYPE sqlite, READ_ONLY)")
+        return True
     except Exception as exc:  # pragma: no cover - environment dependent
-        print(f"[duck] could not attach annotations sqlite: {exc}")
+        print(f"[duck] could not attach {alias} sqlite ({path}): {exc}")
+        return False
 
 
 def close() -> None:
-    global _con, _attached
+    global _con, _attached, _ref_attached
     if _con is not None:
         _con.close()
         _con = None
         _attached = False
+        _ref_attached = False
 
 
 def _cursor() -> duckdb.DuckDBPyConnection:
@@ -166,4 +179,14 @@ async def query_one(sql: str, params: list[Any] | None = None) -> dict[str, Any]
 
 
 def annotations_attached() -> bool:
+    """Users + annotations are joinable (export, health)."""
     return _attached
+
+
+def reference_attached() -> bool:
+    """Collectors + sampling events are joinable. Guard the queries that read
+    `ref.*` on this, not on `annotations_attached()` — the two files can be
+    present independently, and a reference store that is missing (or not yet
+    seeded) should send those callers to their Python fallback rather than into
+    a query against a table DuckDB cannot see."""
+    return _ref_attached

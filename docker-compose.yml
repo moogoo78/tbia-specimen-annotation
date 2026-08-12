@@ -14,6 +14,7 @@ services:
     environment:
       NDB_DUCKDB_PATH: /data/tbia.duckdb
       NDB_SQLITE_PATH: /data/annotations.sqlite
+      NDB_REFERENCE_PATH: /data/reference.sqlite
       # ORCID sign-in — values interpolated from the project-root .env
       # (see .env.example). Empty client id => sign-in returns 503.
       ORCID_BASE: ${ORCID_BASE:-https://orcid.org}
