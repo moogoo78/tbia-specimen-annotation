@@ -66,7 +66,8 @@ backend/ingest/     common.py (export access, registry, column baseline), inspec
                     (survey an export), build.py (export -> DuckDB), prepare.py
                     (derive flags), columns.json (the pinned export header)
 backend/tests/      conftest.py builds a tiny DuckDB+SQLite; test_search, test_annotations
-frontend/src/       pages/ (Explore, RecordDetail, Dashboard, Login), components/, api/, i18n/, design/
+frontend/src/       pages/ (Explore + exploreUrl.ts, RecordDetail, Dashboard, Login), components/,
+                    api/, i18n/, design/, seo/ (pages.json + useSeo.ts)
 data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.json (gitignored)
 ```
 
@@ -135,8 +136,9 @@ provenance the source does not support and would flow into provider exports as c
 `GET /api/sampling-events/counts` is the one place the chronology touches DuckDB: per event,
 how many records its *resolved* actors hold within its years — one grouped join, cached on the
 actor/year signature so a re-seed invalidates it. `/history` shows that number as the specimen
-column and links it into Explore (collectors + `year_from/year_to`, `has_media` cleared so the
-result matches the count); zero renders as an em dash rather than a link into nothing. It
+column and links it into Explore via `exploreUrl()` (collectors + `year_from/year_to`,
+`has_media` cleared so the result matches the count); zero renders as an em dash rather than
+a link into nothing. It
 stores nothing and associates nothing — a counted record may well come from other fieldwork
 the same person did those years — so keep it out of the export path.
 
@@ -172,9 +174,38 @@ grouping, so paging in SQL would pay the full scan per request. Nothing is persi
 `scientific_name` is an **exact, multi-valued filter** on the occurrence search
 (`search.py` `Filters` + `build_where`, so list/count/facet all get it) and is deliberately
 **not** in `FACET_COLUMNS` — 44,874 values is not a facet list, and the species page is the
-picker. A row links into Explore through router `state` (the `/history` mechanism) and must
+picker. A row links into Explore through `exploreUrl()` (see *Explore's URL* below) and must
 clear `has_media`, which `emptyFilters()` defaults to `true`; without that the landing page
 would report fewer records than the row it was opened from.
+
+## Explore's URL
+
+**Explore's filter state is the query string** (`pages/exploreUrl.ts` + `useSearchParams`),
+so a filtered view can be reloaded, shared, and returned to with the back button — which
+matters most on the way back from a record, where the search used to have to be redone by
+hand. Nothing about the filters lives in component state any more; the setters in
+`Explore.tsx` kept their old signatures and write the URL instead.
+
+- **The page's parameters are the API's parameters.** `exploreUrl.ts` builds on
+  `client.ts`'s `filtersToParams` and its inverse `paramsToFilters` (kept beside it so the
+  two cannot drift), so `/explore?q=x` and `/api/occurrences?q=x` mean the same thing and a
+  page's query pasted onto the API returns the rows on screen.
+- **"No parameters at all" is not "this parameter is absent."** `emptyFilters()` starts
+  `has_media` **true** while the API convention reads an absent boolean as false, so
+  `parseExplore` treats a bare `/explore` as the landing defaults and anything else as
+  literal. Every link in goes through **`exploreUrl()`**, which starts from
+  `emptyFilters()` — so an unmentioned flag keeps its landing default, and a link that
+  wants every record still has to say `flags: { has_media: false }` explicitly.
+- Edits **replace** rather than push, so the back button leaves the page instead of
+  stepping through every checkbox.
+- `source` and `collector_id` are serialised, not the `tbia_dataset_id` they expand into —
+  writing both would let the two copies disagree. A URL carries collector **ids** only, so
+  the chip labels are resolved through `GET /api/collectors/{id}` on arrival and cached.
+- `activeId` (the split view's selected record) is deliberately **not** in the URL.
+
+This replaced a router-`state` handoff that applied filters once per navigation and then
+nulled itself out. If you add a link into Explore, use `exploreUrl()` — a second mechanism
+is how the two drift.
 
 ## Curated stories (`/story`)
 
