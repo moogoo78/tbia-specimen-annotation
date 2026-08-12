@@ -42,11 +42,9 @@ function setCanonical(href: string) {
 }
 
 const SITE = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/+$/, "");
-const SUFFIX = "TBIA自然史標本探索與標註平台";
-
 /** Apply title/description for `path`, or for explicitly supplied strings. */
 export function useSeo(override?: { title?: string; description?: string }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const lang = i18n.language?.startsWith("en") ? "en" : "zh";
   const { pathname: path } = useLocation();
   const page = PAGES.find((p) => p.path === path);
@@ -54,8 +52,12 @@ export function useSeo(override?: { title?: string; description?: string }) {
   const title = override?.title ?? page?.title[lang];
   const description = override?.description ?? page?.description[lang];
 
+  // The site name comes from the i18n catalogue rather than a constant here, so
+  // it follows the reader's language and there is one fewer copy of it.
+  const suffix = t("app.title");
+
   useEffect(() => {
-    if (title) document.title = path === "/" ? title : `${title} — ${SUFFIX}`;
+    if (title) document.title = path === "/" ? title : `${title} — ${suffix}`;
     if (description) {
       upsertMeta(
         'meta[name="description"]',
@@ -71,5 +73,5 @@ export function useSeo(override?: { title?: string; description?: string }) {
     // other path it would otherwise be missing or (from the SPA fallback file)
     // absent entirely. Set the real one here.
     if (SITE) setCanonical(SITE + path);
-  }, [title, description, path]);
+  }, [title, description, path, suffix]);
 }

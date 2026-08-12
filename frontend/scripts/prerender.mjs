@@ -30,6 +30,8 @@ const dist = resolve(here, "..", "dist");
 const { pages } = JSON.parse(readFileSync(resolve(here, "..", "src", "seo", "pages.json"), "utf8"));
 
 const SITE = (process.env.VITE_SITE_URL || "").replace(/\/+$/, "");
+// og:site_name is the home page's own title — one copy of the name, not two.
+const SITE_NAME = pages.find((p) => p.path === "/").title.zh;
 const LANG = "zh"; // matches <html lang="zh-Hant">; the runtime hook follows the user's choice
 
 const shellPath = join(dist, "index.html");
@@ -68,7 +70,7 @@ function headFor(page, { canonical }) {
   const tags = [
     `<meta name="description" content="${attr(desc)}" />`,
     `<meta property="og:type" content="${type}" />`,
-    `<meta property="og:site_name" content="TBIA自然史標本探索與標註平台" />`,
+    `<meta property="og:site_name" content="${attr(SITE_NAME)}" />`,
     `<meta property="og:locale" content="zh_TW" />`,
     `<meta property="og:title" content="${attr(title)}" />`,
     `<meta property="og:description" content="${attr(desc)}" />`,
