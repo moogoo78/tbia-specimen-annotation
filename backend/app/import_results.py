@@ -105,7 +105,7 @@ async def import_file(db: Session, path: Path, *, commit: bool) -> str:
             raise ValueError("occurrence not found")
 
         result = extract.parse_pasted(occ_id, raw)  # validates, clamps, drops unknowns
-        result.image_url = (record.get("media") or [None])[0]
+        result.image_urls = extract.images(record)
 
         rows = build_annotations(
             result, record, req.contributor_id, default_service=DEFAULT_SERVICE,

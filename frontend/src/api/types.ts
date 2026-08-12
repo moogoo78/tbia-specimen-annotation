@@ -104,7 +104,9 @@ export interface Annotation {
 export interface ExtractedField { field: string; value: string; confidence: number; }
 export interface ExtractResponse {
   occurrence_id: string;
-  image_url: string | null;
+  // Every image the transcription read — a record's media are views of one
+  // specimen, so they go into one request and yield one set of fields.
+  image_urls: string[];
   model: string;
   service?: string | null;
   extracted_at?: string | null;
@@ -112,7 +114,7 @@ export interface ExtractResponse {
 }
 export interface ExtractPromptResponse {
   occurrence_id: string;
-  image_url: string | null;
+  image_urls: string[];
   target_fields: string[];
   prompt: string;
 }
@@ -123,6 +125,13 @@ export interface TranscribeRequest {
   contributor_id: number;
   created: string;
   notified: boolean;
+  // Queued requests come back pending / 0 — the worker moves them later. The
+  // admin-only run-now route has already processed the request by the time it
+  // answers, so these carry its outcome.
+  status: "pending" | "done" | "failed" | string;
+  processed_at: string | null;
+  error: string | null;
+  n_annotations: number;
 }
 
 export interface TranscribeOptions {

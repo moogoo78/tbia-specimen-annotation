@@ -67,7 +67,31 @@ def test_extract_prompt_targets_gap_fields(client):
     data = res.json()
     assert "annotationScientificName" in data["target_fields"]
     assert "annotationScientificName" in data["prompt"]
-    assert data["image_url"] is None  # r2 has no media
+    assert data["image_urls"] == []  # r2 has no media
+
+
+def test_extract_prompt_lists_every_image(client):
+    """r4 has two media URLs. Both must reach the prompt, with the rule that says
+    they are one specimen — otherwise a value legible only on the second image is
+    silently unreachable."""
+    res = client.get("/api/occurrences/r4/extract-prompt", headers=auth_header(client, CURATOR))
+    assert res.status_code == 200
+    data = res.json()
+    assert data["image_urls"] == ["http://x/img4.jpg", "http://x/img4b.jpg"]
+    for url in data["image_urls"]:
+        assert url in data["prompt"]
+    assert "SAME specimen" in data["prompt"]
+
+
+def test_extract_prompt_caps_images(client, monkeypatch):
+    """The cap bounds what one record can cost; images dominate the token bill."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "transcribe_max_images", 1)
+    data = client.get("/api/occurrences/r4/extract-prompt",
+                      headers=auth_header(client, CURATOR)).json()
+    assert data["image_urls"] == ["http://x/img4.jpg"]
+    assert "http://x/img4b.jpg" not in data["prompt"]
 
 
 def test_extract_prompt_404_for_unknown_record(client):

@@ -117,6 +117,14 @@ class Settings(BaseSettings):
     transcribe_mode: str = Field(default="two_stage", validation_alias="TRANSCRIBE_MODE")
     ocr_model: str = Field(default="claude-sonnet-5", validation_alias="OCR_MODEL")
     field_model: str = Field(default="claude-opus-5", validation_alias="FIELD_MODEL")
+    # A record often carries several images of the *same* specimen (the sheet,
+    # a label close-up, a determination slip), and the label text is frequently
+    # only legible in one of them — so all of them go into the request. The cap
+    # bounds what one record can cost: images dominate the token bill, and a few
+    # TBIA records carry dozens of media URLs.
+    transcribe_max_images: int = Field(
+        default=4, validation_alias="TRANSCRIBE_MAX_IMAGES"
+    )
 
     @model_validator(mode="after")
     def _refuse_insecure_defaults(self) -> "Settings":

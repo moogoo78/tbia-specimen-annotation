@@ -97,7 +97,10 @@ class ExtractedField(BaseModel):
 
 class ExtractResponse(BaseModel):
     occurrence_id: str
-    image_url: str | None
+    # Every image the transcription was made from — a record's media are views
+    # of one specimen (sheet, label close-up, determination slip), so they are
+    # read together into one set of fields rather than one per image.
+    image_urls: list[str] = []
     model: str
     service: str | None = None       # AI service the contributor used (e.g. ChatGPT)
     extracted_at: str | None = None  # date of the extraction (YYYY-MM-DD)
@@ -109,7 +112,7 @@ class ExtractResponse(BaseModel):
 # own AI chat, then parses the JSON they paste back into an ExtractResponse.
 class ExtractPromptResponse(BaseModel):
     occurrence_id: str
-    image_url: str | None
+    image_urls: list[str] = []
     target_fields: list[str]
     prompt: str
 
@@ -144,3 +147,10 @@ class TranscribeRequestOut(BaseModel):
     contributor_id: int
     created: datetime
     notified: bool = False  # whether a Discord ping was actually sent
+    # Filled in by the run-now route, which has already processed the request by
+    # the time it answers. Queued requests come back pending / 0 — the worker is
+    # what moves them, and the record detail is where their outcome shows up.
+    status: str = "pending"
+    processed_at: datetime | None = None
+    error: str | None = None
+    n_annotations: int = 0

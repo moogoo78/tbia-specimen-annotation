@@ -526,7 +526,14 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
 function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: string, value: string) => void }) {
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [open, setOpen] = useState<"queue" | "paste" | null>(null);
+  // Which server-side route runs it. Admins can swap the queue for a call that
+  // happens now: same destination (a transcribe_requests row + `ai` drafts),
+  // but they wait for it and it bills the moment they click — hence admin-only,
+  // and hence the queue stays the default even for them.
+  const isAdmin = user?.role === "admin";
+  const [route, setRoute] = useState<"queue" | "now">("queue");
   const [pasteRaw, setPasteRaw] = useState("");
   const [copied, setCopied] = useState(false);
   const [drafts, setDrafts] = useState<ExtractedField[]>([]);
@@ -573,6 +580,15 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
     mutationFn: () => api.scheduleTranscribe(record.id),
     onSuccess: () => { setOpen(null); qc.invalidateQueries({ queryKey: ["detail", record.id] }); },
   });
+  // Run it here and now (admin). A pipeline failure comes back as a normal
+  // response with status "failed", so it is read off the result rather than
+  // caught as an error; the card stays open either way, because the outcome —
+  // drafts written, or why not — is the thing worth reading.
+  const nowMut = useMutation({
+    mutationFn: () => api.transcribeNow(record.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["detail", record.id] }),
+  });
+  const running = queueMut.isPending || nowMut.isPending;
   const copyPrompt = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -601,21 +617,56 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
       <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ fontSize: 10, color: t.fgSubtle }}>{tr("annotate.aiPickHint")}</div>
 
-        {/* route A — hand it to the platform's batch worker */}
-        <OptionCard n={1} title={tr("annotate.optQueueTitle")} what={tr("annotate.optQueueWhat")}
+        {/* route A — the platform's own AI: queued for the batch worker, or,
+            for an admin, run in the request they just made */}
+        <OptionCard n={1}
+          title={tr(route === "now" ? "annotate.optRunNowTitle" : "annotate.optQueueTitle")}
+          what={tr(route === "now" ? "annotate.optRunNowWhat" : "annotate.optQueueWhat")}
           open={open === "queue"} onToggle={() => setOpen(open === "queue" ? null : "queue")}
-          cta={q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")} disabled={!hasImage}
+          cta={route === "now" ? tr("annotate.optRunNowGo") : q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")}
+          disabled={!hasImage}
           meta={engineChain ? tr("annotate.engineIs", { name: engineChain }) : undefined}>
-          <div style={{ fontSize: 10, color: t.fgSubtle }}>{tr("annotate.optQueueSlow")}</div>
+          {isAdmin && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 10, color: t.fgMuted }}>{tr("annotate.routeLabel")}</span>
+              {(["queue", "now"] as const).map((r) => (
+                <Button key={r} small primary={route === r} disabled={running}
+                  onClick={() => setRoute(r)}>
+                  {tr(r === "now" ? "annotate.routeNow" : "annotate.routeQueue")}
+                </Button>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: t.fgSubtle }}>
+            {tr(route === "now" ? "annotate.optRunNowSlow" : "annotate.optQueueSlow")}
+          </div>
           {engineChain && (
             <div style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>
               {tr("annotate.engineIs", { name: engineChain })}
             </div>
           )}
-          {queueMut.isError && <div style={{ fontSize: 10, color: t.danger }}>{(queueMut.error as Error).message}</div>}
-          <Button primary small disabled={!hasImage || queueMut.isPending}
-            onClick={() => queueMut.mutate()}>
-            {queueMut.isPending ? "…" : <><Icon name="down" size={11} />{q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")}</>}
+          {(queueMut.isError || nowMut.isError) && (
+            <div style={{ fontSize: 10, color: t.danger }}>
+              {((queueMut.error || nowMut.error) as Error).message}
+            </div>
+          )}
+          {/* run-now result: the pipeline reports its own failures in-band */}
+          {nowMut.data && (
+            <div style={{ fontSize: 10, color: nowMut.data.status === "failed" ? t.danger : t.ok }}>
+              {nowMut.data.status === "failed"
+                ? `${tr("annotate.qFailed")} — ${nowMut.data.error ?? ""}`
+                : tr("annotate.nowDone", { n: nowMut.data.n_annotations })}
+            </div>
+          )}
+          {nowMut.isPending && <div style={{ fontSize: 10, color: t.warn }}>{tr("annotate.nowRunning")}</div>}
+          <Button primary small disabled={!hasImage || running}
+            onClick={() => (route === "now" ? nowMut : queueMut).mutate()}>
+            {running ? "…" : (
+              <>
+                <Icon name={route === "now" ? "spark" : "down"} size={11} />
+                {route === "now" ? tr("annotate.optRunNowGo") : q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")}
+              </>
+            )}
           </Button>
         </OptionCard>
 
@@ -627,13 +678,21 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
           {promptQuery.data && (
             <>
               <Step n={1} label={tr("annotate.step1")}>
-                {promptQuery.data.image_url ? (
+                {/* One link per image: a record's media are views of the same
+                    specimen (sheet, label close-up, determination slip), and the
+                    prompt below asks the chat to read them together. */}
+                {promptQuery.data.image_urls.length > 0 ? (
                   <>
-                    <a href={promptQuery.data.image_url} target="_blank" rel="noreferrer"
-                      style={{ color: t.accent, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <Icon name="img" size={11} />{tr("annotate.step1")} ↗
-                    </a>
-                    <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 2 }}>{tr("annotate.step1hint")}</div>
+                    {promptQuery.data.image_urls.map((url, i, all) => (
+                      <a key={url} href={url} target="_blank" rel="noreferrer"
+                        style={{ color: t.accent, fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+                        <Icon name="img" size={11} />
+                        {all.length > 1 ? tr("annotate.step1n", { n: i + 1 }) : tr("annotate.step1")} ↗
+                      </a>
+                    ))}
+                    <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 2 }}>
+                      {tr(promptQuery.data.image_urls.length > 1 ? "annotate.step1hintMulti" : "annotate.step1hint")}
+                    </div>
                   </>
                 ) : (
                   <div style={{ fontSize: 10, color: t.warn }}>{tr("annotate.step1none")}</div>
