@@ -34,27 +34,44 @@ export function Explore() {
   const state = useMemo(() => parseExplore(sp), [sp]);
   const { filters, sources, sort, offset, view } = state;
 
+  // One write per handler, always. `setSearchParams` builds the next URL from
+  // the render's `searchParams` — even given a function, it passes the closure
+  // value, not a live ref — and `navigate` is async, so two calls in the same
+  // handler both start from the pre-click URL and the second silently discards
+  // the first. That is why the setters below fold in their own `offset: 0`
+  // instead of leaving the caller to add a second call.
   const update = useCallback(
     (patch: (s: ExploreState) => Partial<ExploreState>) => {
-      setSp(exploreParams({ ...state, ...patch(state) }), { replace: true });
+      setSp(
+        (prev) => {
+          const cur = parseExplore(prev);
+          return exploreParams({ ...cur, ...patch(cur) });
+        },
+        { replace: true },
+      );
     },
-    [state, setSp],
+    [setSp],
   );
   // Same signatures the component body already used, so only their backing
   // store changed: each of these now edits the URL.
   const setFilters = useCallback(
     (u: Filters | ((f: Filters) => Filters)) =>
-      update((s) => ({ filters: typeof u === "function" ? u(s.filters) : u })),
+      update((s) => ({ filters: typeof u === "function" ? u(s.filters) : u, offset: 0 })),
     [update],
   );
   const setSources = useCallback(
     (u: string[] | ((v: string[]) => string[])) =>
-      update((s) => ({ sources: typeof u === "function" ? u(s.sources) : u })),
+      update((s) => ({ sources: typeof u === "function" ? u(s.sources) : u, offset: 0 })),
     [update],
   );
+  /** Paging only — every other edit resets the offset itself. */
   const setOffset = useCallback((n: number) => update(() => ({ offset: n })), [update]);
   const setSort = useCallback((v: string) => update(() => ({ sort: v, offset: 0 })), [update]);
-  const setView = useCallback((v: View) => update(() => ({ view: v })), [update]);
+  // The map fetches a different page size, so switching to it starts over.
+  const setView = useCallback(
+    (v: View) => update((s) => ({ view: v, offset: v === "map" ? 0 : s.offset })),
+    [update],
+  );
 
   const [qInput, setQInput] = useState(() => state.filters.q ?? "");
   const [showFacets, setShowFacets] = useState(true);
@@ -131,9 +148,8 @@ export function Explore() {
       const cur = f[key];
       return { ...f, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] };
     });
-    setOffset(0);
   };
-  const toggleFlag = (flag: FlagKey) => { setFilters((f) => ({ ...f, [flag]: !f[flag] })); setOffset(0); };
+  const toggleFlag = (flag: FlagKey) => setFilters((f) => ({ ...f, [flag]: !f[flag] }));
   const toggleSource = (key: string) => {
     setSources((s) => {
       if (key.includes("/")) {  // child collection — toggle the one dataset
@@ -147,16 +163,11 @@ export function Explore() {
       const rest = s.filter((k) => !childKeys.includes(k));
       return all ? rest : [...rest, ...childKeys];
     });
-    setOffset(0);
   };
-  const setRecordRange = (from?: number, to?: number) => {
+  const setRecordRange = (from?: number, to?: number) =>
     setFilters((f) => ({ ...f, record_number_from: from, record_number_to: to }));
-    setOffset(0);
-  };
-  const setRecordText = (value?: string) => {
+  const setRecordText = (value?: string) =>
     setFilters((f) => ({ ...f, record_number: value }));
-    setOffset(0);
-  };
   const toggleCollector = (c: CollectorRef) => {
     setLabels((l) => ({ ...l, [c.id]: c.label }));
     update((s) => ({
@@ -216,13 +227,13 @@ export function Explore() {
     if (filters.date_from || filters.date_to) {
       out.push({
         label: `${filters.date_from ?? ""} → ${filters.date_to ?? ""}`,
-        onRemove: () => { setFilters((f) => ({ ...f, date_from: undefined, date_to: undefined })); setOffset(0); },
+        onRemove: () => setFilters((f) => ({ ...f, date_from: undefined, date_to: undefined })),
       });
     }
     if (filters.year_from != null || filters.year_to != null) {
       out.push({
         label: `${filters.year_from ?? ""}–${filters.year_to ?? ""}`,
-        onRemove: () => { setFilters((f) => ({ ...f, year_from: undefined, year_to: undefined })); setOffset(0); },
+        onRemove: () => setFilters((f) => ({ ...f, year_from: undefined, year_to: undefined })),
       });
     }
     if (filters.record_number_from != null || filters.record_number_to != null) {
@@ -240,7 +251,6 @@ export function Explore() {
       label: name,
       onRemove: () => {
         setFilters((f) => ({ ...f, scientific_name: f.scientific_name.filter((x) => x !== name) }));
-        setOffset(0);
       },
     }));
     (["missing_identification", "missing_coordinates", "missing_date", "has_media"] as FlagKey[])
@@ -273,7 +283,7 @@ export function Explore() {
         </span>
         <div style={{ display: "flex", border: `1px solid ${t.border}` }}>
           {(["table", "grid", "split", "map"] as View[]).map((v) => (
-            <button key={v} onClick={() => { setView(v); if (v === "map") setOffset(0); }} title={tr(`view.${v}`)} style={{
+            <button key={v} onClick={() => setView(v)} title={tr(`view.${v}`)} style={{
               padding: "0 8px", height: 26, border: "none",
               background: view === v ? t.accentSoft : "transparent",
               color: view === v ? t.accent : t.fgMuted, cursor: "pointer",
