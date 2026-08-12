@@ -38,6 +38,7 @@ make seed-sampling-events   # curated chronology (data/sampling_events.json) -> 
 make api            # FastAPI on :8000   (frontend proxies /api here)
 make web            # Vite dev server on :5173
 make test           # pytest (backend)
+make test-web       # Explore's URL, clicked in headless Chrome (needs api+web up)
 make build          # frontend production build (also typechecks)
 ```
 
@@ -206,6 +207,20 @@ hand. Nothing about the filters lives in component state any more; the setters i
 This replaced a router-`state` handoff that applied filters once per navigation and then
 nulled itself out. If you add a link into Explore, use `exploreUrl()` — a second mechanism
 is how the two drift.
+
+**One URL write per handler.** `setSearchParams` builds the next URL from the render's
+`searchParams` — even given a function it passes the closure value, not a live ref — and
+`navigate` is async, so two calls in one handler both start from the pre-click URL and the
+second silently discards the first. That shipped once: every facet checkbox ticked and
+changed nothing. `setFilters` / `setSources` / `setView` therefore fold in their own
+`offset: 0` rather than leaving the caller to add a second call.
+
+`make test-web` (`frontend/tests/explore-url.mjs`) is what catches this class. It clicks the
+real page in headless Chrome over CDP — no dependencies, Node's own WebSocket is enough —
+because `tsc`, the build, and loading `/explore?bio_group=…` all stayed green while the
+clicks were broken: they only ever exercised *parsing*. It needs `make api` + `make web` up,
+and asserts relationally (a facet row prints its count; clicking it must make the pager
+total equal *that*) so an ETL refresh cannot invalidate it.
 
 ## Curated stories (`/story`)
 
@@ -407,5 +422,8 @@ the home page. `useSeo` sets the real one client-side.
   `standard_date`, `class`, `order` and friends by name, so an upstream rename would load
   clean and then fail every query. A rename shows as one `+` and one `-`. Accept a change by
   editing the file and committing it; there is deliberately no override flag.
-- The Chrome browser-automation tools aren't connected in this environment — verify UI
-  changes via `tsc`/`vite build` + API checks, and ask the user for visual confirmation.
+- **`tsc` and `vite build` say nothing about whether the UI works.** Both stayed green
+  through a bug that broke every facet checkbox. For anything interactive, drive the real
+  page: `make test-web` for Explore, or headless Chrome over CDP the same way
+  (`frontend/tests/explore-url.mjs` is the worked example). The Chrome browser-automation
+  tools are connected when the extension is running, which is the other way to check.
