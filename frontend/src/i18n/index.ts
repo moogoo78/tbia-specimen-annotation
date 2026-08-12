@@ -183,6 +183,16 @@ const en = {
     optQueueWhat: "Adds this record to the processing queue. You don't have to wait — when it finishes, the proposed values appear below under \"Annotation history\" as submitted annotations for you to review.",
     optQueueGo: "Add to queue",
     optQueueSlow: "Processing is run in batches, so this usually is not instant.",
+    // Admin-only alternative to the queue: same result, but it happens now.
+    routeLabel: "Run it:",
+    routeQueue: "Queue",
+    routeNow: "Now",
+    optRunNowTitle: "Let the platform do it, now",
+    optRunNowWhat: "Calls the AI immediately instead of queueing. Stay on this page while it runs — when it finishes, the proposed values appear below under \"Annotation history\", exactly as the queue would have left them.",
+    optRunNowGo: "Transcribe now",
+    optRunNowSlow: "Admin only. Reading a label takes around half a minute, and the API is billed the moment you click.",
+    nowRunning: "Transcribing… this takes around half a minute. Keep this page open.",
+    nowDone: "Done — {{n}} proposed values written to Annotation history.",
     engineIs: "Engine: {{name}}",
 
     // Queue status strip
@@ -528,6 +538,15 @@ const zh: typeof en = {
     optQueueWhat: "把這筆紀錄排入處理佇列。你不需要等待 — 處理完成後，建議值會以「已送出」的標註出現在下方「標註紀錄」，再由你檢查。",
     optQueueGo: "排入佇列",
     optQueueSlow: "採批次處理，通常不會立即完成。",
+    routeLabel: "執行方式：",
+    routeQueue: "排入佇列",
+    routeNow: "立即執行",
+    optRunNowTitle: "交給平台處理（立即）",
+    optRunNowWhat: "不排隊，直接呼叫 AI。執行期間請停留在本頁 — 完成後建議值會出現在下方「標註紀錄」，與排隊處理的結果完全相同。",
+    optRunNowGo: "立即轉錄",
+    optRunNowSlow: "僅限管理員。讀一張標籤約需半分鐘，而且一按下就會產生 API 費用。",
+    nowRunning: "轉錄中…約需半分鐘，請勿關閉本頁。",
+    nowDone: "完成 — 已寫入 {{n}} 筆建議值到標註紀錄。",
     engineIs: "引擎：{{name}}",
 
     // Queue status strip

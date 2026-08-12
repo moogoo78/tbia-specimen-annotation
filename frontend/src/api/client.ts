@@ -218,6 +218,14 @@ export const api = {
       method: "POST",
       body: opts ? JSON.stringify(opts) : undefined,
     }),
+  // Admin only: run the transcription in the request instead of queueing it.
+  // Holds the connection for the tens of seconds a vision call takes, and a
+  // pipeline failure comes back as status "failed" rather than an HTTP error.
+  transcribeNow: (id: string, opts?: import("./types").TranscribeOptions) =>
+    request<import("./types").TranscribeRequest>(`/occurrences/${id}/transcribe-now`, {
+      method: "POST",
+      body: opts ? JSON.stringify(opts) : undefined,
+    }),
   createAnnotation: (id: string, body: Record<string, unknown>) =>
     request<import("./types").Annotation>(`/occurrences/${id}/annotations`, {
       method: "POST", body: JSON.stringify(body),

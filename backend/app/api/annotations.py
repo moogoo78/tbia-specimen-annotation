@@ -4,7 +4,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import auth, duck, extract, notify, search
+from .. import auth, duck, extract, notify, pipeline, search
 from ..annotations_store import _serialize
 from ..config import settings
 from ..db import get_session
@@ -100,6 +100,66 @@ async def schedule_transcribe(
     notified = notify.transcribe_scheduled(occ_id, user.id)
     out = TranscribeRequestOut.model_validate(req)
     out.notified = notified
+    return out
+
+
+@router.post("/occurrences/{occ_id}/transcribe-now", response_model=TranscribeRequestOut)
+async def transcribe_now(
+    occ_id: str,
+    opts: TranscribeOptions | None = Body(default=None),
+    user: User = Depends(auth.require_role("admin")),
+    db: Session = Depends(get_session),
+):
+    """Transcribe a record **now**, in this request, instead of queueing it.
+
+    Same destination as the queue: one `transcribe_requests` row and `ai`
+    annotation drafts written by `pipeline.process_one`, so a record looks the
+    same afterwards whichever route produced it. What differs is who waits and
+    who pays — the caller holds the connection for the tens of seconds a vision
+    call takes, and the call is billed the moment they click, which is why this
+    is **admin-only** and the queue stays the default for everyone else.
+
+    No Discord ping either: that notification exists to tell a human the worker
+    has something to drain, and here it has already been drained.
+
+    A failure (no API key, unreadable image, model error) is *not* a 500 —
+    `process_one` records it on the row, and the response carries
+    `status="failed"` with the reason in `error`, exactly as the worker would.
+    """
+    record = await duck.query_one("SELECT id FROM occurrence WHERE id = ?", [occ_id])
+    if record is None:
+        raise HTTPException(status_code=404, detail="Occurrence not found")
+
+    opts = opts or TranscribeOptions()
+    if opts.mode is not None and opts.mode not in ("single", "two_stage"):
+        raise HTTPException(status_code=400, detail="mode must be 'single' or 'two_stage'")
+
+    # A record already waiting in the queue is *run*, not queued a second time:
+    # the worker drains by status, so a fresh row would leave the pending one to
+    # be transcribed again later and write a duplicate set of drafts. Running the
+    # existing row also keeps the drafts credited to whoever asked for them — the
+    # admin supplied the impatience, not the request.
+    req = db.execute(
+        select(TranscribeRequest)
+        .where(TranscribeRequest.occurrence_id == occ_id)
+        .where(TranscribeRequest.status == "pending")
+        .order_by(TranscribeRequest.created.desc())
+    ).scalars().first()
+
+    if req is None:
+        req = TranscribeRequest(
+            occurrence_id=occ_id, contributor_id=user.id,
+            mode=opts.mode, ocr_model=opts.ocr_model, field_model=opts.field_model,
+        )
+        db.add(req)
+        db.commit()
+        db.refresh(req)
+
+    n = await pipeline.process_one(db, req)
+    db.refresh(req)
+
+    out = TranscribeRequestOut.model_validate(req)
+    out.n_annotations = n
     return out
 
 

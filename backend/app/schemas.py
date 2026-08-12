@@ -147,3 +147,10 @@ class TranscribeRequestOut(BaseModel):
     contributor_id: int
     created: datetime
     notified: bool = False  # whether a Discord ping was actually sent
+    # Filled in by the run-now route, which has already processed the request by
+    # the time it answers. Queued requests come back pending / 0 — the worker is
+    # what moves them, and the record detail is where their outcome shows up.
+    status: str = "pending"
+    processed_at: datetime | None = None
+    error: str | None = None
+    n_annotations: int = 0

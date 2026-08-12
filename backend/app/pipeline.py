@@ -13,6 +13,7 @@ parser), so the pipeline and the manual flow stay in lockstep.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -245,13 +246,19 @@ def build_annotations(
 async def process_one(db: Session, req: TranscribeRequest) -> int:
     """Transcribe one pending request into annotation rows; returns the count.
 
-    Marks the request done/failed and commits. Never raises — a bad record fails
-    just that request, not the batch."""
+    Marks the request done/failed and commits. Never raises — a bad request fails
+    just itself, not the batch (and not the HTTP request, on the run-now route).
+
+    The Anthropic SDK is synchronous and a transcription takes tens of seconds,
+    so the call goes to a thread: in the worker that costs nothing, and on the
+    run-now route it is what keeps one admin's transcription from stalling every
+    other request the API is serving."""
     try:
         record = await search.get_detail(req.occurrence_id)
         if record is None:
             raise ValueError("occurrence not found")
-        result = transcribe_record(
+        result = await asyncio.to_thread(
+            transcribe_record,
             record, mode=req.mode, ocr_model=req.ocr_model, field_model=req.field_model,
         )
 

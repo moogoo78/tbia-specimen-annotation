@@ -104,6 +104,18 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.jso
   single definition of "which images", shared by the prompt builder, the pipeline and
   `import_results.py`, so the three cannot disagree about what a transcription read.
   Responses carry `image_urls` (a list) — there is no single `image_url` anywhere.
+- **Two routes reach the same AI transcription, and they differ in who waits and who
+  pays.** `POST /occurrences/{id}/transcribe-request` (any contributor) persists a
+  `transcribe_requests` row and pings Discord so a human knows to run `make transcribe`;
+  `POST /occurrences/{id}/transcribe-now` (**admin only**) writes the same row and then
+  calls `pipeline.process_one` inline — no Discord ping, since it has already been
+  drained. Both end in `ai` annotation drafts (`status="submitted"`), so a record looks
+  identical afterwards whichever ran it; the admin switch is per record, in the AI panel,
+  and defaults to the queue. A pipeline failure on the run-now route is **not** a 500 —
+  `process_one` records it and the response carries `status="failed"` + `error`, exactly
+  as the worker would. `process_one` runs the (synchronous) Anthropic call through
+  `asyncio.to_thread`, which is what stops one admin's 30-second transcription from
+  stalling every other request the API is serving.
 
 ## Sampling events (the other "trip")
 

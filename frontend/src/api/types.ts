@@ -125,6 +125,13 @@ export interface TranscribeRequest {
   contributor_id: number;
   created: string;
   notified: boolean;
+  // Queued requests come back pending / 0 — the worker moves them later. The
+  // admin-only run-now route has already processed the request by the time it
+  // answers, so these carry its outcome.
+  status: "pending" | "done" | "failed" | string;
+  processed_at: string | null;
+  error: string | null;
+  n_annotations: number;
 }
 
 export interface TranscribeOptions {
