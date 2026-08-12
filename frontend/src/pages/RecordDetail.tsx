@@ -627,13 +627,21 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
           {promptQuery.data && (
             <>
               <Step n={1} label={tr("annotate.step1")}>
-                {promptQuery.data.image_url ? (
+                {/* One link per image: a record's media are views of the same
+                    specimen (sheet, label close-up, determination slip), and the
+                    prompt below asks the chat to read them together. */}
+                {promptQuery.data.image_urls.length > 0 ? (
                   <>
-                    <a href={promptQuery.data.image_url} target="_blank" rel="noreferrer"
-                      style={{ color: t.accent, fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <Icon name="img" size={11} />{tr("annotate.step1")} ↗
-                    </a>
-                    <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 2 }}>{tr("annotate.step1hint")}</div>
+                    {promptQuery.data.image_urls.map((url, i, all) => (
+                      <a key={url} href={url} target="_blank" rel="noreferrer"
+                        style={{ color: t.accent, fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+                        <Icon name="img" size={11} />
+                        {all.length > 1 ? tr("annotate.step1n", { n: i + 1 }) : tr("annotate.step1")} ↗
+                      </a>
+                    ))}
+                    <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 2 }}>
+                      {tr(promptQuery.data.image_urls.length > 1 ? "annotate.step1hintMulti" : "annotate.step1hint")}
+                    </div>
                   </>
                 ) : (
                   <div style={{ fontSize: 10, color: t.warn }}>{tr("annotate.step1none")}</div>

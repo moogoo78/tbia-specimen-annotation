@@ -22,7 +22,9 @@ ROWS = [
     ("r1", "C-001", "Pocillopora damicornis", "species", "魚類", "新北市", "野柳", 25.2, 121.6, "2004-09-16", "DS-A", "http://x/img1.jpg"),
     ("r2", "C-002", None, "family", "魚類", None, "Taiwan", None, None, None, "DS-A", ""),
     ("r3", "C-003", "Helianthus annuus", "species", "維管束植物", "南投縣", "Forest", 23.9, 120.9, "2019-08-14", "DS-B", ""),
-    ("r4", "C-004", "Rosa canina", "species", "維管束植物", None, None, None, None, "2021-06-03", "DS-B", "http://x/img4.jpg"),
+    # r4 carries two media URLs — the multi-image case the AI routes have to
+    # read together (one specimen, several views), not just the first one.
+    ("r4", "C-004", "Rosa canina", "species", "維管束植物", None, None, None, None, "2021-06-03", "DS-B", "http://x/img4.jpg;http://x/img4b.jpg"),
     ("r5", "C-005", None, "genus", "昆蟲", "屏東縣", "Kenting", 22.0, 120.8, None, "DS-A", ""),
     # r6/r7 exist for the species index: r6 is a *named* genus-rank row (r2 and
     # r5 are coarse but unnamed, so neither reaches the index), and r7 repeats

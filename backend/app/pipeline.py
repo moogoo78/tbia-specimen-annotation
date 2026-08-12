@@ -34,6 +34,20 @@ _OCR_PROMPT = (
     "interpret, summarize, or add commentary. Mark unreadable parts as [illegible]."
 )
 
+# Stage 1 with several images. They are views of one specimen, so the output is
+# one transcript per image in order — stage 2 then reads the lot as a whole.
+_OCR_PROMPT_MULTI = (
+    "Transcribe the natural-history specimen labels in these {n} images verbatim. "
+    "The images all show the SAME specimen from different angles or at different "
+    "zoom levels; some may carry no text at all.\n"
+    "Output ONLY the transcribed text, one block per image in the order given, "
+    "each block starting with its own header line — '--- image 1 ---', "
+    "'--- image 2 ---', and so on. Preserve the original "
+    "language (Chinese or Latin as written). Do not translate, interpret, "
+    "summarize, or add commentary. Mark unreadable parts as [illegible]; write "
+    "[no text] for an image that carries none."
+)
+
 # tbia annotation field -> occurrence column, for the annotation's original_value
 # (reference/diff). `annotation*`/`verbatim*` fields have no occurrence value.
 _ORIGINAL_COLUMN = {
@@ -49,63 +63,70 @@ def transcribe_record(
 ) -> ExtractResponse:
     """Read a specimen label into proposed annotation fields. mode/models default
     to the global settings when not overridden. Raises ValueError when the record
-    has no image."""
-    image_url = _image_url(record)
+    has no image.
+
+    All of the record's images (up to `settings.transcribe_max_images`) go into
+    the request together — they are views of one specimen, and the label text is
+    often legible in only one of them."""
+    image_urls = _image_urls(record)
     mode = mode or settings.transcribe_mode
     field_model = field_model or (settings.anthropic_model if mode == "single" else settings.field_model)
     if mode == "single":
-        return _transcribe_single(record, image_url, field_model)
-    return _transcribe_two_stage(record, image_url, ocr_model or settings.ocr_model, field_model)
+        return _transcribe_single(record, image_urls, field_model)
+    return _transcribe_two_stage(record, image_urls, ocr_model or settings.ocr_model, field_model)
 
 
-def _transcribe_single(record: dict, image_url: str, model: str) -> ExtractResponse:
+def _transcribe_single(record: dict, image_urls: list[str], model: str) -> ExtractResponse:
     """One Claude vision call: OCR + field extraction together. The model sees the
-    image while assigning fields, so it can disambiguate hard-to-read values
-    against the pixels.
+    images while assigning fields, so it can disambiguate hard-to-read values
+    against the pixels — and, with several images, cross-check one against
+    another (`extract.MERGE_RULE` is what tells it to answer once, not per image).
 
     Unlike the OCR stage, thinking is left on (the default on current models):
     reading a hard label and mapping it onto Darwin Core fields is the judgement
     this mode exists for. max_tokens is sized to cover thinking *plus* the JSON,
-    and effort is capped so that headroom doesn't become the usual spend."""
+    and effort is capped so that headroom doesn't become the usual spend; it grows
+    with the image count because full_text spans every image that carries text."""
     prompt = extract.build_prompt(record).prompt
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
     resp = client.messages.create(
         model=model,
-        max_tokens=8192,
+        max_tokens=min(8192 + 2048 * (len(image_urls) - 1), 16000),
         output_config={"effort": "medium"},
         messages=[{
             "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "url", "url": image_url}},
-                {"type": "text", "text": prompt},
-            ],
+            "content": [*_image_blocks(image_urls), {"type": "text", "text": prompt}],
         }],
     )
     text = "".join(b.text for b in resp.content if b.type == "text")
     out = extract.parse_pasted(record.get("id", ""), text)  # validates + clamps
-    out.image_url = image_url
+    out.image_urls = image_urls
     out.model = resp.model
     out.service = "anthropic"
     return out
 
 
-def _transcribe_two_stage(record: dict, image_url: str, ocr_model: str, field_model: str) -> ExtractResponse:
-    """Two calls: ocr_model (vision) transcribes the label to verbatim text, then
-    field_model (text-only) structures that text into fields. Cheaper — image
+def _transcribe_two_stage(record: dict, image_urls: list[str], ocr_model: str, field_model: str) -> ExtractResponse:
+    """Two calls: ocr_model (vision) transcribes the label(s) to verbatim text,
+    then field_model (text-only) structures that text into fields. Cheaper — image
     tokens land on the OCR model — but the field model can't re-read the pixels,
-    so OCR errors propagate. The verbatim text itself is kept as full_text."""
+    so OCR errors propagate. The verbatim text itself is kept as full_text.
+
+    With several images the OCR stage sees all of them in one call and returns
+    one transcript per image; stage 2 reads that as a single document, which is
+    what lets a value present on only one image reach the fields."""
     client = anthropic.Anthropic()
-    full_text = _ocr_label(client, image_url, ocr_model)
-    out = _fields_from_text(client, record, full_text, field_model)
+    full_text = _ocr_label(client, image_urls, ocr_model)
+    out = _fields_from_text(client, record, full_text, field_model, n_images=len(image_urls))
     if not any(f.field == "full_text" for f in out.fields):
         out.fields.append(ExtractedField(field="full_text", value=full_text, confidence=0.9))
-    out.image_url = image_url
+    out.image_urls = image_urls
     out.service = "anthropic (2-stage)"
     out.model = f"{ocr_model} + {field_model}"
     return out
 
 
-def _ocr_label(client: anthropic.Anthropic, image_url: str, ocr_model: str) -> str:
+def _ocr_label(client: anthropic.Anthropic, image_urls: list[str], ocr_model: str) -> str:
     """Stage 1 — vision OCR to verbatim label text.
 
     Thinking is disabled explicitly: this stage only transcribes what is on the
@@ -113,17 +134,17 @@ def _ocr_label(client: anthropic.Anthropic, image_url: str, ocr_model: str) -> s
     max_tokens caps thinking *plus* text, a chatty thinking pass on a dense
     bilingual label can crowd out the transcript itself (empty/truncated text ->
     the ValueError below). Some models default to adaptive thinking when the
-    parameter is omitted, so leaving it off is not the same as not setting it."""
+    parameter is omitted, so leaving it off is not the same as not setting it.
+    max_tokens therefore scales with the number of images: one budget sized for a
+    single label truncates the moment a second transcript has to fit in it."""
+    prompt = _OCR_PROMPT if len(image_urls) == 1 else _OCR_PROMPT_MULTI.format(n=len(image_urls))
     resp = client.messages.create(
         model=ocr_model,
-        max_tokens=2048,
+        max_tokens=min(2048 * len(image_urls), 8192),
         thinking={"type": "disabled"},
         messages=[{
             "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "url", "url": image_url}},
-                {"type": "text", "text": _OCR_PROMPT},
-            ],
+            "content": [*_image_blocks(image_urls), {"type": "text", "text": prompt}],
         }],
     )
     text = "".join(b.text for b in resp.content if b.type == "text").strip()
@@ -132,7 +153,10 @@ def _ocr_label(client: anthropic.Anthropic, image_url: str, ocr_model: str) -> s
     return text
 
 
-def _fields_from_text(client: anthropic.Anthropic, record: dict, full_text: str, field_model: str) -> ExtractResponse:
+def _fields_from_text(
+    client: anthropic.Anthropic, record: dict, full_text: str, field_model: str,
+    *, n_images: int = 1,
+) -> ExtractResponse:
     """Stage 2 — text-only structuring of the OCR transcript into fields.
 
     Thinking stays on here rather than being disabled as in stage 1: the reply is
@@ -142,10 +166,19 @@ def _fields_from_text(client: anthropic.Anthropic, record: dict, full_text: str,
     already extracted by this point, so this stage is mostly mapping."""
     fields = [f for f in extract._target_fields(record) if f != "full_text"]
     field_lines = "\n".join(f"- {f}: {extract.PROMPTABLE_FIELDS[f]}" for f in fields)
+    merge_rule = (
+        "" if n_images == 1 else
+        f"The text holds one block per image ('--- image N ---' headers), {n_images} "
+        "in all, transcribed from different views of the SAME specimen. Merge them "
+        "into ONE set of fields, not one per block: take each value from whichever "
+        "block states it most clearly, and prefer a later determination slip over "
+        "an older label where they disagree.\n"
+    )
     prompt = (
         "You are extracting structured fields from a transcribed natural-history "
         "specimen label.\n\nVerbatim label text:\n---\n"
         f"{full_text}\n---\n\n"
+        f"{merge_rule}"
         "Use ONLY what the text supports — do not invent values. Keep taxonomy and "
         "place names in their original language.\n"
         "Return STRICT JSON only — no explanation, no markdown code fences — using "
@@ -164,11 +197,18 @@ def _fields_from_text(client: anthropic.Anthropic, record: dict, full_text: str,
     return extract.parse_pasted(record.get("id", ""), text)
 
 
-def _image_url(record: dict) -> str:
-    media = record.get("media") or []
-    if not media:
+def _image_urls(record: dict) -> list[str]:
+    urls = extract.images(record)
+    if not urls:
         raise ValueError("record has no image to transcribe")
-    return media[0]
+    return urls
+
+
+def _image_blocks(image_urls: list[str]) -> list[dict]:
+    """One `image` content block per URL, in order — the API takes several in a
+    single user message, and the prompt that follows them explains that they are
+    one specimen."""
+    return [{"type": "image", "source": {"type": "url", "url": url}} for url in image_urls]
 
 
 def build_annotations(

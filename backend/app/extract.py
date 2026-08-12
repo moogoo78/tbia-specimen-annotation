@@ -1,10 +1,13 @@
 """AI-assisted label transcription — STUB.
 
 Shaped exactly like a real vision-model call so it can be swapped for a Claude
-vision request later (read the specimen image at ``image_url``, return proposed
+vision request later (read the specimen images at ``image_urls``, return proposed
 values for the missing fields with per-field confidence). For now it returns
 deterministic mock drafts derived from the record's existing values, only for
 the fields that are actually missing.
+
+The field vocabulary, the image list (``images``) and the copy-paste prompt here
+are shared with ``app.pipeline``, which makes the real Claude vision calls.
 """
 
 from __future__ import annotations
@@ -15,9 +18,31 @@ import re
 from datetime import date
 from typing import Any
 
+from .config import settings
 from .schemas import ExtractPromptResponse, ExtractResponse, ExtractedField
 
 STUB_MODEL = "stub-vision-0 (replace with claude vision)"
+
+
+def images(record: dict, limit: int | None = None) -> list[str]:
+    """The record's media URLs, deduped (order kept) and capped.
+
+    **A record's images are views of one specimen, not one specimen each** — the
+    sheet, a close-up of the label, a determination slip — so every consumer here
+    reads them together and returns a single set of fields. Shared by the prompt
+    builder, the pipeline and the importer so the three cannot disagree about
+    which images a transcription was made from.
+    """
+    limit = settings.transcribe_max_images if limit is None else limit
+    seen: set[str] = set()
+    out: list[str] = []
+    for url in record.get("media") or []:
+        if url not in seen:
+            seen.add(url)
+            out.append(url)
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _conf(seed: str) -> float:
@@ -28,8 +53,7 @@ def _conf(seed: str) -> float:
 
 def extract(record: dict) -> ExtractResponse:
     occ_id = record.get("id", "")
-    media = record.get("media") or []
-    image_url = media[0] if media else None
+    image_urls = images(record)
 
     fields: list[ExtractedField] = []
 
@@ -62,7 +86,7 @@ def extract(record: dict) -> ExtractResponse:
                 confidence=_conf(occ_id + "loc")))
 
     return ExtractResponse(
-        occurrence_id=occ_id, image_url=image_url, model=STUB_MODEL, fields=fields,
+        occurrence_id=occ_id, image_urls=image_urls, model=STUB_MODEL, fields=fields,
     )
 
 
@@ -106,6 +130,40 @@ MAX_PASTE_FIELDS = 20
 MAX_VALUE_LEN = 2000
 
 
+# What to say when a record carries more than one image. Every image is a view
+# of the SAME specimen, so the answer is one merged set of fields — without this
+# a model asked for "the label" from four pictures tends to answer about one of
+# them, or to emit four competing values for a field.
+MERGE_RULE = (
+    "The images all show the SAME specimen from different angles or at different "
+    "zoom levels (whole sheet, label close-up, determination slip, scale bar). "
+    "Read all of them and return ONE combined set of fields, not one per image: "
+    "take each value from whichever image shows it most legibly, and prefer a "
+    "later determination slip over an older label where they disagree. For "
+    "full_text, transcribe every image that carries text, in the order listed, "
+    "separating each image's text with a blank line.\n\n"
+)
+
+
+def _source_phrase(image_urls: list[str]) -> str:
+    if len(image_urls) > 1:
+        return "the specimen images below"
+    if image_urls:
+        return "the specimen label image below"
+    return "the attached image"
+
+
+def _image_block(image_urls: list[str]) -> str:
+    """The URL(s) to read, or nothing when the record has no media (the user
+    attaches their own photo in that case)."""
+    if not image_urls:
+        return ""
+    if len(image_urls) == 1:
+        return f"Specimen label image (open/fetch this URL and read it): {image_urls[0]}\n\n"
+    lines = "\n".join(f"{i}. {url}" for i, url in enumerate(image_urls, 1))
+    return f"Specimen images (open/fetch every one of these URLs and read them):\n{lines}\n\n"
+
+
 def _target_fields(record: dict) -> list[str]:
     """The record's gap fields (or all source fields when nothing is missing),
     always followed by the always-on fields (e.g. the full label transcription)."""
@@ -122,25 +180,20 @@ def _target_fields(record: dict) -> list[str]:
 
 def build_prompt(record: dict) -> ExtractPromptResponse:
     occ_id = record.get("id", "")
-    media = record.get("media") or []
-    image_url = media[0] if media else None
+    image_urls = images(record)
     fields = _target_fields(record)
 
     field_lines = "\n".join(f"- {f}: {PROMPTABLE_FIELDS[f]}" for f in fields)
-    # Embed the image URL in the prompt so an AI chat can fetch it directly;
+    # Embed the image URLs in the prompt so an AI chat can fetch them directly;
     # fall back to "the attached image" when the record has no media.
-    image_line = (
-        f"Specimen label image (open/fetch this URL and read it): {image_url}\n\n"
-        if image_url else
-        ""
-    )
-    source_phrase = "the specimen label image below" if image_url else "the attached image"
     prompt = (
-        f"You are transcribing a natural-history specimen label from {source_phrase}.\n"
-        f"{image_line}"
+        "You are transcribing a natural-history specimen label from "
+        f"{_source_phrase(image_urls)}.\n"
+        f"{_image_block(image_urls)}"
         "Read ONLY what is clearly legible — do not guess or infer missing text. "
         "Keep taxonomy and place names in their original language (Chinese or Latin "
         "as written on the label).\n\n"
+        f"{MERGE_RULE if len(image_urls) > 1 else ''}"
         "Return STRICT JSON only — no explanation, no markdown code fences — using "
         "exactly this shape, with a confidence from 0.0 to 1.0 per field, and omit "
         "any field you cannot read:\n"
@@ -152,7 +205,7 @@ def build_prompt(record: dict) -> ExtractPromptResponse:
         f"{field_lines}"
     )
     return ExtractPromptResponse(
-        occurrence_id=occ_id, image_url=image_url, target_fields=fields, prompt=prompt,
+        occurrence_id=occ_id, image_urls=image_urls, target_fields=fields, prompt=prompt,
     )
 
 
@@ -187,7 +240,7 @@ def parse_pasted(occ_id: str, raw: str) -> ExtractResponse:
     if not fields:
         raise ValueError("No usable fields found in the pasted response.")
     return ExtractResponse(
-        occurrence_id=occ_id, image_url=None,
+        occurrence_id=occ_id,
         model=model or PASTE_MODEL, service=service, extracted_at=when,
         fields=fields,
     )

@@ -92,9 +92,18 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.jso
   than a new hue.
 - Search/facet SQL is built once in `app/search.py` (`build_where`) and reused by list,
   count, and facet endpoints. Free-text is substring/`ILIKE` (no CJK tokenizer).
-- AI extraction (`app/extract.py`) is a **stub** shaped like a real vision response
-  (per-field value + confidence). Swap it for a Claude vision call; the UI already consumes
-  this shape.
+- AI extraction (`app/extract.py`) owns the field vocabulary and the copy-paste prompt;
+  the real Claude vision calls live in `app/pipeline.py` (batch worker). `extract.extract()`
+  is still a stub shaped like a vision response (per-field value + confidence).
+- **A record's images are views of one specimen, not one specimen each** — the sheet, a
+  label close-up, a determination slip — and the label text is often legible in only one
+  of them. So all of a record's media (deduped, capped at `TRANSCRIBE_MAX_IMAGES`, default
+  4 — images dominate the token bill) go into **one** request as several `image` blocks,
+  and the prompt carries `extract.MERGE_RULE`: read them together, return **one** set of
+  fields, prefer a later determination slip over an older label. `extract.images()` is the
+  single definition of "which images", shared by the prompt builder, the pipeline and
+  `import_results.py`, so the three cannot disagree about what a transcription read.
+  Responses carry `image_urls` (a list) — there is no single `image_url` anywhere.
 
 ## Sampling events (the other "trip")
 
