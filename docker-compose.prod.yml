@@ -23,6 +23,10 @@ services:
       NDB_DUCK_TEMP_DIR: /data/duck-tmp
       NDB_DUCK_THREADS: "2"
       NDB_DUCK_MEMORY_LIMIT: 1GB
+      # Concurrent DuckDB scans. Two vCPU at NDB_DUCK_THREADS=2 is fully
+      # committed by two of them, so a third would only make all three slower;
+      # requests past that wait briefly, then get a 503 with Retry-After.
+      NDB_DUCK_MAX_CONCURRENCY: "2"
     volumes:
       - ./data:/data
     mem_limit: 1400m
@@ -38,6 +42,11 @@ services:
         # Baked into the JS bundle at build time — re-run `up -d --build` after
         # changing it. Unset -> no analytics.
         VITE_GA_MEASUREMENT_ID: ${VITE_GA_MEASUREMENT_ID:-}
+        # Deployed origin (https://your-domain.org) for canonical / og:url /
+        # sitemap.xml. Unset -> the prerender emits none of those, which is the
+        # safe default; a canonical pointing at the wrong origin is worse than
+        # no canonical. Usually the same value as SITE_ADDRESS below.
+        VITE_SITE_URL: ${VITE_SITE_URL:-}
     restart: always
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}

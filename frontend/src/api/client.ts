@@ -1,4 +1,4 @@
-import type { Filters } from "./types";
+import { emptyFilters, type Filters } from "./types";
 
 const TOKEN_KEY = "tbia_token";
 
@@ -58,6 +58,46 @@ export function filtersToParams(f: Filters): URLSearchParams {
   return p;
 }
 
+/** Inverse of `filtersToParams`, kept beside it so the two cannot drift.
+ *
+ *  The Explore page puts its filter state in the browser URL using these same
+ *  names, which is why this lives here rather than in the page: `/explore?q=x`
+ *  and `/api/occurrences?q=x` mean the same thing, and a page URL's query can be
+ *  pasted onto the API to get exactly the rows the page is showing.
+ *
+ *  Absent boolean = false, matching what `filtersToParams` writes. That differs
+ *  from `emptyFilters()`, whose `has_media` starts true — so a bare `/explore`
+ *  with no params at all is the caller's cue to use the defaults instead of
+ *  this. See `parseExplore` in pages/exploreUrl.ts. */
+export function paramsToFilters(p: URLSearchParams): Filters {
+  const f = emptyFilters();
+  f.q = p.get("q") || undefined;
+  for (const key of ["bio_group", "kingdom_c", "county", "taxon_rank", "scientific_name",
+    "basis_of_record", "type_status", "dataset_name", "tbia_dataset_id"] as const) {
+    f[key] = p.getAll(key);
+  }
+  f.collector_id = p.getAll("collector_id").map(Number).filter(Number.isFinite);
+  for (const key of ["missing_coordinates", "missing_date",
+    "missing_identification", "has_media"] as const) {
+    f[key] = p.get(key) === "true";
+  }
+  const num = (k: string) => {
+    const v = p.get(k);
+    if (v == null || v === "") return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  f.year_from = num("year_from");
+  f.year_to = num("year_to");
+  f.date_from = p.get("date_from") || undefined;
+  f.date_to = p.get("date_to") || undefined;
+  f.record_number_from = num("record_number_from");
+  f.record_number_to = num("record_number_to");
+  f.record_number = p.get("record_number") || undefined;
+  f.bbox = p.get("bbox") || undefined;
+  return f;
+}
+
 export const api = {
   // ORCID-only sign-in. `orcidConfig` returns the public params for building the
   // authorize URL; `orcidCallback` exchanges the returned code for our JWT.
@@ -73,6 +113,10 @@ export const api = {
     request<import("./types").User>("/auth/me", { method: "PATCH", body: JSON.stringify(patch) }),
 
   // Public — no token needed.
+  /** One collector. Explore uses it to put names on the chips for the ids in
+   *  its URL, which a shared link carries without labels. */
+  collector: (id: number) =>
+    request<import("./types").Collector>(`/collectors/${id}`),
   collectorCareer: (id: number) =>
     request<import("./types").Career>(`/collectors/${id}/career`),
 

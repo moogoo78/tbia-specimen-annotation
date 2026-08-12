@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { t } from "./design/tokens";
 import { usePageviews } from "./analytics";
+import { useSeo } from "./seo/useSeo";
 import { AppHeader } from "./components/AppHeader";
 import { CookieConsent } from "./components/CookieConsent";
 import { Home } from "./pages/Home";
@@ -20,6 +21,11 @@ import { Login } from "./pages/Login";
 import { OrcidCallback } from "./pages/OrcidCallback";
 
 export default function App() {
+  // Title/description for the current route, from src/seo/pages.json — the same
+  // file scripts/prerender.mjs bakes into the served HTML. Called once here
+  // rather than per page: it keys off the location, and a page wanting a title
+  // from loaded data can still call useSeo({ title }) itself.
+  useSeo();
   usePageviews();
 
   return (

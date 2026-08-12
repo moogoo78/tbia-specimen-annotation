@@ -6,6 +6,7 @@ import { t } from "../design/tokens";
 import { api } from "../api/client";
 import type { SpeciesRow, SpeciesScope, SpeciesSort } from "../api/types";
 import { Spinner } from "../components/ui";
+import { exploreUrl } from "./exploreUrl";
 
 // The taxonomic index: every distinct scientific_name the store holds.
 //
@@ -159,8 +160,7 @@ function Row({ s, rank, header }: { s?: SpeciesRow; rank?: number; header?: bool
     // emptyFilters() defaults it to true, so without this the landing page would
     // report a smaller number than the row it was opened from.
     <Link
-      to="/explore"
-      state={{ scientific_name: [s.name], flags: { has_media: false } }}
+      to={exploreUrl({ scientific_name: [s.name], flags: { has_media: false } })}
       title={tr("sp.openHint", { name: s.name, n: s.n_records.toLocaleString() })}
       style={{ ...base, textDecoration: "none", color: t.fg }}
     >

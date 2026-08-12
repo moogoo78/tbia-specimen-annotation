@@ -8,6 +8,7 @@ import { api } from "../api/client";
 import { emptyFilters, type SamplingEvent, type Trip } from "../api/types";
 import { MapView } from "../components/MapView";
 import { Spinner } from "../components/ui";
+import { exploreUrl } from "./exploreUrl";
 
 // A collector's lifetime of work: when they collected, on which trips, and how
 // much of it is on the map.
@@ -47,7 +48,7 @@ export function Collector() {
 
   const { collector, summary: s, years, trips, reference_events: refs } = career.data;
   const unmapped = s.n_records - s.n_geo;
-  const gapFilters = { collector: { id: cid, label: collector.label }, missing_coordinates: true };
+  const gapFilters = { collector: { id: cid, label: collector.label }, flags: { missing_coordinates: true } };
 
   return (
     <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
@@ -84,7 +85,7 @@ export function Collector() {
               unmapped: unmapped.toLocaleString(),
             })}
           </span>
-          <Link to="/explore" state={gapFilters} style={{
+          <Link to={exploreUrl(gapFilters)} style={{
             fontSize: 11, color: t.accent, textDecoration: "none", border: `1px solid ${t.border}`,
             padding: "3px 8px", background: t.panel, whiteSpace: "nowrap",
           }}>

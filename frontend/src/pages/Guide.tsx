@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon, type IconName } from "../design/Icon";
 import { CompletenessDots, StatusPill } from "../components/ui";
+import { exploreUrl } from "./exploreUrl";
 
 // The user manual, in the product. Long-form version of the home page's
 // Get-started strip: the four steps of the contribution loop, then tips and
@@ -65,7 +66,7 @@ export function Guide() {
         <StepBlock n={2} icon="search" title={tr("guide.step2Title")} body={tr("guide.step2Body")}>
           <Bullets items={[tr("guide.step2b1"), tr("guide.step2b2"), tr("guide.step2b3"), tr("guide.step2b4")]} />
           <button
-            onClick={() => nav("/explore", { state: { flags: { missing_identification: true, has_media: true } } })}
+            onClick={() => nav(exploreUrl({ flags: { missing_identification: true, has_media: true } }))}
             style={{
               marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px",
               background: t.panelAlt, border: `1px solid ${t.border}`, cursor: "pointer",

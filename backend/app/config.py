@@ -39,6 +39,26 @@ class Settings(BaseSettings):
     duck_memory_limit: str = ""  # e.g. "1GB"; empty -> leave DuckDB default
     duck_temp_dir: str = ""  # spill dir when memory_limit is hit; empty -> default
 
+    # Admission control for the read API (see duck.py). max_concurrency is the
+    # number of DuckDB scans allowed to run at once — total CPU in play is
+    # roughly this times duck_threads, so on 2 vCPU with duck_threads=2 keep it
+    # at 2. queue_timeout bounds the wait for a slot (-> 503) and query_timeout
+    # interrupts a scan that overruns (-> 504); 0 disables either.
+    duck_max_concurrency: int = 4
+    duck_queue_timeout: float = 10.0
+    duck_query_timeout: float = 30.0
+
+    # Cache-Control lifetimes for the public read API, in seconds (see cache.py).
+    # cache_static_ttl covers the occurrence store, which is a fixed snapshot
+    # between ETL refreshes and so can sit at the CDN edge for a long time;
+    # cache_live_ttl covers the few reads that move as people annotate.
+    # cache_browser_ttl is the private max-age each visitor's own browser gets,
+    # kept short so a hard refresh is worth something. Any of them at 0 turns
+    # public caching off for that tier.
+    cache_static_ttl: int = 3600
+    cache_live_ttl: int = 60
+    cache_browser_ttl: int = 60
+
     # Master "this is a throwaway local environment" switch. Off by default, so
     # anything unsafe stays off unless a developer opts in explicitly. Gates the
     # placeholder jwt_secret and (together with dev_login) the password-less

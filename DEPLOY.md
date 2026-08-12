@@ -149,6 +149,7 @@ transcription, `DISCORD_WEBHOOK_URL` for review pings) go in the same file; see
 
 ```bash
 export SITE_ADDRESS=https://your-domain.org    # or leave unset -> :80 plain HTTP
+export VITE_SITE_URL=https://your-domain.org   # canonical / og:url / sitemap.xml (step 8)
 export VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX     # optional; omit -> no analytics
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml ps
@@ -170,6 +171,14 @@ curl -s http://127.0.0.1/api/health
 > clearing site data re-prompts. Once a choice is made, a **Cookies** link
 > appears in the header: it withdraws consent, deletes the `_ga*` cookies, and
 > brings the banner back so the visitor can choose again.
+
+> Both `VITE_*` vars are **build** args (Vite inlines them), so a later change
+> needs `up -d --build web` rather than a restart. `export`ing them means a
+> deploy from a fresh shell silently drops them — put them in the project-root
+> `.env` instead (gitignored; Compose reads it for interpolation automatically)
+> if you want them to persist. Dropping `VITE_SITE_URL` is silent by design:
+> the build still ships titles and OG tags, just no canonical, `og:url` or
+> `sitemap.xml`.
 
 > Tight on RAM during `--build`? Build the images on your laptop and transfer
 > them: `docker save <img> | ssh ubuntu@<ip> docker load`, then `up -d` without
@@ -254,6 +263,101 @@ Roles are `contributor | reviewer | admin`. A role change takes effect without
 re-issuing tokens: every request resolves the user from SQLite (the `role` claim
 in the JWT is not what's enforced), so the user only needs to reload the page.
 
+## 7. Serving public traffic
+
+The read API is open — no sign-in, no rate limit — and a facet or species
+rollup is a grouped scan over ~2M rows. One search-engine crawler working
+through the site is enough to keep several of those running at once, so three
+things stand between an audience and a flat box: what may be cached, how much
+may run at once, and what may be crawled at all.
+
+**Responses now say how long they may be cached.** Every read on the allowlist
+in `backend/app/cache.py` carries `Cache-Control: public, s-maxage=3600` (60s
+for `/api/volunteers`, which moves as people annotate); everything else —
+`/api/auth/*`, annotations, export, and any request arriving with an
+`Authorization` header — is `private, no-store`. Tune with `NDB_CACHE_STATIC_TTL`
+/ `NDB_CACHE_LIVE_TTL` / `NDB_CACHE_BROWSER_TTL`; `0` disables a tier.
+
+**Cloudflare ignores all of that by default.** Its cache is keyed on file
+extension, so JSON under `/api/*` is a straight bypass however the origin
+labels it. To get any benefit, add a Cache Rule:
+
+- **Rules → Caching → Create rule**, matching `URI Path starts with /api/`
+- **Cache eligibility: Eligible for cache**
+- **Edge TTL: Use cache-control header if present** — the point of the work
+  above; do *not* pin a fixed TTL, or `/api/volunteers` gets the hour too
+- **Browser TTL: Respect origin**
+
+Verify from off-box: `curl -sI https://your-domain.org/api/registry | grep -i
+'cache-control\|cf-cache-status'`. The second request should report
+`cf-cache-status: HIT`.
+
+**Cloudflare only protects what it sits in front of.** The origin's Elastic IP
+is discoverable through Certificate Transparency logs and historical DNS, so
+anyone who finds it can skip the edge entirely. If Cloudflare is your protection
+layer, restrict the security group's :443 to
+[Cloudflare's IP ranges](https://www.cloudflare.com/ips/) rather than
+`0.0.0.0/0`.
+
+**Leave Bot Fight Mode off.** It challenges indiscriminately and will suppress
+the indexing you presumably want. Super Bot Fight Mode's verified-bot allowance
+is the safe form.
+
+**The backend sheds load rather than queueing it.** `NDB_DUCK_MAX_CONCURRENCY`
+(2 in the prod compose, for 2 vCPU) caps simultaneous scans; past that a request
+waits `NDB_DUCK_QUEUE_TIMEOUT` (10s) and then gets **503 + `Retry-After: 30`**,
+and any single scan running past `NDB_DUCK_QUERY_TIMEOUT` (30s) is interrupted
+with **504**. Both are deliberate: a crawler reads `Retry-After` and backs off,
+where an unbounded queue turns a spike into an outage. Seeing 503s in the logs
+means the cap is working — raise it only if the box has headroom.
+
+**And the crawl is bounded before it starts.** `frontend/public/robots.txt`
+excludes the two paths that would generate unbounded cache misses:
+`/record/` (2.08M URLs) and `/explore` (unbounded filter permutations). Neither
+is worth indexing anyway — TBIA's own portal and GBIF are canonical for the
+occurrence records, so ours would be a thin duplicate of upstream. What is left
+crawlable is the narrative layer, which is the part that is ours: `/`,
+`/history`, `/story`, `/species`, `/collectors`, `/institutions`,
+`/contributors`, `/guide`. Read the file before changing it — the reasoning per
+line is in it, including the commented `Disallow: /collectors/` to flip if the
+17k collector profiles turn out to bite.
+
+## 8. Site metadata (titles, link previews, sitemap)
+
+`npm run build` runs `frontend/scripts/prerender.mjs`, which copies the built
+`index.html` once per indexable route (listed in `frontend/src/seo/pages.json`)
+with `<title>`, description, OG/Twitter tags and — on `/` , `/history` and
+`/story/begonia` — schema.org JSON-LD baked into the HTML. This exists because
+**link unfurlers do not execute JavaScript**: a title set from React fixes what
+Google eventually renders, but a `/story/begonia` link pasted into Slack, LINE
+or Twitter can only unfurl from tags already present in the served response.
+
+Set **`VITE_SITE_URL`** to the deployed origin (see `.env.example`). It is a
+*build* arg like `VITE_GA_MEASUREMENT_ID`, so changing it needs
+`up -d --build web`. Unset is safe but degraded: titles, descriptions and OG
+tags still ship, while canonical, `og:url` and `sitemap.xml` are skipped rather
+than pointed at a guessed origin.
+
+Link previews get a real card: `frontend/public/og/<slug>.png`, one 1200×630
+image per page, committed to the repo. They are regenerated by
+`node scripts/og-image.mjs` (headless Chromium, dev-time only — nothing on the
+box needs it), so re-run and commit it after editing a title or description.
+
+Caddy serves the per-route copies through `try_files {path} {path}/index.html
+/index.html` — anything unlisted (a record, a collector) still falls through to
+the SPA shell. Verify after a deploy, with no JavaScript involved:
+
+```bash
+curl -s https://your-domain.org/robots.txt | tail -3      # ends with the Sitemap line
+curl -s https://your-domain.org/sitemap.xml | grep -c '<loc>'   # 9
+curl -s https://your-domain.org/story/begonia | grep -iE 'og:title|canonical|og:image'
+curl -sI https://your-domain.org/og/story-begonia.png | head -1   # 200, image/png
+curl -s https://your-domain.org/record/abc | grep -o '<title>[^<]*</title>'  # SPA shell
+```
+
+Then in Google Search Console: submit the sitemap, and URL-inspect a `/record/`
+path to confirm it reports as blocked by robots.txt.
+
 ## Operations
 
 | Task | Command |
@@ -274,6 +378,20 @@ enough; everything else (DuckDB) is regenerable from the source export.
 DuckDB is rebuilt from scratch by the TBIA ETL. Take the fresh export, run
 `make prepare` over it on your laptop, `scp` the new `tbia.duckdb` up, then
 `docker compose -f docker-compose.prod.yml restart backend`.
+
+**Then purge the cache.** The `s-maxage=3600` on the read API is what makes a
+refresh look like it didn't take: the new store is live, and the edge keeps
+serving the old counts for up to an hour. Cloudflare dashboard → **Caching →
+Configuration → Purge Everything**, or restrict it to the API:
+
+```bash
+curl -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/purge_cache" \
+  -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+  --data '{"prefixes":["your-domain.org/api/"]}'
+```
+
+The same applies after re-seeding curated data, since `/api/collectors*`,
+`/api/sampling-events*` and `/api/stories*` are all on the long tier.
 
 ## Updating the curated data
 
@@ -332,6 +450,15 @@ from the same mounted directory per request, so `git pull` is the whole update.
   ```
   Do **not** re-`scp` your laptop's `annotations.sqlite` — that overwrites live
   users and annotations.
+- **503 "Server busy" / 504 "Query took too long"** — admission control doing
+  its job (step 7), not a fault. A steady stream of them means real demand
+  exceeds `NDB_DUCK_MAX_CONCURRENCY`; check whether the CDN is actually caching
+  (`cf-cache-status`) before raising it, since a bypassed cache is the usual
+  cause.
+- **The site shows old counts after a data refresh** — the edge is still serving
+  the pre-refresh copy for up to `NDB_CACHE_STATIC_TTL`. Purge (see *Updating
+  the occurrence data*). `curl -sI` the origin directly to confirm it is only
+  the cache.
 - **OOM / container killed** — confirm swap is on (`free -h`) and that only the
   Docker path is running (not also a systemd uvicorn).
 - **`database is locked`** — keep the backend at `--workers 1` (already set);

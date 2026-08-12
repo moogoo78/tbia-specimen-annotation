@@ -76,6 +76,12 @@ web:
 test:
 	cd backend && .venv/bin/python -m pytest -q
 
+# Explore's URL, driven by clicking the real page in headless Chrome. Separate
+# from `test` because it needs the app up: run `make api` and `make web` first.
+# Override the target with WEB_URL=, the browser with CHROME_BIN=.
+test-web:
+	node frontend/tests/explore-url.mjs
+
 build:
 	cd frontend && npm run build
 

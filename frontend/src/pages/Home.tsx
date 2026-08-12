@@ -7,6 +7,7 @@ import { Icon, type IconName } from "../design/Icon";
 import { api } from "../api/client";
 import { useAuth } from "../auth";
 import { emptyFilters, type Dataset, type SourceKind } from "../api/types";
+import { exploreUrl } from "./exploreUrl";
 
 // Landing page: introduces the platform, then offers two card grids that drill
 // into Explore pre-faceted — by biological group (生物類群) or by holding
@@ -45,9 +46,9 @@ export function Home() {
     return out.sort((a, b) => b.records - a.records);
   }, [registry.data, statsById]);
 
-  const byGroup = (value: string) => nav("/explore", { state: { bio_group: [value] } });
+  const byGroup = (value: string) => nav(exploreUrl({ bio_group: [value] }));
   const byOrg = (o: { kind: SourceKind; code: string; ids: string[] }) =>
-    nav("/explore", { state: { sources: o.ids.map((id) => `${o.kind}:${o.code}/${id}`) } });
+    nav(exploreUrl({ sources: o.ids.map((id) => `${o.kind}:${o.code}/${id}`) }));
 
   return (
     <div style={{ flex: 1, overflow: "auto" }}>
@@ -117,7 +118,7 @@ function GetStarted() {
   const steps: { n: number; icon: IconName; key: string; go: () => void }[] = [
     { n: 1, icon: "user", key: "step1", go: () => nav(user ? "/guide#step-1" : "/login") },
     // The manual's own highest-value combination: identifiable from the photo.
-    { n: 2, icon: "search", key: "step2", go: () => nav("/explore", { state: { flags: { missing_identification: true, has_media: true } } }) },
+    { n: 2, icon: "search", key: "step2", go: () => nav(exploreUrl({ flags: { missing_identification: true, has_media: true } })) },
     { n: 3, icon: "spark", key: "step3", go: () => nav("/guide#step-3") },
     { n: 4, icon: "check", key: "step4", go: () => nav("/dashboard") },
   ];

@@ -1,0 +1,130 @@
+{
+  "_comment": [
+    "Per-route page metadata: the single source for both consumers.",
+    "scripts/prerender.mjs reads it from Node and bakes the tags into dist/<path>/index.html,",
+    "because social and chat unfurlers (Slack, LINE, Twitter, Facebook) do not run JavaScript;",
+    "src/seo/useSeo.ts reads the same file at runtime for the title Google's rendered pass and",
+    "GA's page_title see. It lives here as JSON rather than in i18n/index.ts because the",
+    "prerender step has to read it without a TypeScript build. Bilingual all the same:",
+    "prerender emits `zh` to match <html lang=\"zh-Hant\">, the hook follows the active language.",
+    "",
+    "Only indexable routes belong here. /explore, /record/:id, /dashboard and /login are",
+    "excluded from crawling in public/robots.txt and get no entry.",
+    "",
+    "Optional `card.title` overrides the headline on the OG image only (scripts/og-image.mjs),",
+    "for titles that are too long to set at card size. The page's real <title> is unaffected."
+  ],
+  "pages": [
+    {
+      "path": "/",
+      "title": {
+        "en": "TBIA Specimen Exploration & Annotation Platform",
+        "zh": "TBIA自然史標本探索與標註平台"
+      },
+      "description": {
+        "en": "A collaborative platform for enriching TBIA natural-history specimen records. Find occurrences missing identification, coordinates or dates, fill them by hand or with AI-assisted label transcription, and return reviewed enrichments to data providers.",
+        "zh": "TBIA 自然史標本資料的協作標註平台。找出缺少鑑定、座標或日期的標本紀錄，以人工或 AI 輔助的標籤辨識補齊，並將審核後的補遺回饋給資料提供者。"
+      },
+      "card": { "title": "填補標本後設資料的缺口" },
+      "schema": {
+        "@type": "Dataset",
+        "name": "TBIA 自然史標本探索與標註平台",
+        "description": "台灣生物多樣性資訊聯盟（TBIA）自然史標本紀錄的協作補遺平台，涵蓋 945 個資料集、約 208 萬筆標本紀錄。",
+        "inLanguage": ["zh-Hant", "en"],
+        "isBasedOn": "https://tbiadata.tw/",
+        "creator": { "@type": "Organization", "name": "TBIA 台灣生物多樣性資訊聯盟" }
+      }
+    },
+    {
+      "path": "/species",
+      "title": { "en": "Species", "zh": "物種" },
+      "description": {
+        "en": "Every distinct scientific name in the store — 44,874 of them, 33,810 identified to species rank or below — searchable and sortable, each linking to the records that carry it. Names are listed as the store holds them, reconciled against no checklist.",
+        "zh": "資料庫中的每一個學名——共 44,874 個，其中 33,810 個鑑定到種級以下——可搜尋、可排序，並可連至使用該學名的標本紀錄。學名照資料庫原樣列出，未與任何名錄比對。"
+      }
+    },
+    {
+      "path": "/institutions",
+      "title": { "en": "Collection institutions", "zh": "典藏機構" },
+      "description": {
+        "en": "The institutions and aggregators behind the specimen records — their datasets, record counts, and a way into the records themselves.",
+        "zh": "標本紀錄背後的典藏機構與整合平台——各自的資料集、紀錄數量，以及進入紀錄本身的入口。"
+      }
+    },
+    {
+      "path": "/collectors",
+      "title": { "en": "Collectors", "zh": "採集者" },
+      "description": {
+        "en": "The people behind the specimens: searchable collector profiles with what each one collected, when, where, and how much of it still needs georeferencing.",
+        "zh": "標本背後的採集者：可搜尋的採集者列表，呈現每個人採了什麼、何時、何地，以及還有多少紀錄需要定位。"
+      }
+    },
+    {
+      "path": "/contributors",
+      "title": { "en": "Top contributors", "zh": "貢獻者排行" },
+      "description": {
+        "en": "Ranked by annotations a reviewer accepted — the work that actually reached a data provider.",
+        "zh": "依審核通過的註記數排名——也就是真正回饋給資料提供者的成果。"
+      }
+    },
+    {
+      "path": "/story",
+      "title": { "en": "Data stories", "zh": "資料說故事" },
+      "description": {
+        "en": "Topics that read the collection as a narrative rather than a result set: who went where, when, and what of it can still be found in the store today. Each topic works from a published source and queries the specimen data live.",
+        "zh": "以敘事的方式閱讀典藏，而不只是查詢結果：誰在何時去了哪裡，以及今天在資料庫裡還找得到什麼。每則故事都以已出版的文獻為本，並即時查詢標本資料。"
+      }
+    },
+    {
+      "path": "/history",
+      "title": {
+        "en": "A history of botanical survey in Taiwan",
+        "zh": "台灣植物調查研究史"
+      },
+      "description": {
+        "en": "The expeditions that built Taiwan's plant collections, 1854–1988 — a 37-entry chronology transcribed from published literature, with each entry's collectors linked to the records they left behind.",
+        "zh": "1854 至 1988 年間建立台灣植物典藏的歷次調查——轉錄自已出版文獻的 37 則年表記事，並將每則記事的採集者連到他們留下的標本紀錄。"
+      },
+      "schema": {
+        "@type": "CreativeWork",
+        "name": "台灣植物調查研究史年表",
+        "description": "附錄一：台灣植物調查研究史年表，37 則記事，1854–1988。轉錄自已出版文獻，並將記事中的採集者連結至標本紀錄。",
+        "inLanguage": "zh-Hant",
+        "temporalCoverage": "1854/1988",
+        "spatialCoverage": { "@type": "Place", "name": "Taiwan" },
+        "citation": [
+          "許建昌 (1975) 附錄一：台灣植物調查研究史年表。",
+          "黃增泉 (1983)。",
+          "黃增泉 (1986)。"
+        ]
+      }
+    },
+    {
+      "path": "/story/begonia",
+      "title": {
+        "en": "Dr. Ching-I Peng | Begonias of the World",
+        "zh": "彭鏡毅博士｜世界秋海棠"
+      },
+      "description": {
+        "en": "Twenty years of fieldwork on Begonia across Asia, Europe and beyond — transcribed from a digital curation, with every trip answered by the specimens Peng collected in those exact days.",
+        "zh": "橫跨亞洲、歐洲等地二十餘年的秋海棠田野調查——轉錄自數位策展，每一趟行程都以彭老師在那幾天實際採集的標本回答。"
+      },
+      "schema": {
+        "@type": "CreativeWork",
+        "name": "彭鏡毅博士｜世界秋海棠",
+        "description": "彭鏡毅博士二十餘年的秋海棠採集行程與發表物種，轉錄自中央研究院生物多樣性研究博物館（BRMAS）的數位策展。",
+        "inLanguage": "zh-Hant",
+        "about": { "@type": "Person", "name": "彭鏡毅 Ching-I Peng" },
+        "citation": "中央研究院生物多樣性研究博物館（BRMAS）數位策展。"
+      }
+    },
+    {
+      "path": "/guide",
+      "title": { "en": "Guide", "zh": "使用說明" },
+      "description": {
+        "en": "How to find a record with a metadata gap, propose a correction, and how review works before an enrichment reaches a data provider.",
+        "zh": "如何找出後設資料有缺口的標本紀錄、提出補正，以及補遺回饋給資料提供者之前的審核流程。"
+      }
+    }
+  ]
+}

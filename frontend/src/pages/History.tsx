@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import type { SamplingEvent, SamplingEventActor } from "../api/types";
 import { Spinner } from "../components/ui";
 import { Citation } from "../components/Citation";
+import { exploreUrl } from "./exploreUrl";
 
 // The curated chronology: collecting events as published literature records
 // them. This is the upper, documented half of the platform's trip concept — the
@@ -173,8 +174,7 @@ function Specimens({ ev, n }: { ev: SamplingEvent; n?: number }) {
   const who = resolved.map((a) => a.collector_label || a.recorded_by).join("、");
   return (
     <Link
-      to="/explore"
-      state={{
+      to={exploreUrl({
         collectors: resolved.map((a) => ({
           id: a.collector_id as number,
           label: a.collector_label || a.recorded_by,
@@ -183,7 +183,7 @@ function Specimens({ ev, n }: { ev: SamplingEvent; n?: number }) {
         // The count is unfiltered by media, so the landing page must be too —
         // Explore otherwise defaults to records that carry an image.
         flags: { has_media: false },
-      }}
+      })}
       title={tr("hist.specimensHint", { who, from: ev.year_start, to: ev.year_end })}
       style={{ fontSize: 11, color: t.accent, textDecoration: "none", whiteSpace: "nowrap" }}
     >

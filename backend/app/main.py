@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from . import duck
+from .cache import cache_control_middleware
 from .config import settings
 from .db import init_db
 
@@ -25,6 +27,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Added last, so it is outermost and stamps every response -- including the ones
+# the exception handlers below produce.
+app.middleware("http")(cache_control_middleware)
+
+
+# Load shedding from duck.py surfaces as 503/504 rather than a hung request.
+# Retry-After is the part that matters for the traffic this exists for: a
+# crawler reads it and backs off, where a bare 5xx just gets retried at once.
+@app.exception_handler(duck.DuckOverloaded)
+async def _overloaded(request: Request, exc: duck.DuckOverloaded) -> JSONResponse:
+    return JSONResponse(
+        {"detail": "Server busy, please retry shortly."},
+        status_code=503,
+        headers={"Retry-After": "30"},
+    )
+
+
+@app.exception_handler(duck.DuckTimeout)
+async def _query_timeout(request: Request, exc: duck.DuckTimeout) -> JSONResponse:
+    return JSONResponse(
+        {"detail": "Query took too long. Try narrowing the filters."},
+        status_code=504,
+    )
 
 
 @app.get("/api/health")

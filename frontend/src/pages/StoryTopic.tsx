@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import type { Story, StoryRegion, StorySpecies, StoryTrip } from "../api/types";
 import { Spinner } from "../components/ui";
 import { Citation } from "../components/Citation";
+import { exploreUrl } from "./exploreUrl";
 
 // A curated story, rendered from `GET /api/stories/{key}`: the transcription as
 // written, with every number in it answered live by the occurrence store.
@@ -113,7 +114,7 @@ function Summary({ story }: { story: Story }) {
           border: `1px solid ${t.border}`, textDecoration: "none", color: t.fg,
         } as const;
         return tile.to
-          ? <Link key={tile.label} to="/explore" state={tile.to} style={style}>{body}</Link>
+          ? <Link key={tile.label} to={exploreUrl(tile.to)} style={style}>{body}</Link>
           : <div key={tile.label} style={style}>{body}</div>;
       })}
     </div>
@@ -161,12 +162,11 @@ function Trip({ trip, story }: { trip: StoryTrip; story: Story }) {
         )}
         {c && trip.n_records > 0 ? (
           <Link
-            to="/explore"
-            state={{
+            to={exploreUrl({
               collectors: [{ id: c.id, label: c.label }],
               dates: { from: trip.date_start, to: trip.date_end },
               flags: { has_media: false },
-            }}
+            })}
             title={tr("storyDetail.tripHint", { who: c.label, from: trip.date_start, to: trip.date_end })}
             style={{ display: "inline-block", marginTop: 5, fontSize: 11, color: t.accent, textDecoration: "none" }}
           >
@@ -254,7 +254,7 @@ function Species({ sp, n }: { sp: StorySpecies; n: number }) {
     return <span style={{ ...style, color: t.fgMuted }} title={tr("storyDetail.speciesAbsent")}>{label}</span>;
   }
   return (
-    <Link to="/explore" state={{ q: sp.name, flags: { has_media: false } }}
+    <Link to={exploreUrl({ q: sp.name, flags: { has_media: false } })}
       style={{ ...style, color: t.fg, textDecoration: "none" }}>
       {label}
       <span style={{ color: t.accent, marginLeft: 6 }}>{sp.n_records} →</span>

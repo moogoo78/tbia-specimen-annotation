@@ -38,6 +38,7 @@ make seed-sampling-events   # curated chronology (data/sampling_events.json) -> 
 make api            # FastAPI on :8000   (frontend proxies /api here)
 make web            # Vite dev server on :5173
 make test           # pytest (backend)
+make test-web       # Explore's URL, clicked in headless Chrome (needs api+web up)
 make build          # frontend production build (also typechecks)
 ```
 
@@ -60,12 +61,14 @@ local dev + tests have deterministic users; tests mint JWTs directly via `auth.c
 
 ```
 backend/app/        main.py, duck.py, db.py, models.py, search.py, extract.py, auth.py, config.py
+                    cache.py (Cache-Control allowlist for the public read API)
 backend/app/api/    occurrences.py, annotations.py, auth.py, export.py
 backend/ingest/     common.py (export access, registry, column baseline), inspect.py
                     (survey an export), build.py (export -> DuckDB), prepare.py
                     (derive flags), columns.json (the pinned export header)
 backend/tests/      conftest.py builds a tiny DuckDB+SQLite; test_search, test_annotations
-frontend/src/       pages/ (Explore, RecordDetail, Dashboard, Login), components/, api/, i18n/, design/
+frontend/src/       pages/ (Explore + exploreUrl.ts, RecordDetail, Dashboard, Login), components/,
+                    api/, i18n/, design/, seo/ (pages.json + useSeo.ts)
 data/               tbia.duckdb (ETL export) + annotations.sqlite + registry.json (gitignored)
 ```
 
@@ -134,8 +137,9 @@ provenance the source does not support and would flow into provider exports as c
 `GET /api/sampling-events/counts` is the one place the chronology touches DuckDB: per event,
 how many records its *resolved* actors hold within its years — one grouped join, cached on the
 actor/year signature so a re-seed invalidates it. `/history` shows that number as the specimen
-column and links it into Explore (collectors + `year_from/year_to`, `has_media` cleared so the
-result matches the count); zero renders as an em dash rather than a link into nothing. It
+column and links it into Explore via `exploreUrl()` (collectors + `year_from/year_to`,
+`has_media` cleared so the result matches the count); zero renders as an em dash rather than
+a link into nothing. It
 stores nothing and associates nothing — a counted record may well come from other fieldwork
 the same person did those years — so keep it out of the export path.
 
@@ -171,9 +175,52 @@ grouping, so paging in SQL would pay the full scan per request. Nothing is persi
 `scientific_name` is an **exact, multi-valued filter** on the occurrence search
 (`search.py` `Filters` + `build_where`, so list/count/facet all get it) and is deliberately
 **not** in `FACET_COLUMNS` — 44,874 values is not a facet list, and the species page is the
-picker. A row links into Explore through router `state` (the `/history` mechanism) and must
+picker. A row links into Explore through `exploreUrl()` (see *Explore's URL* below) and must
 clear `has_media`, which `emptyFilters()` defaults to `true`; without that the landing page
 would report fewer records than the row it was opened from.
+
+## Explore's URL
+
+**Explore's filter state is the query string** (`pages/exploreUrl.ts` + `useSearchParams`),
+so a filtered view can be reloaded, shared, and returned to with the back button — which
+matters most on the way back from a record, where the search used to have to be redone by
+hand. Nothing about the filters lives in component state any more; the setters in
+`Explore.tsx` kept their old signatures and write the URL instead.
+
+- **The page's parameters are the API's parameters.** `exploreUrl.ts` builds on
+  `client.ts`'s `filtersToParams` and its inverse `paramsToFilters` (kept beside it so the
+  two cannot drift), so `/explore?q=x` and `/api/occurrences?q=x` mean the same thing and a
+  page's query pasted onto the API returns the rows on screen.
+- **"No parameters at all" is not "this parameter is absent."** `emptyFilters()` starts
+  `has_media` **true** while the API convention reads an absent boolean as false, so
+  `parseExplore` treats a bare `/explore` as the landing defaults and anything else as
+  literal. Every link in goes through **`exploreUrl()`**, which starts from
+  `emptyFilters()` — so an unmentioned flag keeps its landing default, and a link that
+  wants every record still has to say `flags: { has_media: false }` explicitly.
+- Edits **replace** rather than push, so the back button leaves the page instead of
+  stepping through every checkbox.
+- `source` and `collector_id` are serialised, not the `tbia_dataset_id` they expand into —
+  writing both would let the two copies disagree. A URL carries collector **ids** only, so
+  the chip labels are resolved through `GET /api/collectors/{id}` on arrival and cached.
+- `activeId` (the split view's selected record) is deliberately **not** in the URL.
+
+This replaced a router-`state` handoff that applied filters once per navigation and then
+nulled itself out. If you add a link into Explore, use `exploreUrl()` — a second mechanism
+is how the two drift.
+
+**One URL write per handler.** `setSearchParams` builds the next URL from the render's
+`searchParams` — even given a function it passes the closure value, not a live ref — and
+`navigate` is async, so two calls in one handler both start from the pre-click URL and the
+second silently discards the first. That shipped once: every facet checkbox ticked and
+changed nothing. `setFilters` / `setSources` / `setView` therefore fold in their own
+`offset: 0` rather than leaving the caller to add a second call.
+
+`make test-web` (`frontend/tests/explore-url.mjs`) is what catches this class. It clicks the
+real page in headless Chrome over CDP — no dependencies, Node's own WebSocket is enough —
+because `tsc`, the build, and loading `/explore?bio_group=…` all stayed green while the
+clicks were broken: they only ever exercised *parsing*. It needs `make api` + `make web` up,
+and asserts relationally (a facet row prints its count; clicking it must make the pager
+total equal *that*) so an ETL refresh cannot invalidate it.
 
 ## Curated stories (`/story`)
 
@@ -272,6 +319,82 @@ check the export before dropping an entry.
 The Explore **Source** facet is driven by that merged response; selecting a source
 expands to the union of its `tbia_dataset_id`s.
 
+## Serving public traffic
+
+Reads are unauthenticated and expensive (a facet rollup scans ~2M rows), so two
+mechanisms bound what an open audience can cost. Both are policy in one file each —
+change the policy there, not at the endpoints.
+
+- **`app/cache.py`** stamps `Cache-Control` on every response from an **allowlist of
+  route templates**, defaulting to `private, no-store`. A new endpoint is therefore
+  uncached until it is added to `STATIC_ROUTES` (occurrence-store reads and seeded data,
+  `s-maxage=3600`) or `LIVE_ROUTES` (moves as people annotate, 60s). `test_cache.py`
+  asserts every listed template still matches a mounted route, so a rename fails the
+  suite instead of quietly becoming origin load. Two invariants: a request carrying
+  `Authorization` never gets a `public` response (so a shared cache can never store one
+  produced under credentials, even if a listed route later grows per-user content), and
+  non-200s are never cached (an error would outlive its cause at the edge).
+- **`app/duck.py`** caps *concurrent* scans (`NDB_DUCK_MAX_CONCURRENCY`) rather than
+  requests per client — the load that hurts arrives from many IPs at once, which per-IP
+  limiting cannot see. Over the cap, a request waits `NDB_DUCK_QUEUE_TIMEOUT` then raises
+  `DuckOverloaded` → 503 + `Retry-After`; a scan past `NDB_DUCK_QUERY_TIMEOUT` is
+  cancelled via DuckDB's `interrupt()` (there is no `statement_timeout`) → `DuckTimeout`
+  → 504. Both are plain `RuntimeError`s so `worker.py` and `import_results.py` see normal
+  errors; `main.py` maps them to responses.
+
+- **`frontend/public/robots.txt`** bounds the crawl before it starts, which the two
+  mechanisms above cannot: a crawler's whole job is requesting URLs nobody has requested
+  yet, so it is structurally a cache-miss generator. `/record/` (2.08M URLs) and
+  `/explore` (unbounded filter permutations) are disallowed. That costs nothing worth
+  having — TBIA's own portal and GBIF are canonical for the occurrence records, so ours
+  would be a thin duplicate of upstream. The narrative layer stays crawlable, and it is
+  the only part that is uniquely ours.
+
+A CDN in front does nothing for `/api/*` until it is told to honour these headers, and
+after an ETL refresh or a re-seed the edge must be purged — see DEPLOY.md step 7.
+
+## Page metadata (`src/seo/`)
+
+The app is client-rendered, so the served HTML is one shell for all 17 routes. **Link
+unfurlers (Slack, LINE, Twitter, Facebook) never run JavaScript**, so a title set from
+React is invisible to them — which is the whole reason there is a build step here rather
+than just a hook.
+
+`src/seo/pages.json` is the single source: one entry per indexable route, `title` and
+`description` in both languages, plus optional schema.org `schema` for JSON-LD. Two
+consumers read it —
+
+- **`scripts/prerender.mjs`** (run by `npm run build`) copies `dist/index.html` to
+  `dist/<path>/index.html` with the head filled in, and writes `sitemap.xml` +
+  robots.txt's absolute `Sitemap:` line. Injected tags are fenced in `<!-- seo:start -->`
+  so a re-run replaces them rather than stacking a second copy. Caddy reaches the copies
+  via `try_files {path} {path}/index.html /index.html`; unlisted routes still fall
+  through to the SPA shell.
+- **`src/seo/useSeo.ts`**, called once in `App.tsx`, keeps the title right after
+  client-side navigation — what Google's rendered pass reads, and what `analytics.ts`
+  reports as `page_title` (before it, every GA pageview carried the same static title).
+
+**The OG cards in `public/og/` are committed PNGs, not a build product.**
+`scripts/og-image.mjs` renders one per page from the same `pages.json`, through headless
+Chromium — which production does not have and should not grow — so it is a dev-time tool
+you re-run and commit after changing a title or description. Exactly 1200×630, the size
+`prerender.mjs` declares, so the file and the declaration cannot disagree. `card.title`
+overrides the headline for titles that do not set at card size (the home page's full name
+wraps for one character); it does not touch the page's real `<title>`. An `og:image` must
+be absolute, so with `VITE_SITE_URL` unset the tags fall back to the text-only
+`summary` card rather than naming an image nobody can fetch.
+
+It is JSON rather than i18n keys because the prerender has to read it from Node with no
+TypeScript build; it stays bilingual all the same, prerender emitting `zh` to match
+`<html lang="zh-Hant">`.
+
+**`VITE_SITE_URL` is a build arg**, like `VITE_GA_MEASUREMENT_ID` — Vite inlines it, and
+the prerender needs an absolute origin. Unset degrades deliberately: titles and OG tags
+still ship, canonical/`og:url`/`sitemap.xml` are skipped rather than guessed at a wrong
+origin. **The root `dist/index.html` gets no canonical** for the same reason: it is also
+the fallback for every unlisted route, so a canonical there would claim `/record/x` is
+the home page. `useSeo` sets the real one client-side.
+
 ## Gotchas
 
 - Password hashing uses **pbkdf2_sha256** (not bcrypt) — passlib+bcrypt 4.x is broken here.
@@ -299,5 +422,8 @@ expands to the union of its `tbia_dataset_id`s.
   `standard_date`, `class`, `order` and friends by name, so an upstream rename would load
   clean and then fail every query. A rename shows as one `+` and one `-`. Accept a change by
   editing the file and committing it; there is deliberately no override flag.
-- The Chrome browser-automation tools aren't connected in this environment — verify UI
-  changes via `tsc`/`vite build` + API checks, and ask the user for visual confirmation.
+- **`tsc` and `vite build` say nothing about whether the UI works.** Both stayed green
+  through a bug that broke every facet checkbox. For anything interactive, drive the real
+  page: `make test-web` for Explore, or headless Chrome over CDP the same way
+  (`frontend/tests/explore-url.mjs` is the worked example). The Chrome browser-automation
+  tools are connected when the extension is running, which is the other way to check.
