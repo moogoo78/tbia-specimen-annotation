@@ -461,6 +461,18 @@ the home page. `useSeo` sets the real one client-side.
 - Settings via env with `NDB_` prefix (`app/config.py`): `NDB_DUCKDB_PATH` (defaults to
   `data/tbia.duckdb`), `NDB_SQLITE_PATH`, `NDB_REFERENCE_PATH`, `NDB_JWT_SECRET`,
   `NDB_CORS_ORIGINS`.
+- **Every secret resolves through `Settings`, including `ANTHROPIC_API_KEY`** — never
+  through a library's own env lookup. Nothing here calls `load_dotenv`, so
+  `anthropic.Anthropic()` reading `os.environ` saw a *different* environment from the
+  rest of the app: a key in `.env` reached it only when Compose happened to interpolate
+  it, and a host `make transcribe` failed with the SDK's "Could not resolve
+  authentication method" while the value sat in the file. `pipeline._client()` now passes
+  it explicitly and refuses first with a message naming the file. The three env sources
+  are genuinely different things: the root `.env` is read by the host (Makefile targets)
+  and by **Compose's `${VAR}` interpolation** of `docker-compose.yml`; `backend/.env` is
+  prod's `env_file:`, injected wholesale and the deployed container's *only* source
+  (`REPO`-relative dotenv paths resolve outside the image); and a real env var beats
+  both. `docker compose restart` does not re-read `env_file` — use `up -d`.
 - **`NDB_DEV_MODE` is the "throwaway local environment" switch, default off.** It
   permits the placeholder `NDB_JWT_SECRET` (the repo is public, so a deploy that
   keeps it is trivially forgeable — `Settings` raises at import otherwise) and is

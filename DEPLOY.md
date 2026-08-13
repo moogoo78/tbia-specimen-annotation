@@ -130,6 +130,11 @@ ORCID_ADMIN_IDS=
 # NDB_DEV_MODE also permits the placeholder JWT secret, so leaving it out is
 # what makes the NDB_JWT_SECRET line above non-optional.
 NDB_DEV_LOGIN=false
+
+# AI label transcription. Leave empty to run without it (the button reports
+# that it is unconfigured rather than failing mid-transcription). This file is
+# the container's only env source, so a key in the root .env does not reach it.
+ANTHROPIC_API_KEY=
 EOF
 chmod 600 backend/.env
 ```
@@ -141,9 +146,21 @@ finds the placeholder without `NDB_DEV_MODE=true`, so a missing or typo'd line
 here fails loudly at deploy time instead of silently shipping forgeable sessions.
 
 With an empty `ORCID_CLIENT_ID` the API returns **503** on `/api/auth/orcid/*`
-and nobody can sign in. Optional extras (`ANTHROPIC_API_KEY` for AI
-transcription, `DISCORD_WEBHOOK_URL` for review pings) go in the same file; see
-`.env.example` for the full list.
+and nobody can sign in. `DISCORD_WEBHOOK_URL` (review pings) is optional and goes
+in the same file; see `.env.example` for the full list.
+
+`ANTHROPIC_API_KEY` is optional only while nobody transcribes: it is what both AI
+routes need, including `transcribe-now`, which runs **inside the API process** —
+so unlike the batch worker, the key has to be in the environment of *this*
+container, not of the shell that runs `make transcribe`. Two things about this
+file make that easy to get wrong. It is the container's only settings source
+(inside the image the code lives at `/app`, so the repo-relative `.env` fallbacks
+resolve to paths that do not exist there), and **`docker compose restart` does
+not re-read it** — after editing, always:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d backend
+```
 
 > The DuckDB caps (`NDB_DUCK_THREADS`, `NDB_DUCK_MEMORY_LIMIT`,
 > `NDB_DUCK_TEMP_DIR`) and the DB paths are already set in
