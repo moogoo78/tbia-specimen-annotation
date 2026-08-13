@@ -39,6 +39,7 @@ export function Dashboard() {
       <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>{tr("dash.title")}</h2>
 
       <RankingOptIn />
+      {user.role === "admin" && <TranscribeRoutePolicy />}
 
       {/* status summary */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
@@ -134,6 +135,58 @@ function RankingOptIn() {
       <Link to="/contributors" style={{ fontSize: 11, color: t.accent, textDecoration: "none", flexShrink: 0 }}>
         {tr("vol.viewAll")}
       </Link>
+    </div>
+  );
+}
+
+// The system-wide AI transcription route, set by an admin for everyone. It used
+// to be a switch inside each record's AI panel, which only admins saw and which
+// only changed their own next click — so it read as a personal preference when
+// what it decides is what the platform does with a contributor's click and who
+// pays for it. It lives here instead: one setting, one place, stated as applying
+// to all users. The server enforces the same value (`policy.transcribe_route`),
+// so this is the decision itself rather than a view of it.
+function TranscribeRoutePolicy() {
+  const { t: tr } = useTranslation();
+  const qc = useQueryClient();
+  const cfg = useQuery({ queryKey: ["transcribe-config"], queryFn: () => api.transcribeConfig() });
+  const save = useMutation({
+    mutationFn: (route: "queue" | "now") => api.setTranscribeConfig(route),
+    // Write the answer straight into the cache the record panel reads, so the
+    // AI card is not still offering the old route behind its 10-minute
+    // staleTime — the point of the setting is that it takes effect now.
+    onSuccess: (next) => qc.setQueryData(["transcribe-config"], next),
+  });
+  const route = cfg.data?.route ?? "queue";
+  const busy = cfg.isLoading || save.isPending;
+
+  return (
+    <div style={{
+      padding: "8px 10px", marginBottom: 14,
+      background: t.panel, border: `1px solid ${t.border}`, maxWidth: 620,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Icon name="spark" size={12} />
+        <div style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>{tr("dash.aiRouteTitle")}</div>
+        {(["queue", "now"] as const).map((r) => (
+          <Button key={r} small primary={route === r} disabled={busy}
+            onClick={() => route !== r && save.mutate(r)}>
+            {tr(r === "now" ? "annotate.routeNow" : "annotate.routeQueue")}
+          </Button>
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 4, lineHeight: 1.5 }}>
+        {tr("dash.aiRouteHint")}
+      </div>
+      {route === "now" && !save.isPending && (
+        <div style={{ fontSize: 11, color: t.warn, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+          <Icon name="alert" size={11} />{tr("dash.aiRouteNowWarn")}
+        </div>
+      )}
+      {save.isPending && <div style={{ fontSize: 11, color: t.fgSubtle, marginTop: 4 }}>{tr("dash.aiRouteSaving")}</div>}
+      {save.isError && (
+        <div style={{ fontSize: 11, color: t.danger, marginTop: 4 }}>{(save.error as Error).message}</div>
+      )}
     </div>
   );
 }

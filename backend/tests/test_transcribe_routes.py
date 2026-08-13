@@ -3,7 +3,12 @@
 Both land in the same place — a `transcribe_requests` row plus `ai` annotation
 drafts — and differ only in who waits and who pays: the queue hands the record
 to the batch worker and pings Discord, run-now spends the API call inside the
-request, which is why it is admin-only.
+request.
+
+Which one a click takes is *system-wide policy an admin sets* (`app/policy.py`),
+not a per-caller choice: an admin may always run one, and everyone else may
+exactly when the route is set to "now". The endpoint enforces it, so the setting
+bounds the spend rather than only the UI.
 """
 
 import pytest
@@ -42,11 +47,69 @@ def stub_claude(monkeypatch):
     monkeypatch.setattr(pipeline.anthropic, "Anthropic", lambda *a, **k: _Client())
 
 
-def test_run_now_is_admin_only(client, stub_claude):
+@pytest.fixture(autouse=True)
+def route_back_to_the_queue():
+    """The route is persisted policy and the `client` fixture is session-scoped,
+    so a test that moves it would otherwise hand "now" to every test that runs
+    after it — including one asserting a contributor is refused."""
+    yield
+    from app.db import SessionLocal
+    from app import policy
+
+    with SessionLocal() as db:
+        policy.set_transcribe_route(db, policy.DEFAULT_ROUTE)
+
+
+def _set_route(client, value: str):
+    res = client.put("/api/transcribe/config", json={"route": value},
+                     headers=auth_header(client, ADMIN))
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+def test_run_now_is_closed_to_contributors_while_the_route_is_the_queue(client, stub_claude):
+    """The default. An admin can always run one; nobody else can, so the queue
+    setting means no contributor is spending vision calls inline — not merely
+    that the UI stops offering it."""
     for who in (CURATOR, REVIEWER):
         res = client.post("/api/occurrences/r4/transcribe-now", headers=auth_header(client, who))
         assert res.status_code == 403, who
     assert client.post("/api/occurrences/r4/transcribe-now").status_code == 401
+
+
+def test_admin_route_switch_opens_run_now_to_everyone(client, stub_claude):
+    """The switch is the *system's*, which is the whole point: once an admin sets
+    "now", a contributor's own click runs and bills inline."""
+    assert client.get("/api/transcribe/config").json()["route"] == "queue"
+
+    assert _set_route(client, "now")["route"] == "now"
+    # Every caller is told the same thing — it is what their click will do.
+    assert client.get("/api/transcribe/config").json()["route"] == "now"
+
+    res = client.post("/api/occurrences/r4/transcribe-now", headers=auth_header(client, CURATOR))
+    assert res.status_code == 200
+    assert res.json()["status"] == "done"
+
+    # ...and switching back closes it again, without a restart.
+    _set_route(client, "queue")
+    res = client.post("/api/occurrences/r1/transcribe-now", headers=auth_header(client, CURATOR))
+    assert res.status_code == 403
+
+
+def test_only_an_admin_may_move_the_route(client):
+    for who in (CURATOR, REVIEWER):
+        res = client.put("/api/transcribe/config", json={"route": "now"},
+                         headers=auth_header(client, who))
+        assert res.status_code == 403, who
+    assert client.put("/api/transcribe/config", json={"route": "now"}).status_code == 401
+    assert client.get("/api/transcribe/config").json()["route"] == "queue"
+
+
+def test_an_unknown_route_is_rejected(client):
+    res = client.put("/api/transcribe/config", json={"route": "immediately"},
+                     headers=auth_header(client, ADMIN))
+    assert res.status_code == 400
+    assert client.get("/api/transcribe/config").json()["route"] == "queue"
 
 
 def test_run_now_writes_drafts_in_the_request(client, stub_claude):

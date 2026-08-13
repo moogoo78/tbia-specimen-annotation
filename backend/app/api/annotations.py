@@ -4,7 +4,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import auth, duck, extract, notify, pipeline, search
+from .. import auth, duck, extract, notify, pipeline, policy, search
 from ..annotations_store import _serialize
 from ..config import settings
 from ..db import get_session
@@ -16,6 +16,7 @@ from ..schemas import (
     ExtractPromptResponse,
     ExtractResponse,
     TranscribeConfig,
+    TranscribeConfigUpdate,
     TranscribeOptions,
     TranscribeRequestOut,
 )
@@ -60,15 +61,39 @@ async def ai_extract_paste(
 
 
 @router.get("/transcribe/config", response_model=TranscribeConfig)
-async def transcribe_config():
-    """The models the "auto" preset resolves to. Mirrors the fallback logic in
-    pipeline.transcribe_record: single mode uses anthropic_model and no OCR pass;
-    two_stage uses ocr_model -> field_model."""
+async def transcribe_config(db: Session = Depends(get_session)):
+    """The models the "auto" preset resolves to, plus the route in force. Mirrors
+    the fallback logic in pipeline.transcribe_record: single mode uses
+    anthropic_model and no OCR pass; two_stage uses ocr_model -> field_model.
+
+    The route comes from the admin-set policy, not from who is asking — every
+    caller is told the same thing, because it is what *their* click will do."""
+    route = policy.transcribe_route(db)
     if settings.transcribe_mode == "single":
-        return TranscribeConfig(mode="single", ocr_model=None, field_model=settings.anthropic_model)
+        return TranscribeConfig(
+            mode="single", ocr_model=None, field_model=settings.anthropic_model, route=route,
+        )
     return TranscribeConfig(
         mode="two_stage", ocr_model=settings.ocr_model, field_model=settings.field_model,
+        route=route,
     )
+
+
+@router.put("/transcribe/config", response_model=TranscribeConfig)
+async def set_transcribe_config(
+    body: TranscribeConfigUpdate,
+    user: User = Depends(auth.require_role("admin")),
+    db: Session = Depends(get_session),
+):
+    """Set the system-wide transcribe route. Admin-only, and it moves what every
+    contributor's click does — under "now" their request pays for the vision call
+    and holds the connection while it runs — so it is one deliberate act by one
+    role, rather than a per-record choice each caller makes for themselves."""
+    try:
+        policy.set_transcribe_route(db, body.route, user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return await transcribe_config(db)
 
 
 @router.post("/occurrences/{occ_id}/transcribe-request", response_model=TranscribeRequestOut)
@@ -107,7 +132,7 @@ async def schedule_transcribe(
 async def transcribe_now(
     occ_id: str,
     opts: TranscribeOptions | None = Body(default=None),
-    user: User = Depends(auth.require_role("admin")),
+    user: User = Depends(auth.current_user),
     db: Session = Depends(get_session),
 ):
     """Transcribe a record **now**, in this request, instead of queueing it.
@@ -116,8 +141,15 @@ async def transcribe_now(
     annotation drafts written by `pipeline.process_one`, so a record looks the
     same afterwards whichever route produced it. What differs is who waits and
     who pays — the caller holds the connection for the tens of seconds a vision
-    call takes, and the call is billed the moment they click, which is why this
-    is **admin-only** and the queue stays the default for everyone else.
+    call takes, and the call is billed the moment they click.
+
+    **Who may call it is policy, not role alone.** An admin always may. Everyone
+    else may exactly when an admin has switched the system-wide route to "now"
+    (`policy.transcribe_route`) — the same value the UI reads to decide which
+    button to show. The check is here rather than only in the UI because the
+    endpoint is reachable without it, and "the switch is set to queue" has to
+    mean nobody is spending vision calls inline, not just that nobody is being
+    offered the option.
 
     No Discord ping either: that notification exists to tell a human the worker
     has something to drain, and here it has already been drained.
@@ -126,6 +158,9 @@ async def transcribe_now(
     `process_one` records it on the row, and the response carries
     `status="failed"` with the reason in `error`, exactly as the worker would.
     """
+    if user.role != "admin" and policy.transcribe_route(db) != "now":
+        raise HTTPException(status_code=403, detail="Run-now is disabled; use the queue")
+
     record = await duck.query_one("SELECT id FROM occurrence WHERE id = ?", [occ_id])
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")

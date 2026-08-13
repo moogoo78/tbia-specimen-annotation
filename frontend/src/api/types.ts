@@ -141,10 +141,15 @@ export interface TranscribeOptions {
 }
 
 /** What the server's "auto" preset resolves to (GET /api/transcribe/config). */
+export type TranscribeRoute = "queue" | "now";
+
 export interface TranscribeConfig {
   mode: "single" | "two_stage" | string;
   ocr_model: string | null;
   field_model: string;
+  // System-wide and admin-set: what *every* user's transcribe click does. Not a
+  // per-user preference — the server enforces the same value it reports here.
+  route: TranscribeRoute;
 }
 
 export interface DevUser { email: string; display_name: string; role: string; }

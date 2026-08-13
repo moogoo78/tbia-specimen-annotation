@@ -526,14 +526,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
 function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: string, value: string) => void }) {
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
-  const { user } = useAuth();
   const [open, setOpen] = useState<"queue" | "paste" | null>(null);
-  // Which server-side route runs it. Admins can swap the queue for a call that
-  // happens now: same destination (a transcribe_requests row + `ai` drafts),
-  // but they wait for it and it bills the moment they click — hence admin-only,
-  // and hence the queue stays the default even for them.
-  const isAdmin = user?.role === "admin";
-  const [route, setRoute] = useState<"queue" | "now">("queue");
   const [pasteRaw, setPasteRaw] = useState("");
   const [copied, setCopied] = useState(false);
   const [drafts, setDrafts] = useState<ExtractedField[]>([]);
@@ -544,12 +537,18 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
   const q = record.transcribe;   // durable queue state (survives reload)
 
   // "Auto" sends no overrides, so what it runs is whatever the server is
-  // configured for — ask, rather than showing an opaque "Auto".
+  // configured for — ask, rather than showing an opaque "Auto". The same
+  // response carries the route in force.
   const engineCfg = useQuery({
     queryKey: ["transcribe-config"],
     queryFn: () => api.transcribeConfig(),
     staleTime: 10 * 60_000,
   });
+  // Which route this click takes is the admin's system-wide setting (Dashboard),
+  // not a choice made here — under "now" it is every contributor's click that
+  // runs and bills inline, not just an admin's. Until the config loads, assume
+  // the queue: it is the default, and the cheap answer to be wrong about.
+  const route: "queue" | "now" = engineCfg.data?.route === "now" ? "now" : "queue";
   // The server's model chain as "sonnet-5→opus-4-8" (the claude- prefix is noise
   // at this width). Read-only: the contributor doesn't pick an engine.
   const engineChain = (() => {
@@ -626,17 +625,6 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
           cta={route === "now" ? tr("annotate.optRunNowGo") : q ? tr("annotate.qAgain") : tr("annotate.optQueueGo")}
           disabled={!hasImage}
           meta={engineChain ? tr("annotate.engineIs", { name: engineChain }) : undefined}>
-          {isAdmin && (
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: 10, color: t.fgMuted }}>{tr("annotate.routeLabel")}</span>
-              {(["queue", "now"] as const).map((r) => (
-                <Button key={r} small primary={route === r} disabled={running}
-                  onClick={() => setRoute(r)}>
-                  {tr(r === "now" ? "annotate.routeNow" : "annotate.routeQueue")}
-                </Button>
-              ))}
-            </div>
-          )}
           <div style={{ fontSize: 10, color: t.fgSubtle }}>
             {tr(route === "now" ? "annotate.optRunNowSlow" : "annotate.optQueueSlow")}
           </div>
