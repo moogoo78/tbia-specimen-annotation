@@ -21,7 +21,7 @@ import anthropic
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import extract, search
+from . import extract, media, search
 from .config import settings
 from .models import Annotation, TranscribeRequest
 from .schemas import ExtractedField, ExtractResponse
@@ -232,10 +232,22 @@ def _fields_from_text(
 
 
 def _image_urls(record: dict) -> list[str]:
+    """Which images this transcription reads, at the size it reads them.
+
+    `extract.images` decides *which* — the shared definition, so the prompt
+    builder, the importer and this module cannot disagree. `media.at_size` then
+    asks for the rendition the models should actually see: the export's URL is a
+    1024px derivative for HAST, legible as a sheet and not as a label. Sources
+    without a rule come back unchanged.
+
+    The rewrite happens here, at the single definition, rather than at the two
+    call sites that build image blocks — so `out.image_urls` records the images
+    that were really read, and a stored draft points at the same pixels the model
+    was looking at."""
     urls = extract.images(record)
     if not urls:
         raise ValueError("record has no image to transcribe")
-    return urls
+    return [media.at_size(u, settings.ocr_image_size) for u in urls]
 
 
 def _image_blocks(image_urls: list[str]) -> list[dict]:

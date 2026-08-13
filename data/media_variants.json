@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "Image size variants published alongside a record's media URL, per source.",
+    "",
+    "TBIA's export carries ONE URL per image, and for several institutions that",
+    "URL is a downscaled derivative — HAST's is 683x1024, too small to read a",
+    "handwritten label. The bigger renditions exist on the same bucket under a",
+    "different filename suffix; nothing in the export says so, which is why this",
+    "file exists. Read by app/media.py, re-read when the file's mtime changes.",
+    "",
+    "A rule matches on `url_prefix` (a literal, matched case-insensitively) and",
+    "rewrites the filename's `suffix` -> another size's suffix. `canonical` is",
+    "the suffix the export actually ships, so a rule that stops matching leaves",
+    "the original URL untouched rather than inventing one.",
+    "",
+    "long_edge is the real pixel long edge, measured, not assumed: it is what",
+    "decides whether the Claude vision API downscales the image before reading",
+    "it (2576px / 3.75MP on the current models), and therefore whether a bigger",
+    "file buys detail or only bandwidth.",
+    "",
+    "Adding a source is an edit here plus nothing else. Verify the sizes exist",
+    "before adding them -- a 404 is worse than a small image."
+  ],
+  "rules": [
+    {
+      "id": "brmas-hast",
+      "note": "中央研究院生物多樣性研究博物館 (BRMAS) / HAST herbarium sheets, ~126k records. Verified 2026-08-13 against S_138530: every suffix returns 200.",
+      "url_prefix": "https://brmas-media.s3-ap-northeast-1.amazonaws.com/hast/",
+      "pattern": "-{suffix}.jpg",
+      "canonical": "l",
+      "sizes": [
+        { "suffix": "l", "long_edge": 1024 },
+        { "suffix": "x", "long_edge": 2048 },
+        { "suffix": "o", "long_edge": 4096 }
+      ]
+    }
+  ]
+}

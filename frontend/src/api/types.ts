@@ -27,9 +27,22 @@ export interface OccurrenceRow {
   thumbnail: string | null;
 }
 
+/** One rung of a record's image-size ladder (see backend/app/media.py). The URLs
+ *  arrive already rewritten — the browser never builds one, so a size means the
+ *  same thing here as it does to the transcription pipeline. */
+export interface MediaSize {
+  size: string;          // the source's own suffix: "m" | "l" | "x" | "o" for HAST
+  long_edge: number;     // real pixels on the long edge, measured
+  canonical: boolean;    // the rendition TBIA's export itself ships
+  urls: string[];        // parallel to `media`, same order
+}
+
 export interface OccurrenceDetail extends OccurrenceRow {
   [key: string]: unknown;
   media: string[];
+  /** Larger/smaller renditions of `media`, when the source publishes them.
+   *  Empty for every source without a rule — the gallery then just shows `media`. */
+  media_sizes: MediaSize[];
   annotations: Annotation[];
   /** Most recent AI transcription request for this record (null = never queued). */
   transcribe: TranscribeState | null;
