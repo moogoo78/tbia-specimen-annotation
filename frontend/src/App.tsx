@@ -17,6 +17,7 @@ import { StoryTopic } from "./pages/StoryTopic";
 import { RecordDetail } from "./pages/RecordDetail";
 import { Dashboard } from "./pages/Dashboard";
 import { Guide } from "./pages/Guide";
+import { AiWalkthrough } from "./pages/AiWalkthrough";
 import { Login } from "./pages/Login";
 import { OrcidCallback } from "./pages/OrcidCallback";
 
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/record/:id" element={<RecordDetail />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/guide" element={<Guide />} />
+        <Route path="/guide/ai-transcribe" element={<AiWalkthrough />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/orcid/callback" element={<OrcidCallback />} />
       </Routes>

@@ -125,6 +125,14 @@
         "en": "How to find a record with a metadata gap, propose a correction, and how review works before an enrichment reaches a data provider.",
         "zh": "如何找出後設資料有缺口的標本紀錄、提出補正，以及補遺回饋給資料提供者之前的審核流程。"
       }
+    },
+    {
+      "path": "/guide/ai-transcribe",
+      "title": { "en": "Walkthrough", "zh": "實做示範" },
+      "description": {
+        "en": "A worked example of AI-assisted label transcription: one herbarium sheet from finding it, through reading its label, to checking what the model proposed and sending it for review.",
+        "zh": "AI 輔助標籤辨識的實做示範：以一份臘葉標本為例，從找到它、讀它的標籤，到檢查 AI 提出的建議值並送出審核。"
+      }
     }
   ]
 }

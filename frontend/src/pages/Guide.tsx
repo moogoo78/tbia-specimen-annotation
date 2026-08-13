@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon, type IconName } from "../design/Icon";
@@ -93,6 +93,15 @@ export function Guide() {
             fontSize: 12, color: t.fg, lineHeight: 1.7, margin: "10px 0 0",
             borderLeft: `2px solid ${t.warn}`, paddingLeft: 10,
           }}>{tr("guide.step3AiWarn")}</p>
+          {/* The worked example. Kept as a link rather than folded in: this
+              page is the reference, and a five-screenshot walkthrough of one
+              specimen would bury the other three steps. */}
+          <Link to="/guide/ai-transcribe" style={{
+            display: "inline-flex", alignItems: "center", gap: 6, marginTop: 12,
+            fontSize: 12, fontWeight: 600, color: t.accent, textDecoration: "none",
+          }}>
+            <Icon name="spark" size={12} />{tr("guide.step3AiWalk")}<Icon name="caretR" size={10} />
+          </Link>
         </StepBlock>
 
         {/* 4 · 送出與回饋 */}
