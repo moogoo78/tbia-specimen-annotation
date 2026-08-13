@@ -143,6 +143,16 @@ class Settings(BaseSettings):
     transcribe_max_images: int = Field(
         default=4, validation_alias="TRANSCRIBE_MAX_IMAGES"
     )
+    # Which rendition of each image the vision calls read (see app/media.py).
+    # The export's own URL is a downscaled derivative for some sources — HAST's
+    # is 1024px on the long edge, below what a handwritten label needs — so the
+    # default asks for the 2048px one where a source publishes it.
+    #
+    # "x" rather than "o" because the API downscales anything past 2576px on the
+    # long edge: 4096px is paid for in bandwidth and then thrown away, while
+    # 2048px is read whole. Sources with no rule ignore this and serve the URL
+    # the export shipped, so it costs nothing there.
+    ocr_image_size: str = Field(default="x", validation_alias="OCR_IMAGE_SIZE")
 
     @model_validator(mode="after")
     def _refuse_insecure_defaults(self) -> "Settings":

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
-import type { ExtractedField, OccurrenceDetail } from "../api/types";
+import type { ExtractedField, MediaSize, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
 
@@ -200,7 +200,7 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
         {/* right column: media + annotation */}
         <div style={{ width: annotW, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, paddingLeft: 12 }}>
           <Section title={`${tr("detail.media")} · ${r.media.length}`}>
-            <MediaGallery urls={r.media} references={r["references"] as string} />
+            <MediaGallery urls={r.media} sizes={r.media_sizes} references={r["references"] as string} />
           </Section>
           <AnnotationPanel record={r} />
         </div>
@@ -284,8 +284,21 @@ function Taxonomy({ r }: { r: OccurrenceDetail }) {
   );
 }
 
-function MediaGallery({ urls, references }: { urls: string[]; references?: string }) {
+// Remembered across records: someone reading labels wants the big one every
+// time, and re-picking it on each record is the annoyance the setting removes.
+const MEDIA_SIZE_KEY = "tbia.mediaSize";
+
+function MediaGallery({ urls, sizes, references }: { urls: string[]; sizes?: MediaSize[]; references?: string }) {
   const { t: tr } = useTranslation();
+  // What a click opens. The thumbnails always stay on the URL the export
+  // shipped — the point of the picker is reading a label full-screen, and
+  // rendering 4096px into a 120px tile would cost 750KB an image for nothing.
+  const ladder = sizes ?? [];
+  const [pick, setPick] = useState<string | null>(() => localStorage.getItem(MEDIA_SIZE_KEY));
+  const chosen = ladder.find((s) => s.size === pick) ?? ladder.find((s) => s.canonical) ?? null;
+  const openUrls = chosen ? chosen.urls : urls;
+  const choose = (size: string) => { setPick(size); localStorage.setItem(MEDIA_SIZE_KEY, size); };
+
   if (urls.length === 0) {
     return (
       <div style={{ fontSize: 11, color: t.fgSubtle }}>
@@ -295,14 +308,30 @@ function MediaGallery({ urls, references }: { urls: string[]; references?: strin
     );
   }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-      {urls.slice(0, 6).map((u, i) => (
-        <a key={i} href={u} target="_blank" rel="noreferrer" style={{ aspectRatio: "1", border: `1px solid ${t.border}`, overflow: "hidden", background: t.panelAlt }}>
-          <img src={u} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-        </a>
-      ))}
-    </div>
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+        {urls.slice(0, 6).map((u, i) => (
+          <a key={i} href={openUrls[i] ?? u} target="_blank" rel="noreferrer" style={{ aspectRatio: "1", border: `1px solid ${t.border}`, overflow: "hidden", background: t.panelAlt }}>
+            <img src={u} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          </a>
+        ))}
+      </div>
+      {/* Absent entirely for sources that publish one rendition — most of them. */}
+      {ladder.length > 1 && (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10, color: t.fgMuted }}>{tr("detail.openAt")}</span>
+            {ladder.map((s) => (
+              <Button key={s.size} small primary={chosen?.size === s.size} onClick={() => choose(s.size)}>
+                {s.long_edge}px
+              </Button>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 3 }}>{tr("detail.openAtHint")}</div>
+        </div>
+      )}
+    </>
   );
 }
 

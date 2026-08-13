@@ -160,6 +160,11 @@ const en = {
     collector: "Collector", coordinates: "Coordinates", elevation: "Elevation",
     backToResults: "Back to results", noMedia: "No images for this specimen",
     resize: "Drag to resize",
+    // Image-size picker: only shown where the source publishes more than one
+    // rendition. It governs what a thumbnail opens, not the thumbnail itself,
+    // so choosing 4096px doesn't make the page heavier.
+    openAt: "Open at",
+    openAtHint: "The label is usually only legible at 2048px or above.",
   },
   annotate: {
     title: "Fill the gaps", field: "Field", proposed: "Proposed value",
@@ -520,6 +525,8 @@ const zh: typeof en = {
     collector: "採集者", coordinates: "座標", elevation: "海拔",
     backToResults: "返回結果", noMedia: "此標本沒有影像",
     resize: "拖曳調整寬度",
+    openAt: "開啟尺寸",
+    openAtHint: "標籤文字通常要 2048px 以上才看得清楚。",
   },
   annotate: {
     title: "補齊缺漏資料", field: "欄位", proposed: "建議值",

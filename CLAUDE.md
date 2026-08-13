@@ -78,6 +78,7 @@ local dev + tests have deterministic users; tests mint JWTs directly via `auth.c
 ```
 backend/app/        main.py, duck.py, db.py, models.py, search.py, extract.py, auth.py, config.py
                     cache.py (Cache-Control allowlist for the public read API)
+                    media.py (image size variants, from data/media_variants.json)
 backend/app/api/    occurrences.py, annotations.py, auth.py, export.py
 backend/ingest/     common.py (export access, registry, column baseline), inspect.py
                     (survey an export), build.py (export -> DuckDB), prepare.py
@@ -86,7 +87,7 @@ backend/tests/      conftest.py builds a tiny DuckDB+SQLite; test_search, test_a
 frontend/src/       pages/ (Explore + exploreUrl.ts, RecordDetail, Dashboard, Login), components/,
                     api/, i18n/, design/, seo/ (pages.json + useSeo.ts)
 data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
-                    reference.sqlite (seeded) + registry.json (gitignored)
+                    reference.sqlite (seeded) + registry.json + media_variants.json
 ```
 
 ## Conventions
@@ -121,6 +122,27 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
   single definition of "which images", shared by the prompt builder, the pipeline and
   `import_results.py`, so the three cannot disagree about what a transcription read.
   Responses carry `image_urls` (a list) — there is no single `image_url` anywhere.
+- **The export's image URL is not the only size the source publishes.** TBIA ships
+  one URL per image, and for HAST (126k records) it is a 1024px derivative — enough
+  to see a herbarium sheet, not to read its label. The larger renditions sit on the
+  same bucket under another filename suffix (`-x` 2048px, `-o` 4096px) and nothing in
+  the export says so, which is what `data/media_variants.json` records: one rule per
+  source, hand-curated and tracked in git like `registry.json`, re-read on mtime.
+  `app/media.py` is its only reader, so a size name means the same thing to the
+  pipeline, the API and the UI. **A size is a request, never a promise** — `at_size()`
+  returns the original URL for an unruled source, an unknown size, or a filename the
+  rule doesn't describe, which is what lets `pipeline._image_urls` ask for a bigger
+  image unconditionally instead of branching per source. The rewrite happens there, at
+  the single definition of "which images", so `image_urls` records what was really
+  read. `OCR_IMAGE_SIZE` (default `x`) picks it: **2048px is the largest rendition the
+  vision API does not downscale** (it caps at 2576px / ~3.75MP on the current models),
+  so `-o` is bandwidth paid for pixels the model never sees, and `-l` is ~4× cheaper in
+  image tokens than `-x` but frequently illegible. Only the calls that carry images are
+  affected — the two-stage field pass is text-only. The record page gets the same ladder
+  as `media_sizes` on the detail response and offers it as an **open-at** picker
+  (remembered in `localStorage`): it changes what a thumbnail opens, never the thumbnail
+  itself, so choosing 4096px costs no page weight. The copy-paste prompt still lists the
+  export's own URLs.
 - **Two routes reach the same AI transcription, and they differ in who waits and who
   pays.** `POST /occurrences/{id}/transcribe-request` (any contributor) persists a
   `transcribe_requests` row and pings Discord so a human knows to run `make transcribe`;

@@ -17,6 +17,7 @@ secrets*
 !/data/registry.json
 !/data/sampling_events.json
 !/data/story_begonia.json
+!/data/media_variants.json
 
 # --- Raw data exports & API scratch dumps at repo root (large / not source) ---
 /tbia_*.csv

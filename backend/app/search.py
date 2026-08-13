@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import duck
+from . import duck, media
 
 # The ETL's occurrence table. Read-only here; `ingest/prepare.py` adds the
 # completeness flags this module filters and sorts on.
@@ -275,6 +275,11 @@ async def get_detail(occ_id: str) -> dict | None:
     if row is None:
         return None
     row["media"] = parse_media(row.get("associated_media"))
+    # Other renditions of those same images, when the source publishes them
+    # (app/media.py). Sent from here rather than derived in the browser so one
+    # file decides what a size name means; `[]` for every source without a rule,
+    # which is what makes the picker absent rather than broken.
+    row["media_sizes"] = media.sizes_for(row["media"])
     return row
 
 
