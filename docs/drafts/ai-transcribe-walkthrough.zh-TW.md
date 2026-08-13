@@ -1,3 +1,12 @@
+> ⚠️ **這是草稿，不是文件。**
+>
+> 正式版本是網站上的 **`/guide/ai-transcribe`**，文字在
+> `frontend/src/i18n/index.ts` 的 `walk` 區塊（`en` 與 `zh` 各一份）。
+> 這裡改了不會影響網站；改完要有人把它同步過去。
+>
+> 這個檔案存在的理由只有一個：用 Markdown 寫稿比直接改 TypeScript 字串好改。
+> 一旦兩邊對不上，以 i18n 為準。
+
 # 實做示範：用 AI 讀一張標本標籤
 
 找一張標本、讓 AI 把標籤上的字讀出來、(人)檢查、送審(人審核)
@@ -8,13 +17,13 @@
 
 到**探索(Explore)**，左邊篩選條件預設有勾選 **具有影像**，資料完整度選擇 **缺少日期**，先以中研院植物標本館(**HAST**)為例。
 
-![勾選 HAST、缺少日期、具有影像](../frontend/public/guide/island-step1-1-find.png)
+![勾選 HAST、缺少日期、具有影像](../../frontend/public/guide/island-step1-1-find.png)
 
 隨便點一筆。
 
 有可能電腦螢幕畫面太小，畫面格子會擠在一起，需要先把畫面空出來：左上角**漏斗**收起篩選、清單右上角 **`‹`** 收起清單。
 
-![收起兩側，讓紀錄佔滿畫面](../frontend/public/guide/island-step1-2-adjust-layout.png)
+![收起兩側，讓紀錄佔滿畫面](../../frontend/public/guide/island-step1-2-adjust-layout.png)
 
 現在左邊是原始資料，紅色字體「缺漏」就是我們要補的；右邊是照片跟標註區。
 
@@ -28,7 +37,7 @@
 
 照片下面有**開啟尺寸**：
 
-![把開啟尺寸切到 2048px](../frontend/public/guide/island-step1-3-ready.png)
+![把開啟尺寸切到 2048px](../../frontend/public/guide/island-step1-3-ready.png)
 
 - **1024px** — 資料庫原本給的。看得出是臘葉標本，但標籤讀不動
 - **2048px** — 大部分標籤這個尺寸就夠了
@@ -36,7 +45,7 @@
 
 選好點縮圖，就會用那個尺寸開新分頁。
 
-![放大之後就讀得到了](../frontend/public/guide/island-step1-4-label.png)
+![放大之後就讀得到了](../../frontend/public/guide/island-step1-4-label.png)
 
 ```
 Makino Herbarium  168800
@@ -58,7 +67,7 @@ Coll.: Tomitaro MAKINO    Det.: Y. Momiyama
 
 往下捲到**補齊缺漏資料 → 用 AI 辨識標籤**，按**立即轉錄**。
 
-![按下立即轉錄](../frontend/public/guide/island-step2-1-AI-select.png)
+![按下立即轉錄](../../frontend/public/guide/island-step2-1-AI-select.png)
 
 ⚠️ 按鈕一按下去系統就開始做，可能會等半分鐘。
 
@@ -68,11 +77,11 @@ note::
 
 如果可以直接執行的話 **別關頁面**：
 
-![轉錄中，別關頁面](../frontend/public/guide/island-step2-2-AI-start.png)
+![轉錄中，別關頁面](../../frontend/public/guide/island-step2-2-AI-start.png)
 
 好了會告訴你AI寫了幾個欄位 (一個欄位算一筆)：
 
-![完成，寫入 5 筆建議值](../frontend/public/guide/island-step2-3-AI-done.png)
+![完成，寫入 5 筆建議值](../../frontend/public/guide/island-step2-3-AI-done.png)
 
 ---
 
@@ -80,7 +89,7 @@ note::
 
 建議值出現在下面的**標註紀錄**，每筆都標示著 ✦ AI。
 
-![AI 寫進來的五筆](../frontend/public/guide/island-step2-4-AI-values.png)
+![AI 寫進來的五筆](../../frontend/public/guide/island-step2-4-AI-values.png)
 
 刪除線是舊的、箭號後面是新的；🚫 表示本來是空的。拿它跟你剛剛看的標籤一項一項對：
 
@@ -105,7 +114,7 @@ AI 寫的建議值狀態已經是**已送出**，接下來等審核者處理，�
 
 想看自己累積了多少、有幾筆被採納，到**貢獻儀表板**：
 
-![貢獻儀表板](../frontend/public/guide/island-step4-check.png)
+![貢獻儀表板](../../frontend/public/guide/island-step4-check.png)
 
 ---
 
