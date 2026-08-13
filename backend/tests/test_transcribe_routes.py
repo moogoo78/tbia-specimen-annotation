@@ -44,6 +44,10 @@ class _Client:
 
 @pytest.fixture
 def stub_claude(monkeypatch):
+    # The key too, not just the client: `pipeline._client()` refuses before it
+    # constructs anything, so without this the suite would pass or fail on
+    # whether the machine running it happens to have a real key in .env.
+    monkeypatch.setattr(pipeline.settings, "anthropic_api_key", "test-key")
     monkeypatch.setattr(pipeline.anthropic, "Anthropic", lambda *a, **k: _Client())
 
 
@@ -143,6 +147,22 @@ def test_run_now_reports_pipeline_failure_in_band(client, monkeypatch):
     assert data["status"] == "failed"
     assert data["n_annotations"] == 0
     assert "ANTHROPIC_API_KEY" in data["error"]
+
+
+def test_a_deployment_without_a_key_says_which_file_to_put_it_in(client, monkeypatch):
+    """The real preflight, not a stubbed raise. Missing credentials is an
+    operator fault the person clicking cannot fix, and the SDK's own version of
+    this arrives as "Could not resolve authentication method" from inside a
+    transcription — so `_client()` refuses first, in a sentence that names the
+    file. Production hit exactly this the day run-now went live."""
+    monkeypatch.setattr(pipeline.settings, "anthropic_api_key", "")
+
+    res = client.post("/api/occurrences/r4/transcribe-now", headers=auth_header(client, ADMIN))
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "failed"
+    assert data["n_annotations"] == 0
+    assert "ANTHROPIC_API_KEY" in data["error"] and "backend/.env" in data["error"]
 
 
 def test_run_now_drains_a_queued_request_instead_of_adding_one(client, stub_claude):

@@ -55,6 +55,10 @@ class _Client:
 def calls(monkeypatch):
     """Records every messages.create() the pipeline makes."""
     recorded: list[dict] = []
+    # `pipeline._client()` checks the key before constructing the client, so the
+    # stub needs one — otherwise these tests would depend on the .env of
+    # whatever machine runs them.
+    monkeypatch.setattr(pipeline.settings, "anthropic_api_key", "test-key")
     monkeypatch.setattr(
         pipeline.anthropic, "Anthropic", lambda *a, **k: _Client(recorded),
     )

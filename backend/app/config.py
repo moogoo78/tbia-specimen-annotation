@@ -111,9 +111,20 @@ class Settings(BaseSettings):
     # under Integrations → Webhooks and paste its URL. Plain env vars (no NDB_).
     discord_webhook_url: str = Field(default="", validation_alias="DISCORD_WEBHOOK_URL")
 
-    # AI transcription pipeline (the batch worker that drains transcribe_requests
-    # and calls Claude vision). ANTHROPIC_API_KEY is read by the SDK directly;
-    # without it the worker skips API calls. Plain env vars (no NDB_ prefix).
+    # AI transcription pipeline (the batch worker that drains transcribe_requests,
+    # and the run-now route, both calling Claude vision). Plain env vars (no NDB_
+    # prefix).
+    #
+    # The key is a Settings field rather than something the SDK picks up on its
+    # own, because `anthropic.Anthropic()` reads `os.environ` and nothing here
+    # calls load_dotenv — so a key sitting in .env reached the SDK only when
+    # Compose happened to inject it, and a host run of `make transcribe` failed
+    # with the SDK's opaque "Could not resolve authentication method" while the
+    # value was in the file all along. Read through pydantic it resolves the
+    # same way every other setting does: real env var first, then the repo's
+    # .env, then backend/.env. Empty -> pipeline._client() refuses with a
+    # message naming the file to put it in.
+    anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
     anthropic_model: str = Field(
         default="claude-opus-5", validation_alias="ANTHROPIC_MODEL"
     )

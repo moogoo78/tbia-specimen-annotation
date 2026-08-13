@@ -58,6 +58,39 @@ _ORIGINAL_COLUMN = {
 }
 
 
+class MissingAPIKey(RuntimeError):
+    """No Anthropic credentials on this deployment. Its own type so a caller can
+    tell "the operator has not finished configuring this box" apart from a
+    transcription that genuinely failed."""
+
+
+def _client() -> anthropic.Anthropic:
+    """The Anthropic client, with the key passed explicitly.
+
+    Explicitly, because the SDK's own fallback reads ``os.environ`` and nothing
+    here calls load_dotenv: the key had to be in the *process* environment,
+    while every other setting in this app comes from a .env file. The two
+    disagreed exactly where it is most expensive to find out — a host
+    ``make transcribe`` and a production container each missing it for a
+    different reason.
+
+    The check ahead of it turns the SDK's "Could not resolve authentication
+    method. Expected one of api_key, auth_token, or credentials to be set" —
+    raised at *request* time, in the middle of a transcription, and surfaced to
+    whoever clicked — into a sentence naming what to do about it. It is a
+    deployment fault, not a per-record one, but it still fails only this
+    request: ``process_one`` records it as the failure reason, exactly as it
+    would any other."""
+    if not settings.anthropic_api_key:
+        raise MissingAPIKey(
+            "ANTHROPIC_API_KEY is not set on this deployment, so AI transcription "
+            "cannot run. Set it in backend/.env (or the repo-root .env) and restart "
+            "the API — under Docker, `up -d backend`, since `restart` does not "
+            "re-read env_file."
+        )
+    return anthropic.Anthropic(api_key=settings.anthropic_api_key)
+
+
 def transcribe_record(
     record: dict, *, mode: str | None = None,
     ocr_model: str | None = None, field_model: str | None = None,
@@ -89,7 +122,7 @@ def _transcribe_single(record: dict, image_urls: list[str], model: str) -> Extra
     and effort is capped so that headroom doesn't become the usual spend; it grows
     with the image count because full_text spans every image that carries text."""
     prompt = extract.build_prompt(record).prompt
-    client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
+    client = _client()
     resp = client.messages.create(
         model=model,
         max_tokens=min(8192 + 2048 * (len(image_urls) - 1), 16000),
@@ -116,7 +149,7 @@ def _transcribe_two_stage(record: dict, image_urls: list[str], ocr_model: str, f
     With several images the OCR stage sees all of them in one call and returns
     one transcript per image; stage 2 reads that as a single document, which is
     what lets a value present on only one image reach the fields."""
-    client = anthropic.Anthropic()
+    client = _client()
     full_text = _ocr_label(client, image_urls, ocr_model)
     out = _fields_from_text(client, record, full_text, field_model, n_images=len(image_urls))
     if not any(f.field == "full_text" for f in out.fields):
