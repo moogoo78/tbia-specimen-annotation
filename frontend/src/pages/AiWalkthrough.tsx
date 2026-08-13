@@ -10,8 +10,9 @@ import { Icon } from "../design/Icon";
 //
 // Screenshots live in public/guide/ (served at /guide/*.png, alongside but
 // unrelated to the /guide route). Prose is in i18n `walk.*` like Guide.tsx,
-// so both languages come from one file; the drafting source is
-// docs/ai-transcribe-step-by-step.zh-TW.md.
+// so both languages come from one file. docs/drafts/ contains the Markdown the
+// Chinese was written in — a convenience for drafting, not a source of truth:
+// the i18n keys are what ships, and the draft is the copy that goes stale.
 
 /** A screenshot with its caption. Width-capped and lazy: nine full-page PNGs
  *  is ~2.9MB, and a reader on step 1 should not pay for step 5's. */

@@ -371,7 +371,8 @@ const en = {
   // The AI walkthrough (/guide/ai-transcribe). Deliberately narrow: one real
   // specimen, start to finish. Everything conceptual — what an annotation is,
   // the status ladder, the two AI routes in the abstract — stays in `guide.*`
-  // and is linked, not repeated. Source draft: docs/ai-transcribe-step-by-step.zh-TW.md.
+  // and is linked, not repeated. These keys are the published text; the Markdown
+  // in docs/drafts/ is only where the Chinese was written.
   walk: {
     title: "Walkthrough: reading one specimen label with AI",
     lead: "Find a specimen, let the AI read the text off its label, then a person checks it and a person reviews it.",
