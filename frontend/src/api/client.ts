@@ -213,6 +213,11 @@ export const api = {
     }),
   transcribeConfig: () =>
     request<import("./types").TranscribeConfig>("/transcribe/config"),
+  // Admin-only: move the route for everyone (403 otherwise).
+  setTranscribeConfig: (route: import("./types").TranscribeRoute) =>
+    request<import("./types").TranscribeConfig>("/transcribe/config", {
+      method: "PUT", body: JSON.stringify({ route }),
+    }),
   scheduleTranscribe: (id: string, opts?: import("./types").TranscribeOptions) =>
     request<import("./types").TranscribeRequest>(`/occurrences/${id}/transcribe-request`, {
       method: "POST",

@@ -107,6 +107,27 @@ class TranscribeRequest(Base):
     field_model: Mapped[str | None] = mapped_column(String(64))
 
 
+class AppSetting(Base):
+    """One runtime policy value: set by an admin, applying to everyone.
+
+    ``config.py`` holds the *deployment's* settings — env vars, changed by
+    whoever can restart the process. This holds the half an admin changes from
+    the UI while it runs. It lives in the annotation store rather than the
+    reference store because nothing re-seeds it: on the disposable file, a
+    rebuild would silently revert an operator's decision.
+
+    Key/value rather than a column per setting, so adding one is a write rather
+    than a migration — there is no Alembic here.
+    """
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(String(255), default="")
+    updated: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+
 class Collector(RefBase):
     """A canonical collector (person). Enrichment over the read-only occurrence
     store: occurrences map in via ``CollectorAlias.recorded_by`` (the raw string),

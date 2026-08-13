@@ -19,7 +19,7 @@ Occurrence data is **read-only**; enrichment lives only as annotations. Hence tw
   fast facets/completeness aggregation; queries run in a threadpool (`app/duck.py`).
   `build.py` loads the export's own columns; `make prepare` adds the derived ones.
 - **SQLite ×2** (`app/db.py`), split by **what it costs to lose the file**:
-  - `data/annotations.sqlite` — `users`, `annotations`, `transcribe_requests`
+  - `data/annotations.sqlite` — `users`, `annotations`, `transcribe_requests`, `app_settings`
     (`Base` / `SessionLocal`). Irreplaceable; this is the one to back up, and it stays
     small (tens of KB until annotations accumulate).
   - `data/reference.sqlite` — `collectors`, `collector_alias`, `sampling_event`,
@@ -124,15 +124,30 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
 - **Two routes reach the same AI transcription, and they differ in who waits and who
   pays.** `POST /occurrences/{id}/transcribe-request` (any contributor) persists a
   `transcribe_requests` row and pings Discord so a human knows to run `make transcribe`;
-  `POST /occurrences/{id}/transcribe-now` (**admin only**) writes the same row and then
-  calls `pipeline.process_one` inline — no Discord ping, since it has already been
-  drained. Both end in `ai` annotation drafts (`status="submitted"`), so a record looks
-  identical afterwards whichever ran it; the admin switch is per record, in the AI panel,
-  and defaults to the queue. A pipeline failure on the run-now route is **not** a 500 —
+  `POST /occurrences/{id}/transcribe-now` writes the same row and then calls
+  `pipeline.process_one` inline — no Discord ping, since it has already been drained.
+  Both end in `ai` annotation drafts (`status="submitted"`), so a record looks identical
+  afterwards whichever ran it. A pipeline failure on the run-now route is **not** a 500 —
   `process_one` records it and the response carries `status="failed"` + `error`, exactly
   as the worker would. `process_one` runs the (synchronous) Anthropic call through
   `asyncio.to_thread`, which is what stops one admin's 30-second transcription from
   stalling every other request the API is serving.
+- **Which route a click takes is one system-wide setting, not a per-caller choice.**
+  `app/policy.py` holds it in `app_settings` (annotation store, so it is durable and
+  backed up): `queue` (the default) or `now`. An **admin** moves it from the Dashboard
+  (`PUT /api/transcribe/config`); `GET /api/transcribe/config` reports it to everyone
+  alongside the model chain, and the record page's AI panel renders whichever route is in
+  force. Under `now` it is *every contributor's* click that runs and bills inline, which
+  is the cost decision the setting exists to make deliberate — hence admin-only to set,
+  and `queue` as the default. **`transcribe-now` enforces the same value** (admin always;
+  anyone else only while the route is `now`), because the endpoint is reachable without
+  the UI and "the switch is on queue" has to mean nobody is spending vision calls inline,
+  not merely that nobody is being offered the button.
+
+`policy.py` is the counterpart to `config.py`: env settings are the deployment's and need
+a restart, `app_settings` rows are the admin's and take effect on the next request. Reads
+are per request and uncached — a policy that needs a TTL to expire is the thing it
+replaces — and an unrecognised value degrades to the default rather than erroring.
 
 ## Sampling events (the other "trip")
 

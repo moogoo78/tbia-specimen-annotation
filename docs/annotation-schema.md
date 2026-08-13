@@ -84,10 +84,14 @@ Enforced in exactly two places — `require_role("reviewer")` on export
 endpoint takes any authenticated user.
 
 Note:
-- **`admin` currently grants nothing beyond `reviewer`.** `require_role` lets an
-  admin through every gate (`backend/app/auth.py:65`), but no admin-only endpoint
-  exists — there is no user management and no delete. Treat it as a reserved
-  wildcard for future gates.
+- **`admin` grants one thing beyond `reviewer`: the AI transcription route.**
+  `require_role` lets an admin through every gate (`backend/app/auth.py:65`), and
+  `PUT /api/transcribe/config` is the one endpoint only they reach — it sets
+  `policy.transcribe_route` for the whole system, and under `now` a contributor's
+  click spends a vision call inside their own request, so it is a spending
+  decision rather than a review one. `POST /occurrences/{id}/transcribe-now`
+  follows from it: an admin always, everyone else exactly while that route is
+  `now`. There is still no user management and no delete.
 - The frontend mirrors the single boundary with
   `isReviewer = role === "reviewer" || role === "admin"` — export button
   (`frontend/src/pages/Dashboard.tsx:35`) and the accept / reject / mark-merged

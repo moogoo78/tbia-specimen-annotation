@@ -137,6 +137,18 @@ class TranscribeConfig(BaseModel):
     mode: str                  # "single" | "two_stage"
     ocr_model: str | None      # stage-1 vision model (two_stage only)
     field_model: str           # primary field model (both modes)
+    # System-wide, admin-set: which route a transcribe click takes for *everyone*
+    # ("queue" | "now"). Read by every signed-in user so the AI panel can label
+    # the button it is about to run; only an admin may PUT it.
+    route: str
+
+
+class TranscribeConfigUpdate(BaseModel):
+    """Admin write to the runtime policy. Only the route is settable — the model
+    chain stays deployment config (env), because changing it is a restart-level
+    decision, not one made mid-session."""
+
+    route: str                 # "queue" | "now"
 
 
 class TranscribeRequestOut(BaseModel):
