@@ -8,7 +8,7 @@ from .. import auth, duck, extract, notify, pipeline, policy, search
 from ..annotations_store import _serialize
 from ..config import settings
 from ..db import get_session
-from ..models import Annotation, TranscribeRequest, User
+from ..models import DEFAULT_LICENSE, LICENSES, Annotation, TranscribeRequest, User
 from ..schemas import (
     AnnotationCreate,
     AnnotationUpdate,
@@ -212,6 +212,12 @@ async def create_annotation(
         raise HTTPException(status_code=404, detail="Occurrence not found")
     if body.status not in CONTRIB_STATUSES:
         raise HTTPException(status_code=400, detail="status must be draft or submitted")
+    # An unstated licence is the contributor's own default, not a platform guess.
+    license = body.license or user.default_license or DEFAULT_LICENSE
+    if license not in LICENSES:
+        raise HTTPException(
+            status_code=400, detail=f"license must be one of {', '.join(LICENSES)}"
+        )
 
     ann = Annotation(
         occurrence_id=occ_id,
@@ -224,6 +230,7 @@ async def create_annotation(
         ai_raw=body.ai_raw,
         note=body.note,
         status=body.status,
+        license=license,
         contributor_id=user.id,
     )
     db.add(ann)
@@ -254,6 +261,29 @@ def update_annotation(
             ann.proposed_value = body.proposed_value
         if body.note is not None:
             ann.note = body.note
+
+    # Relicensing is the contributor's alone — at any time, in any status.
+    #
+    # A reviewer may edit a *value*; that is the job. Restating the terms someone
+    # else released their work under is not, so this is the one edit the reviewer
+    # role does not inherit — not even for an admin.
+    #
+    # There is no status past which it freezes, which is iNaturalist's rule and
+    # the right one: what cannot be revoked is the copy a provider already took,
+    # not the record. An export states the terms in force when it ran, that
+    # delivered file keeps them, and a later change applies to exports from here
+    # on. Freezing the row instead would confuse "you cannot take back what you
+    # gave" with "you may never change your mind", and only the first is true.
+    if body.license is not None:
+        if not is_owner:
+            raise HTTPException(
+                status_code=403, detail="Only the contributor may set the licence"
+            )
+        if body.license not in LICENSES:
+            raise HTTPException(
+                status_code=400, detail=f"license must be one of {', '.join(LICENSES)}"
+            )
+        ann.license = body.license
 
     # Status transitions.
     if body.status is not None:

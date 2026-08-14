@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from .models import DEFAULT_LICENSE
+
 
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -13,6 +15,7 @@ class UserOut(BaseModel):
     display_name: str
     role: str
     show_in_ranking: bool = False
+    default_license: str = DEFAULT_LICENSE
 
 
 class TokenResponse(BaseModel):
@@ -60,12 +63,18 @@ class AnnotationCreate(BaseModel):
     ai_confidence: float | None = None
     ai_raw: str | None = None
     status: str = "submitted"  # contributors may save "draft" or "submitted"
+    # Terms this contribution is released under (models.LICENSES). Absent means
+    # "whatever my default is" — resolved server-side from the user, falling back
+    # to the platform default — so an older client that never sends the field
+    # still gets the contributor's own choice rather than a guess.
+    license: str | None = None
 
 
 class AnnotationUpdate(BaseModel):
     proposed_value: str | None = None
     note: str | None = None
     status: str | None = None  # submit / accept / reject / merge transitions
+    license: str | None = None  # the contributor's own, at any time
 
 
 class AnnotationOut(BaseModel):
@@ -80,6 +89,7 @@ class AnnotationOut(BaseModel):
     ai_confidence: float | None
     note: str | None
     status: str
+    license: str
     contributor_id: int
     contributor_name: str | None = None
     reviewed_by: int | None

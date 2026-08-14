@@ -61,6 +61,55 @@ draft ──> submitted ──> accepted ──> merged
 - `merged` means the value was handed back to the data provider. Export
   (`/api/export/*`) defaults to `statuses=accepted,merged`.
 
+## Licensing
+
+Every annotation carries the terms its contributor released it under —
+`LICENSES` (`backend/app/models.py`), as SPDX identifiers so the *version* is
+part of the value:
+
+| id | shown as | |
+| --- | --- | --- |
+| `CC0-1.0` | CC0 1.0 | public domain dedication |
+| `CC-BY-4.0` | CC BY 4.0 | attribution |
+| `CC-BY-NC-4.0` | CC BY-NC 4.0 | attribution, non-commercial — **the default** |
+
+The rules follow [iNaturalist's][inat], which is the model most of our
+contributors will already have met. Three and no more, because the point of the
+platform is handing enrichment back to providers and **GBIF ingests only CC0 /
+CC BY / CC BY-NC** — iNat's fourth option, all-rights-reserved, would be a
+contribution that could never be delivered.
+
+[inat]: https://help.inaturalist.org/en/support/solutions/articles/151000173511-how-do-licenses-work-on-inaturalist-should-i-change-my-licenses
+
+- **Per annotation, with a per-user default.** `users.default_license` seeds the
+  picker (Dashboard → *Default licence for your annotations*); the record form
+  applies one choice to every field submitted in a click and may override it for
+  that submission alone. The stored value is the grant attached to *that work* —
+  a provider export has to state the terms it was written under, and a
+  contributor may license one record differently from the next.
+- **Changing the default is prospective only.** It decides what new annotations
+  start on and touches nothing already contributed — the same split iNat draws
+  between a default and a bulk relicense (we have no bulk operation; relicensing
+  is per annotation, on the record).
+- **An absent licence is the contributor's default, never "none".**
+  `AnnotationCreate.license` is optional and resolves server-side to
+  `user.default_license`, falling back to `DEFAULT_LICENSE`. The SQLite
+  `ADD COLUMN` that brings an existing deployment forward backfills
+  `CC-BY-NC-4.0`, so work contributed when the form asked for no terms is read
+  conservatively rather than as an open grant. An AI draft
+  (`pipeline.build_annotations`) takes the column default: nobody picked for it.
+- **Only the contributor may relicense — but at any time, in any status.** A
+  reviewer may edit a *value* in any status (that is the job) and may not restate
+  someone else's terms; not even an admin inherits that. There is deliberately no
+  status past which the licence freezes: what cannot be revoked is the copy a
+  provider already took, not the record. Enforced in `PATCH /annotations/{id}`,
+  offered in the UI on the contributor's own rows in *Annotation history*.
+- The export (`/api/export/provider`) carries `license` and `license_uri` per
+  row — the id we store, and the deed URI DwC's `license` term wants. Terms vary
+  row by row, so a file cannot be described by one blanket statement. **An export
+  is a snapshot**: it states the terms in force when it ran, the delivered file
+  keeps them, and a later change shows up in the next export.
+
 ## Roles and permissions
 
 `ROLES = ("contributor", "reviewer", "admin")` (`backend/app/models.py:21`). Assigned
@@ -75,13 +124,16 @@ request, so a change takes effect immediately.
 | Create annotation (`draft` / `submitted`) | ✅ | ✅ | ✅ |
 | Edit **own** annotation while `draft` / `submitted` | ✅ | ✅ | ✅ |
 | Edit **anyone's** annotation, in any status | ❌ | ✅ | ✅ |
+| Set the licence on **own** annotation, in any status | ✅ | ✅ | ✅ |
+| Set the licence on **anyone else's** | ❌ | ❌ | ❌ |
 | Set `accepted` / `rejected` / `merged` | ❌ | ✅ | ✅ |
 | Export accepted deltas | ❌ | ✅ | ✅ |
 
 Enforced in exactly two places — `require_role("reviewer")` on export
-(`backend/app/api/export.py:81`) and the `is_reviewer` branches of
-`PATCH /annotations/{id}` (`backend/app/api/annotations.py:152`). Every other
-endpoint takes any authenticated user.
+(`backend/app/api/export.py`) and the `is_reviewer` / `is_owner` branches of
+`PATCH /annotations/{id}` (`backend/app/api/annotations.py`), which is also
+where the licence rule above lives, as the one edit a reviewer does *not*
+inherit. Every other endpoint takes any authenticated user.
 
 Note:
 - **`admin` grants one thing beyond `reviewer`: the AI transcription route.**

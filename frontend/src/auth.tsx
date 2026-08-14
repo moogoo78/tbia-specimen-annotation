@@ -11,6 +11,11 @@ interface AuthState {
   finishOrcidLogin: (code: string) => Promise<void>;
   /** Dev-only: sign in as a seeded demo user by email (localhost testing). */
   devLogin: (email: string) => Promise<void>;
+  /** Re-read the signed-in user. Call after changing a self-service setting
+   *  (`PATCH /auth/me`) so the copy held here cannot drift from the server's —
+   *  the record page seeds its licence picker from `user.default_license`, and
+   *  a change made on the Dashboard has to reach it without a reload. */
+  refreshUser: () => Promise<void>;
   logout: () => void;
 }
 
@@ -66,10 +71,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user);
   };
 
+  const refreshUser = async () => {
+    if (!getToken()) return;
+    setUser(await api.me());
+  };
+
   const logout = () => { setToken(null); setUser(null); };
 
   return (
-    <AuthContext.Provider value={{ user, loading, startOrcidLogin, finishOrcidLogin, devLogin, logout }}>
+    <AuthContext.Provider value={{ user, loading, startOrcidLogin, finishOrcidLogin, devLogin, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

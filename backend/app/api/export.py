@@ -3,6 +3,15 @@ dataset, joined against the occurrence record, as JSON or DwC-style CSV.
 
 Primary path uses DuckDB's ATTACHed SQLite (one federated join). Falls back to
 a Python-side join if the attach is unavailable.
+
+**An export is a snapshot of the terms, not a subscription to them.** Each row
+carries the licence in force when the file was produced; a contributor who
+relicenses afterwards changes what the *next* export says and nothing about the
+file a provider already holds. That is the licensing rule itself — a grant
+someone acted on cannot be revoked — expressed as the obvious implementation
+rather than as a special case, which is why nothing here pins or versions a
+licence: reading the current value is correct precisely because the delivered
+file kept its own copy.
 """
 
 from __future__ import annotations
@@ -17,13 +26,19 @@ from sqlalchemy.orm import Session
 
 from .. import auth, duck
 from ..db import get_session
-from ..models import Annotation, User
+from ..models import LICENSE_URIS, Annotation, User
 
 router = APIRouter(prefix="/api/export", tags=["export"])
 
 EXPORT_COLUMNS = [
     "annotation_id", "occurrence_id", "catalog_number", "scientific_name",
     "field", "original_value", "proposed_value", "status", "contributor", "reviewed_at",
+    # The terms each delta is released under. Both forms: the SPDX id the
+    # platform stores, and the deed URI DwC's `license` wants. A provider
+    # deciding whether it may republish a value is the reason this export
+    # exists at all, so it ships per row rather than as a blanket statement —
+    # contributors choose per annotation, so a file can hold three of them.
+    "license", "license_uri",
 ]
 
 
@@ -32,7 +47,7 @@ async def _rows_federated(dataset_name: str, statuses: list[str]) -> list[dict]:
     sql = f"""
         SELECT a.id AS annotation_id, a.occurrence_id, o.catalog_number,
                o.scientific_name, a.field, a.original_value, a.proposed_value,
-               a.status, u.display_name AS contributor, a.reviewed_at
+               a.status, u.display_name AS contributor, a.reviewed_at, a.license
         FROM ann.annotations a
         JOIN occurrence o ON o.id = a.occurrence_id
         LEFT JOIN ann.users u ON u.id = a.contributor_id
@@ -68,8 +83,20 @@ def _rows_python(db: Session, dataset_name: str, statuses: list[str]) -> list[di
             "status": a.status,
             "contributor": u.display_name if u else None,
             "reviewed_at": a.reviewed_at.isoformat() if a.reviewed_at else None,
+            "license": a.license,
         })
     return out
+
+
+def _with_license_uri(rows: list[dict]) -> list[dict]:
+    """Resolve each row's licence id to its deed URI.
+
+    Done here rather than in either query so the two paths — federated join and
+    Python fallback — cannot disagree about what a licence id means. An id with
+    no mapping gets a null URI, never a guessed one."""
+    for r in rows:
+        r["license_uri"] = LICENSE_URIS.get(r.get("license") or "")
+    return rows
 
 
 @router.get("/provider")
@@ -85,6 +112,7 @@ async def export_provider(
         rows = await _rows_federated(dataset_name, status_list)
     else:
         rows = _rows_python(db, dataset_name, status_list)
+    rows = _with_license_uri(rows)
 
     if format == "json":
         return {"dataset_name": dataset_name, "count": len(rows), "deltas": rows}

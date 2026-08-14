@@ -106,6 +106,7 @@ export interface Annotation {
   ai_confidence: number | null;
   note: string | null;
   status: string;
+  license: string;
   contributor_id: number;
   contributor_name: string | null;
   reviewed_by: number | null;
@@ -168,7 +169,7 @@ export interface TranscribeConfig {
 export interface DevUser { email: string; display_name: string; role: string; }
 export interface DevLoginConfig { enabled: boolean; users: DevUser[]; }
 
-export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; show_in_ranking?: boolean; }
+export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; show_in_ranking?: boolean; default_license?: string; }
 
 // A row of the public volunteer ranking. `name` is null unless the volunteer
 // opted in — render `Contributor #<user_id>` in that case.

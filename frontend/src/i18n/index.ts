@@ -174,6 +174,11 @@ const en = {
     apply: "Use", applyAll: "Use all", model: "Model",
     src_ai: "AI", src_mixed: "AI·edited",
     current: "now", fieldsFilled: "fields to submit",
+    license: "Licence", licenseDeed: "read the licence",
+    licenseHint: "The terms you release this contribution under. It travels with the value when it goes back to the data provider, so pick what you are willing to have republished. Starts on your default licence; changing it here applies to this submission only.",
+    licenseChange: "Change the licence on your annotation",
+    licenseDefaultLabel: "Default licence for your annotations",
+    licenseDefaultHint: "What new annotations start on. You can pick something else on any individual submission, and change the licence on your past annotations from the record page. Changing this default leaves work you have already contributed as it is.",
     grpCollection: "Collection", grpEvent: "Collection event", grpTaxonomy: "Taxonomy",
     grpLocality: "Locality", grpOther: "Annotation-only",
 
@@ -611,6 +616,11 @@ const zh: typeof en = {
     apply: "填入", applyAll: "全部填入", model: "模型",
     src_ai: "AI", src_mixed: "AI·修改",
     current: "現值", fieldsFilled: "個欄位待送出",
+    license: "授權條款", licenseDeed: "閱讀授權條款",
+    licenseHint: "你以什麼條款釋出這筆貢獻。這個條款會隨著資料一起回饋給資料提供者，請選擇你願意被再次發布的範圍。預設帶入你的預設授權條款；在這裡更改只影響這次送出的內容。",
+    licenseChange: "更改這筆標註的授權條款",
+    licenseDefaultLabel: "標註的預設授權條款",
+    licenseDefaultHint: "新標註預設使用的條款。每次送出都可以另外選擇，過去的標註也可以在該筆紀錄頁面上更改。更改這個預設值不會動到你已經貢獻的標註。",
     grpCollection: "典藏資訊", grpEvent: "採集事件", grpTaxonomy: "生物分類",
     grpLocality: "地點", grpOther: "標註專用",
 

@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from .. import auth
 from ..config import settings
 from ..db import get_session
-from ..models import User
+from ..models import LICENSES, User
 from ..schemas import (
     DevLoginConfig,
     DevLoginRequest,
@@ -104,8 +104,10 @@ def me(user: User = Depends(auth.current_user)):
 
 class MePatch(BaseModel):
     """Self-service settings. Only fields a user may change about themselves —
-    role is deliberately not here."""
-    show_in_ranking: bool
+    role is deliberately not here. Each is optional so a client may send one
+    without restating the other."""
+    show_in_ranking: bool | None = None
+    default_license: str | None = None
 
 
 @router.patch("/me", response_model=UserOut)
@@ -114,8 +116,20 @@ def update_me(
     user: User = Depends(auth.current_user),
     db: Session = Depends(get_session),
 ):
-    """Opt in/out of being named on the public volunteer ranking."""
-    user.show_in_ranking = body.show_in_ranking
+    """Ranking opt-in, and the licence new annotations start on.
+
+    Changing the default is **prospective only** — it seeds the picker on the
+    next submission and leaves every existing annotation exactly as contributed.
+    Relicensing past work is done per annotation, by its contributor, which is
+    where the terms actually live (`PATCH /annotations/{id}`)."""
+    if body.default_license is not None:
+        if body.default_license not in LICENSES:
+            raise HTTPException(
+                status_code=400, detail=f"license must be one of {', '.join(LICENSES)}"
+            )
+        user.default_license = body.default_license
+    if body.show_in_ranking is not None:
+        user.show_in_ranking = body.show_in_ranking
     db.add(user)
     db.commit()
     db.refresh(user)

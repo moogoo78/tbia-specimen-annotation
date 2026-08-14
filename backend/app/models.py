@@ -23,6 +23,33 @@ from .db import Base, RefBase
 STATUSES = ("draft", "submitted", "accepted", "rejected", "merged")
 ROLES = ("contributor", "reviewer", "admin")
 
+# Licences a contributor may release their annotation under. Stored as SPDX
+# identifiers, which carry the *version* — "CC-BY" without one names four
+# incompatible licences, and this value travels to data providers in the export,
+# where the ambiguity would be theirs to resolve.
+#
+# These three and no more because the platform exists to hand enrichment back to
+# data providers: GBIF ingests CC0 / CC BY / CC BY-NC and nothing else, so an
+# all-rights-reserved annotation — which iNaturalist offers, hosting content for
+# its own sake — would be a contribution that could never be delivered.
+#
+# The default is the most restrictive of the three on purpose, and it is the one
+# iNaturalist defaults to: a contributor who never looks at the picker grants the
+# least, and widening later is their decision to make rather than one the form
+# made silently on their behalf.
+LICENSES = ("CC0-1.0", "CC-BY-4.0", "CC-BY-NC-4.0")
+DEFAULT_LICENSE = "CC-BY-NC-4.0"
+
+# The canonical deed URI per identifier. DwC's `license` recommends a URI, so
+# the export carries both — the id is what the UI and the DB speak, the URI is
+# what a provider's own metadata wants. Anything not listed has no URI rather
+# than a guessed one.
+LICENSE_URIS = {
+    "CC0-1.0": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "CC-BY-4.0": "https://creativecommons.org/licenses/by/4.0/",
+    "CC-BY-NC-4.0": "https://creativecommons.org/licenses/by-nc/4.0/",
+}
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -43,6 +70,11 @@ class User(Base):
     # Opt-in to being named on the public volunteer ranking. Off by default —
     # the board shows "Contributor #<id>" until a user turns this on.
     show_in_ranking: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Terms new annotations are created under (LICENSES). A *default*, not a
+    # policy: it seeds the picker on each submission and changing it never
+    # touches work already contributed, which stays on the terms it was
+    # submitted with until its contributor changes it there.
+    default_license: Mapped[str] = mapped_column(String(32), default=DEFAULT_LICENSE)
     created: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     annotations: Mapped[list["Annotation"]] = relationship(
@@ -69,6 +101,12 @@ class Annotation(Base):
 
     note: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(16), default="submitted", index=True)
+
+    # The terms this contribution is released under (see LICENSES above). Chosen
+    # per annotation rather than per user, because it is a grant attached to the
+    # work, not a profile preference: a row exported to a provider has to state
+    # the terms that were in force when it was written.
+    license: Mapped[str] = mapped_column(String(32), default=DEFAULT_LICENSE)
 
     contributor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     contributor: Mapped[User] = relationship(

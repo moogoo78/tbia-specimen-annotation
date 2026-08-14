@@ -23,6 +23,7 @@ def _serialize(a: Annotation, name: str | None) -> dict[str, Any]:
         "ai_confidence": a.ai_confidence,
         "note": a.note,
         "status": a.status,
+        "license": a.license,
         "contributor_id": a.contributor_id,
         "contributor_name": name,
         "reviewed_by": a.reviewed_by,

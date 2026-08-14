@@ -143,6 +143,30 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
   (remembered in `localStorage`): it changes what a thumbnail opens, never the thumbnail
   itself, so choosing 4096px costs no page weight. The copy-paste prompt still lists the
   export's own URLs.
+- **Every annotation carries the licence its contributor released it under**, and
+  the rules are **iNaturalist's** — that is the deliberate reference point, not a
+  coincidence. `models.LICENSES`: `CC0-1.0` / `CC-BY-4.0` / `CC-BY-NC-4.0`, SPDX ids
+  because a licence without a version is not a licence, and this value reaches data
+  providers. Those three and no more: GBIF ingests only these, so iNat's fourth
+  option (all-rights-reserved) would be a contribution the export could never
+  deliver. Default **`CC-BY-NC-4.0`** — an unstated grant is the smallest one, never
+  none — and it is also what the SQLite `ADD COLUMN` backfills onto rows written
+  before the picker existed.
+  - **`users.default_license` seeds; `annotations.license` binds.** An absent
+    `license` on create resolves to the contributor's default; changing that default
+    is prospective and touches nothing already contributed. The record form applies
+    one choice to every field in a submission and may override for that submission
+    alone (`frontend/src/licenses.ts` mirrors the vocabulary; nothing is kept in
+    `localStorage` — the profile is the memory).
+  - **Only the contributor may relicense, at any time, in any status.** A reviewer
+    may edit a *value* but never restate someone else's terms, not even as admin.
+    There is no freeze after `accepted`: what cannot be revoked is the copy a
+    provider already took, not the record. An export is a **snapshot** — it states
+    the terms in force when it ran, the delivered file keeps them, the next export
+    carries the change. That is why `export.py` reads the current value and pins
+    nothing.
+  - `/api/export/provider` ships `license` + `license_uri` per row, because terms
+    vary row by row. See *Licensing* in `docs/annotation-schema.md`.
 - **Two routes reach the same AI transcription, and they differ in who waits and who
   pays.** `POST /occurrences/{id}/transcribe-request` (any contributor) persists a
   `transcribe_requests` row and pings Discord so a human knows to run `make transcribe`;

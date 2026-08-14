@@ -85,24 +85,39 @@ def _migrate_users() -> None:
         conn.exec_driver_sql("CREATE UNIQUE INDEX ix_users_email ON users (email)")
 
 
-def _add_user_columns() -> None:
-    """Add columns appended to ``users`` since a DB was first created.
+# Columns appended to a table since the first deployments, as
+# ``table -> [(column, DDL)]``. SQLite backfills existing rows from the DDL's
+# DEFAULT, so each entry has to name a default that is *right* for rows written
+# before the column existed — for ``annotations.license`` that is the platform
+# default, the narrowest of the three grants, which is the conservative reading
+# of work contributed when the form asked for no terms at all.
+ADDED_COLUMNS = {
+    "users": [
+        ("show_in_ranking", "BOOLEAN DEFAULT 0"),
+        ("default_license", "VARCHAR(32) DEFAULT 'CC-BY-NC-4.0'"),
+    ],
+    "annotations": [("license", "VARCHAR(32) DEFAULT 'CC-BY-NC-4.0'")],
+}
+
+
+def _add_columns() -> None:
+    """Add columns appended to a table since a DB was first created.
 
     ``create_all`` only creates *missing tables*, so a column added to the model
     never reaches an existing ``annotations.sqlite``. Unlike ``_migrate_users()``
     — which had to rebuild the table because SQLite cannot ALTER a NOT NULL
-    constraint away — appending a nullable column with a default is a plain
+    constraint away — appending a column with a default is a plain
     ``ADD COLUMN``. Idempotent: each column is added only if absent.
     """
-    added = [("show_in_ranking", "BOOLEAN DEFAULT 0")]
     with engine.begin() as conn:
-        info = conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()
-        if not info:
-            return  # fresh install — create_all builds the current schema
-        have = {row[1] for row in info}
-        for name, ddl in added:
-            if name not in have:
-                conn.exec_driver_sql(f"ALTER TABLE users ADD COLUMN {name} {ddl}")
+        for table, added in ADDED_COLUMNS.items():
+            info = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+            if not info:
+                continue  # fresh install — create_all builds the current schema
+            have = {row[1] for row in info}
+            for name, ddl in added:
+                if name not in have:
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
 REFERENCE_TABLES = (
@@ -190,7 +205,7 @@ def init_db() -> None:
     from . import models  # noqa: F401  (register mappers)
 
     _migrate_users()
-    _add_user_columns()
+    _add_columns()
     _move_reference_tables()
     Base.metadata.create_all(engine)
     RefBase.metadata.create_all(ref_engine)
