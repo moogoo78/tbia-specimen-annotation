@@ -37,6 +37,15 @@ secrets*
 /dataset-selected13.json
 /selected-13-dataset-ids.txt
 
+# --- Promo copy (local working drafts) ---
+# Social-post text for announcing the platform: written here because Markdown
+# is easier to draft in than a post box, but it is one person's working copy
+# with placeholders and counts that go stale with the next export — not
+# something a clone needs. Unlike the other files in docs/drafts/, which are
+# tracked because they are the working copy of text that ships on the site.
+docs/drafts/post.md
+docs/drafts/promo-posts.zh-TW.md
+
 # --- Agent / editor local state ---
 .claude/
 .DS_Store
