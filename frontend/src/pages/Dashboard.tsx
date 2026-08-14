@@ -7,6 +7,8 @@ import { Icon } from "../design/Icon";
 import { api } from "../api/client";
 import { useAuth } from "../auth";
 import { Button, Spinner, StatusPill } from "../components/ui";
+import { LICENSES, LICENSE_LABELS, asLicense, licenseLabel } from "../licenses";
+import type { License } from "../licenses";
 
 const STATUSES = ["submitted", "accepted", "rejected", "merged", "draft"];
 
@@ -39,6 +41,7 @@ export function Dashboard() {
       <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>{tr("dash.title")}</h2>
 
       <RankingOptIn />
+      <DefaultLicense />
       {user.role === "admin" && <TranscribeRoutePolicy />}
 
       {/* status summary */}
@@ -79,7 +82,7 @@ export function Dashboard() {
                     {" → "}<span style={{ fontWeight: 600 }}>{a.proposed_value}</span>
                   </div>
                   <div style={{ fontSize: 10, color: t.fgSubtle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {a.contributor_name} · {a.dataset_name}
+                    {a.contributor_name} · {licenseLabel(a.license)} · {a.dataset_name}
                   </div>
                 </Link>
               ))}
@@ -135,6 +138,52 @@ function RankingOptIn() {
       <Link to="/contributors" style={{ fontSize: 11, color: t.accent, textDecoration: "none", flexShrink: 0 }}>
         {tr("vol.viewAll")}
       </Link>
+    </div>
+  );
+}
+
+// The licence new annotations start on. A *default*, not a policy: it seeds the
+// picker on the record page and nothing more, so changing it here leaves every
+// annotation already contributed exactly as it was — relicensing those is done
+// per annotation, on the record, by whoever wrote them.
+//
+// It sits beside the ranking opt-in for the same reason: a standing choice about
+// how your own contributions are published belongs somewhere you can find it,
+// not re-asked on every record.
+function DefaultLicense() {
+  const { t: tr } = useTranslation();
+  const qc = useQueryClient();
+  const { refreshUser } = useAuth();
+  const me = useQuery({ queryKey: ["me"], queryFn: () => api.me(), retry: false });
+  const set = useMutation({
+    mutationFn: (v: License) => api.updateMe({ default_license: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["me"] });
+      // The record page reads this off the auth context, not this query.
+      refreshUser();
+    },
+  });
+  const current = asLicense(me.data?.default_license);
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", marginBottom: 14,
+      background: t.panel, border: `1px solid ${t.border}`, maxWidth: 620,
+    }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12, fontWeight: 600 }}>{tr("annotate.licenseDefaultLabel")}</div>
+        <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 2, lineHeight: 1.5 }}>
+          {tr("annotate.licenseDefaultHint")}
+        </div>
+      </div>
+      <select value={current} disabled={me.isLoading || set.isPending}
+        onChange={(e) => set.mutate(e.target.value as License)}
+        style={{
+          fontSize: 12, fontFamily: t.sans, padding: "4px 6px", background: t.panelAlt,
+          border: `1px solid ${t.border}`, cursor: "pointer", flexShrink: 0,
+        }}>
+        {LICENSES.map((l) => <option key={l} value={l}>{LICENSE_LABELS[l]}</option>)}
+      </select>
     </div>
   );
 }

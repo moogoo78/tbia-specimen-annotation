@@ -271,6 +271,12 @@ def build_annotations(
     necessarily come from this pipeline.
     """
     note = f"AI transcription ({result.service or default_service} · {result.model})"
+    # No `license` here: an AI draft takes the column default (the narrowest of
+    # the three), because nobody picked terms for it — the request that produced
+    # it carries no licence choice, and inventing a wider grant on the
+    # requester's behalf is exactly what the default exists to avoid. A
+    # contributor who wants other terms sets them on the draft while it is
+    # pending (PATCH /annotations/{id}).
     return [
         Annotation(
             occurrence_id=result.occurrence_id,

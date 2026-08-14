@@ -8,6 +8,8 @@ import { api } from "../api/client";
 import type { ExtractedField, MediaSize, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
+import { LICENSES, LICENSE_LABELS, LICENSE_URIS, asLicense, licenseLabel } from "../licenses";
+import type { License } from "../licenses";
 
 // Annotatable form, mirroring docs/annotation-schema.md (parts + widgets).
 type Widget = "input" | "textarea" | "select" | "date" | "dms";
@@ -352,6 +354,23 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   // apart ai (kept verbatim), mixed (AI value then edited), manual (typed).
   const [aiSeed, setAiSeed] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
+  // Terms this submission is released under. Applies to every field submitted
+  // in one click — the form writes one annotation per filled field, and they
+  // are one act of contribution, so splitting the grant between them would be
+  // a distinction the contributor never made.
+  //
+  // Seeded from the contributor's own default (Dashboard → settings), which is
+  // where a standing preference belongs; changing it here is a choice about
+  // *this* submission and leaves the default alone.
+  const [license, setLicense] = useState<License>(() => asLicense(user?.default_license));
+  const profileLicense = asLicense(user?.default_license);
+  // `user` arrives after the first paint (App fetches /auth/me), so the picker
+  // would otherwise sit on the platform fallback while the contributor's own
+  // default was already known. Only re-seeds while the form is untouched.
+  const touchedLicense = useRef(false);
+  useEffect(() => {
+    if (!touchedLicense.current) setLicense(profileLicense);
+  }, [profileLicense]);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["detail", record.id] });
 
@@ -412,12 +431,20 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
         field: fd.name, proposed_value: value, original_value: originalFor(record, fd.name),
         note: note || null,
         source: sourceFor(fd.name, value),
-        status,
+        status, license,
       }))),
     onSuccess: () => { setValues({}); setAiSeed({}); setNote(""); refresh(); },
   });
   const reviewMut = useMutation({
     mutationFn: ({ annId, status }: { annId: number; status: string }) => api.updateAnnotation(annId, { status }),
+    onSuccess: refresh,
+  });
+  // Relicensing an annotation already contributed — the contributor's own, at
+  // any point in its life. What a provider already exported keeps the terms it
+  // was exported with; this is what the next export will say.
+  const relicenseMut = useMutation({
+    mutationFn: ({ annId, license }: { annId: number; license: License }) =>
+      api.updateAnnotation(annId, { license }),
     onSuccess: refresh,
   });
 
@@ -530,6 +557,29 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
           })}
 
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tr("annotate.note")} style={inputStyle} />
+
+          {/* Licence for this submission. Sits with the submit buttons rather
+              than among the fields: it is a property of the contribution, not
+              of any one value, and it is the last thing to confirm before the
+              work leaves the contributor's hands. */}
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: t.fgMuted }}>{tr("annotate.license")}</span>
+              <select
+                value={license}
+                onChange={(e) => { touchedLicense.current = true; setLicense(e.target.value as License); }}
+                style={{ ...inputStyle, width: "auto", flex: 1 }}
+              >
+                {LICENSES.map((l) => <option key={l} value={l}>{LICENSE_LABELS[l]}</option>)}
+              </select>
+              <a href={LICENSE_URIS[license]} target="_blank" rel="noreferrer noopener"
+                style={{ fontSize: 10, color: t.accent, whiteSpace: "nowrap" }}>{tr("annotate.licenseDeed")}</a>
+            </div>
+            <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 3, lineHeight: 1.4 }}>
+              {tr("annotate.licenseHint")}
+            </div>
+          </div>
+
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
             <Button primary small disabled={filled.length === 0 || createMut.isPending} onClick={() => createMut.mutate("submitted")}>{tr("annotate.submit")}</Button>
             <Button small disabled={filled.length === 0 || createMut.isPending} onClick={() => createMut.mutate("draft")}>{tr("annotate.saveDraft")}</Button>
@@ -537,8 +587,9 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
           </div>
         </div>
 
-        <History annotations={record.annotations} isReviewer={isReviewer}
-          onReview={(annId, status) => reviewMut.mutate({ annId, status })} />
+        <History annotations={record.annotations} isReviewer={isReviewer} userId={user.id}
+          onReview={(annId, status) => reviewMut.mutate({ annId, status })}
+          onRelicense={(annId, license) => relicenseMut.mutate({ annId, license })} />
       </div>
     </div>
   );
@@ -877,9 +928,13 @@ function SourceTag({ source }: { source: string }) {
   );
 }
 
-function History({ annotations, isReviewer, onReview }: {
+function History({ annotations, isReviewer, onReview, userId, onRelicense }: {
   annotations: OccurrenceDetail["annotations"]; isReviewer: boolean;
   onReview: (annId: number, status: string) => void;
+  /** The signed-in contributor, or undefined when nobody is. Only their own
+   *  rows get the licence picker — nobody restates someone else's terms. */
+  userId?: number;
+  onRelicense?: (annId: number, license: License) => void;
 }) {
   const { t: tr } = useTranslation();
   if (annotations.length === 0) return null;
@@ -900,7 +955,25 @@ function History({ annotations, isReviewer, onReview }: {
           </div>
           {a.note && <div style={{ color: t.fgMuted, fontSize: 10 }}>{a.note}</div>}
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-            <span style={{ fontSize: 10, color: t.fgSubtle }}>— {a.contributor_name}</span>
+            {/* The terms it was contributed under — a reviewer decides whether
+                to accept a value into the provider export, and the licence is
+                half of what that decision rests on. Its contributor can change
+                it here at any time, in any status: what an earlier export
+                delivered stays as delivered, and this sets what the next one
+                says. Everyone else reads it. */}
+            <span style={{ fontSize: 10, color: t.fgSubtle }}>— {a.contributor_name} ·</span>
+            {userId === a.contributor_id && onRelicense ? (
+              <select value={asLicense(a.license)} title={tr("annotate.licenseChange")}
+                onChange={(e) => onRelicense(a.id, e.target.value as License)}
+                style={{
+                  fontSize: 10, fontFamily: t.mono, color: t.fgMuted, padding: "1px 2px",
+                  background: t.panelAlt, border: `1px solid ${t.borderSoft}`, cursor: "pointer",
+                }}>
+                {LICENSES.map((l) => <option key={l} value={l}>{LICENSE_LABELS[l]}</option>)}
+              </select>
+            ) : (
+              <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>{licenseLabel(a.license)}</span>
+            )}
             {isReviewer && (a.status === "submitted" || a.status === "draft") && (
               <span style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
                 <Button small onClick={() => onReview(a.id, "accepted")}>{tr("annotate.accept")}</Button>
