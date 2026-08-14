@@ -182,6 +182,7 @@ const en = {
     aiWhat: "AI reads the text off the specimen image and proposes values for the form below. Nothing is submitted until you review it.",
     aiPickHint: "Two ways to do it — pick either:",
     aiNoImage: "This record has no image, so AI has no label to read. You can still fill the form by hand.",
+    aiWalk: "See it done on a real specimen",
 
     // Option A — server-side queue
     optQueueTitle: "Let the platform do it",
@@ -618,6 +619,7 @@ const zh: typeof en = {
     aiWhat: "由 AI 讀取標本影像上的標籤文字，替下方表單提出建議值。建議值一定要你檢查過、按下送出才會成立。",
     aiPickHint: "兩種做法，擇一即可：",
     aiNoImage: "此紀錄沒有影像，AI 沒有標籤可讀。你仍然可以手動填寫下方表單。",
+    aiWalk: "看一個真實標本的實作示範",
 
     // Option A — server-side queue
     optQueueTitle: "交給平台處理",

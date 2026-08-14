@@ -632,6 +632,16 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
           <Icon name="spark" size={12} />{tr("annotate.aiTitle")}
         </div>
         <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.6, marginTop: 3 }}>{tr("annotate.aiWhat")}</div>
+        {/* The walkthrough, from where the work actually happens. New tab on
+            purpose: this panel sits above a half-filled annotation form (and,
+            in Explore's split view, inside a search), and navigating away
+            would discard both to read a help page. */}
+        <Link to="/guide/ai-transcribe" target="_blank" rel="noreferrer" style={{
+          display: "inline-flex", alignItems: "center", gap: 4, marginTop: 4,
+          fontSize: 10, color: t.accent, textDecoration: "none",
+        }}>
+          <Icon name="spark" size={10} />{tr("annotate.aiWalk")} ↗
+        </Link>
         {!hasImage && (
           <div style={{ fontSize: 10, color: t.warn, lineHeight: 1.5, marginTop: 4, display: "flex", gap: 4 }}>
             <Icon name="alert" size={11} /><span>{tr("annotate.aiNoImage")}</span>
