@@ -122,6 +122,65 @@ Build to a side path and swap only after preparing, as above. Building straight 
 `data/tbia.duckdb` leaves the API serving a flag-less store for the minute in between. To
 roll back, keep the previous file until the new one has run for a while.
 
+### What the store adds to the export
+
+Ten of `occurrence`'s 76 columns are the platform's, not TBIA's, and so is the whole
+`dataset` table. Everything else is the export's own column, snake_cased and left alone.
+The distinction matters when reading a value back out: an export column is what the
+provider published, a derived one is what this repo concluded — and only the first is
+theirs to correct.
+
+**From `data/registry.json`, added by `ingest/build.py`** (joined on `tbiaDatasetID`;
+`ingest/common.py:BUILD_ADDED`). These are the curation call of step 2, materialised
+per row:
+
+| Column | Derived from |
+|---|---|
+| `institution_code` | The registry section key holding the dataset; literal `GBIF` for anything uncurated |
+| `institution_name` | The registry source's `name`; `GBIF` for the rest |
+| `dataset_code` | The registry entry's `code` (`TNM`, `ENT`, …); null for GBIF-held datasets |
+| `groups` (`VARCHAR[]`) | The registry entry's `groups` — our own vocabulary (`Aves`, `Plantae`, …), with no counterpart in the export |
+
+The same join is also the ingest filter, so a registry edit changes not just these four
+values but which rows exist at all.
+
+**Interpreted by `ingest/prepare.py`** (`make prepare`; `ingest/common.py:PREPARE_ADDED`).
+These are the completeness flags the product is built around — the gaps contributors go
+looking for:
+
+| Column | Expression |
+|---|---|
+| `has_coordinates` | `standard_latitude` and `standard_longitude` both non-null |
+| `has_date` | `standard_date` non-null |
+| `has_identification` | `taxon_rank` in `SPECIES_RANKS` **and** `scientific_name` non-blank |
+| `has_media` | `associated_media` non-blank |
+| `year` | `year(standard_date)` |
+| `completeness_score` | The four flags summed, 0–4 |
+
+`has_identification` is the one carrying real interpretive weight. `SPECIES_RANKS`
+(`ingest/common.py`) is species, subspecies, variety, form, forma and subvariety — so a
+record identified only to genus or family counts as a *gap*, which is a definition this
+repo chose and not one the export states. Change that tuple and the platform's headline
+number changes with it.
+
+**The `dataset` table has no counterpart in the export at all.** `build.py` rolls it up
+from the rows actually loaded, which is what stops its counts drifting from the store's
+contents. `dataset_name`, `source_dataset_id`, `gbif_dataset_id` and `rights_holder` are a
+`max()` / `any_value()` pick over each dataset's rows, so a dataset whose rows disagree
+about its name silently gets one of them; `in_registry`, `num_of_rows` and
+`n_source_dataset_ids` are counted during the build, and the `n_identified` /
+`n_georeferenced` / `n_dated` / `n_with_media` / `avg_completeness` roll-ups are added by
+`prepare.py` alongside the row-level flags.
+
+**Two transformations stop short of being new columns.** Names are mechanically
+snake_cased (`standardDate` → `standard_date`), and the columns listed in
+`ingest/common.py` as `DOUBLE_COLS` / `BOOLEAN_COLS` / `TIMESTAMP_COLS` are cast on load
+with `TRY_CAST`, which nulls on failure rather than erroring. So an unparseable upstream
+date or coordinate becomes null here and then reads as a metadata gap — "the provider
+recorded nothing" and "the provider recorded something we could not parse" are
+indistinguishable in the store, and the second is worth checking upstream before
+reporting it as missing.
+
 ### If the build stops on a column change
 
 `backend/ingest/columns.json` pins the export's column names. If they move, the build
