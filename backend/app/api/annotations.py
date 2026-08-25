@@ -8,7 +8,14 @@ from .. import auth, duck, extract, notify, pipeline, policy, search
 from ..annotations_store import _serialize
 from ..config import settings
 from ..db import get_session
-from ..models import DEFAULT_LICENSE, LICENSES, Annotation, TranscribeRequest, User
+from ..models import (
+    DEFAULT_LICENSE,
+    LICENSES,
+    Annotation,
+    TranscribeRequest,
+    User,
+    public_name,
+)
 from ..schemas import (
     AnnotationCreate,
     AnnotationUpdate,
@@ -28,8 +35,7 @@ CONTRIB_STATUSES = {"draft", "submitted"}
 
 
 def _out(db: Session, a: Annotation) -> dict:
-    name = db.get(User, a.contributor_id)
-    return _serialize(a, name.display_name if name else None)
+    return _serialize(a, public_name(db.get(User, a.contributor_id)))
 
 
 @router.post("/occurrences/{occ_id}/extract", response_model=ExtractResponse)

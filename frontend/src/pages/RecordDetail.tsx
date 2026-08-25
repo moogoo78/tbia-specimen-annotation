@@ -10,6 +10,7 @@ import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
 import { LICENSES, LICENSE_LABELS, LICENSE_URIS, asLicense, licenseLabel } from "../licenses";
 import type { License } from "../licenses";
+import { contributorLabel, isAnonymous } from "../contributors";
 
 // Annotatable form, mirroring docs/annotation-schema.md (parts + widgets).
 type Widget = "input" | "textarea" | "select" | "date" | "dms";
@@ -906,7 +907,7 @@ function QueueStatus({ q }: { q: NonNullable<OccurrenceDetail["transcribe"]> }) 
         <div style={{ fontSize: 10, color: t.danger, marginTop: 3, wordBreak: "break-word" }}>{q.error}</div>
       )}
       <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginTop: 3 }}>
-        {when}{q.requested_by ? ` · ${tr("annotate.qBy", { who: q.requested_by })}` : ""}
+        {when} · {tr("annotate.qBy", { who: contributorLabel(tr, q.requested_by, q.requested_by_id) })}
       </div>
     </div>
   );
@@ -961,7 +962,9 @@ function History({ annotations, isReviewer, onReview, userId, onRelicense }: {
                 it here at any time, in any status: what an earlier export
                 delivered stays as delivered, and this sets what the next one
                 says. Everyone else reads it. */}
-            <span style={{ fontSize: 10, color: t.fgSubtle }}>— {a.contributor_name} ·</span>
+            <span style={{ fontSize: 10, color: t.fgSubtle, fontStyle: isAnonymous(a.contributor_name) ? "italic" : "normal" }}
+                  title={isAnonymous(a.contributor_name) ? tr("vol.anonymousHint") : undefined}>
+              — {contributorLabel(tr, a.contributor_name, a.contributor_id)} ·</span>
             {userId === a.contributor_id && onRelicense ? (
               <select value={asLicense(a.license)} title={tr("annotate.licenseChange")}
                 onChange={(e) => onRelicense(a.id, e.target.value as License)}

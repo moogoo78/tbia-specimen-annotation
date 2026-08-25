@@ -110,6 +110,45 @@ contribution that could never be delivered.
   is a snapshot**: it states the terms in force when it ran, the delivered file
   keeps them, and a later change shows up in the next export.
 
+## Naming a contributor
+
+Two settings, one rule. `users.show_in_ranking` decides **whether** to name a
+contributor and governs **every surface that says who contributed** — not just
+the ranking it is named after; `users.public_display_name` decides **as what**.
+Both live on the user, both are self-service (`PATCH /api/auth/me`), and the
+first is off by default, so a new account is never named without asking.
+
+- **The server withholds the name; it does not ask the UI to hide it.**
+  `models.public_name(user)` returns `None` for a user who has not opted in, and
+  otherwise `public_display_name or display_name`; every read path calls it: the volunteer ranking
+  (`api/volunteers.py`), the dashboard's annotation list and each annotation
+  response (`api/annotations.py`), a record's annotation history and its
+  transcription queue line (`annotations_store.py`). It matters that this is
+  server-side: `GET /api/occurrences/{id}` is unauthenticated and edge-cached,
+  so a name left in that payload is published to everyone who asks, whatever
+  the page chooses to render.
+- **The chosen name is a separate column because `display_name` is ORCID's.**
+  The callback overwrites `display_name` from the token response on *every*
+  sign-in (`api/auth.py`), so a name edited in place would revert the next time
+  its owner signed in. `public_display_name` is null until someone sets one,
+  which is why an untouched account is still published exactly as ORCID has it;
+  a blank submission clears it back to null rather than storing `""`. Capped at
+  60 characters (`api/auth.py:MAX_PUBLIC_NAME`), whitespace collapsed, and
+  applied retroactively — it is a name, not a per-annotation byline, so changing
+  it renames work already contributed.
+- **`contributor_name: null` means "not for publication", never "no
+  contributor".** The id always ships (`contributor_id`, `requested_by_id`), and
+  `frontend/src/contributors.ts` turns the pair into the same *Unnamed
+  contributor #<id>* everywhere — one function, because five separate call sites
+  formatting it themselves is how the opt-out came to cover only the ranking.
+- **The provider export is deliberately not one of these surfaces.**
+  `/api/export/*` ships the ORCID `display_name` unconditionally, honouring
+  neither setting. That file is the hand-off to a data provider, where the name
+  is the attribution the row's own licence asks for — `CC-BY-4.0` and
+  `CC-BY-NC-4.0` both require it, and the contributor chose the licence — and
+  the ORCID-verified name is what makes that attribution checkable against an
+  iD. A contributor who wants no attribution anywhere releases under `CC0-1.0`.
+
 ## Roles and permissions
 
 `ROLES = ("contributor", "reviewer", "admin")` (`backend/app/models.py:21`). Assigned

@@ -8,10 +8,12 @@ from typing import Any
 from sqlalchemy import select
 
 from .db import SessionLocal
-from .models import Annotation, TranscribeRequest, User
+from .models import Annotation, TranscribeRequest, User, public_name
 
 
 def _serialize(a: Annotation, name: str | None) -> dict[str, Any]:
+    """`name` is the *publishable* name (models.public_name), so None here means
+    the contributor has not opted in — not that the row has no contributor."""
     return {
         "id": a.id,
         "occurrence_id": a.occurrence_id,
@@ -36,12 +38,12 @@ def _serialize(a: Annotation, name: str | None) -> dict[str, Any]:
 def list_for_occurrence(occ_id: str) -> list[dict[str, Any]]:
     with SessionLocal() as db:
         rows = db.execute(
-            select(Annotation, User.display_name)
+            select(Annotation, User)
             .join(User, Annotation.contributor_id == User.id)
             .where(Annotation.occurrence_id == occ_id)
             .order_by(Annotation.created.desc())
         ).all()
-        return [_serialize(a, name) for a, name in rows]
+        return [_serialize(a, public_name(u)) for a, u in rows]
 
 
 def latest_transcribe_request(occ_id: str) -> dict[str, Any] | None:
@@ -50,7 +52,7 @@ def latest_transcribe_request(occ_id: str) -> dict[str, Any] | None:
     short-lived post-click flash."""
     with SessionLocal() as db:
         row = db.execute(
-            select(TranscribeRequest, User.display_name)
+            select(TranscribeRequest, User)
             .join(User, TranscribeRequest.contributor_id == User.id)
             .where(TranscribeRequest.occurrence_id == occ_id)
             .order_by(TranscribeRequest.created.desc())
@@ -58,11 +60,14 @@ def latest_transcribe_request(occ_id: str) -> dict[str, Any] | None:
         ).first()
         if row is None:
             return None
-        req, name = row
+        req, user = row
         return {
             "id": req.id,
             "status": req.status,
-            "requested_by": name,
+            # Who asked, named only if they opted in; the id goes out either way
+            # so the UI can say "Unnamed contributor #<id>" like everywhere else.
+            "requested_by": public_name(user),
+            "requested_by_id": req.contributor_id,
             "created": req.created.isoformat() if req.created else None,
             "processed_at": req.processed_at.isoformat() if req.processed_at else None,
             "error": req.error,

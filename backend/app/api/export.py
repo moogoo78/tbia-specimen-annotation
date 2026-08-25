@@ -42,6 +42,15 @@ EXPORT_COLUMNS = [
 ]
 
 
+# `contributor` is the ORCID `display_name` in both query paths, and deliberately
+# honours neither `users.show_in_ranking` nor `users.public_display_name` — i.e.
+# not `models.public_name`. Those two decide what the *site* shows and under what
+# name; this file is the hand-off to a data provider, where the name is the
+# attribution the row's own licence asks for — CC-BY-4.0 and CC-BY-NC-4.0 both
+# require it, the contributor picked them, and it is the ORCID-verified name that
+# makes the attribution checkable against an iD.
+
+
 async def _rows_federated(dataset_name: str, statuses: list[str]) -> list[dict]:
     placeholders = ", ".join(["?"] * len(statuses))
     sql = f"""

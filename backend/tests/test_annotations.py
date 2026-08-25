@@ -66,8 +66,81 @@ def test_transcribe_request_shows_on_detail(client):
 
     state = client.get("/api/occurrences/r2").json()["transcribe"]
     assert state["status"] == "pending"
-    assert state["requested_by"]
+    # Detail is public, and the demo user has not opted in to being named, so
+    # the queue line gets the id to render "Unnamed contributor #<id>" from.
+    assert state["requested_by"] is None
+    assert state["requested_by_id"]
     assert state["processed_at"] is None
+
+
+def test_contributor_named_only_when_opted_in(client):
+    """`users.show_in_ranking` governs every surface that says who contributed,
+    not just the ranking. The record detail is unauthenticated and edge-cached,
+    so a name left on it there is published to everyone."""
+    cur = auth_header(client, CURATOR)
+    ann = client.post("/api/occurrences/r2/annotations", headers=cur, json={
+        "field": "locality", "proposed_value": "Hualien", "status": "submitted",
+    })
+    assert ann.status_code == 200, ann.text
+    ann_id = ann.json()["id"]
+
+    def named() -> str | None:
+        detail = client.get("/api/occurrences/r2").json()
+        row = next(a for a in detail["annotations"] if a["id"] == ann_id)
+        assert row["contributor_id"]          # the id is never withheld
+        return row["contributor_name"]
+
+    assert named() is None                    # off by default
+    assert ann.json()["contributor_name"] is None   # and on the create response
+    listed = client.get("/api/annotations", headers=cur).json()["items"]
+    assert next(a for a in listed if a["id"] == ann_id)["contributor_name"] is None
+
+    client.patch("/api/auth/me", headers=cur, json={"show_in_ranking": True})
+    assert named() == "Ada Curator"
+    client.patch("/api/auth/me", headers=cur, json={"show_in_ranking": False})
+    assert named() is None
+
+
+def test_contributor_publishes_under_a_chosen_name(client):
+    """Being named and being named *as what* are separate settings. The chosen
+    name replaces the ORCID one everywhere the site names a contributor —
+    including on work already contributed — while the provider export keeps the
+    ORCID name, which is what makes the CC-BY attribution checkable."""
+    cur = auth_header(client, CURATOR)
+    rev = auth_header(client, REVIEWER)
+    ann = client.post("/api/occurrences/r2/annotations", headers=cur, json={
+        "field": "county", "proposed_value": "花蓮縣", "status": "submitted",
+    })
+    ann_id = ann.json()["id"]
+
+    def named() -> str | None:
+        detail = client.get("/api/occurrences/r2").json()
+        return next(a for a in detail["annotations"] if a["id"] == ann_id)["contributor_name"]
+
+    # A chosen name alone publishes nothing — the opt-in still governs.
+    me = client.patch("/api/auth/me", headers=cur, json={"public_display_name": "  蘇  阿達 "})
+    assert me.status_code == 200, me.text
+    assert me.json()["public_display_name"] == "蘇 阿達"   # whitespace collapsed
+    assert named() is None
+
+    client.patch("/api/auth/me", headers=cur, json={"show_in_ranking": True})
+    assert named() == "蘇 阿達"
+    board = client.get("/api/volunteers").json()["items"]
+    assert any(v["name"] == "蘇 阿達" for v in board)
+
+    # The provider hand-off is deliberately not one of those surfaces.
+    deltas = client.get("/api/export/provider?dataset_name=DS-A", headers=rev).json()["deltas"]
+    assert {d["contributor"] for d in deltas} == {"Ada Curator"}
+
+    # Too long is refused rather than silently truncated.
+    assert client.patch("/api/auth/me", headers=cur,
+                        json={"public_display_name": "x" * 61}).status_code == 400
+
+    # Blank is the way back to the ORCID name, not a nameless byline.
+    assert client.patch("/api/auth/me", headers=cur,
+                        json={"public_display_name": "   "}).json()["public_display_name"] is None
+    assert named() == "Ada Curator"
+    client.patch("/api/auth/me", headers=cur, json={"show_in_ranking": False})
 
 
 def test_anonymous_cannot_annotate(client):

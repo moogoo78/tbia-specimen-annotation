@@ -167,6 +167,27 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
     nothing.
   - `/api/export/provider` ships `license` + `license_uri` per row, because terms
     vary row by row. See *Licensing* in `docs/annotation-schema.md`.
+- **A contributor's name is published only if they opted in.** `users.show_in_ranking`
+  is one switch over *every* surface that names a contributor, not just the ranking it
+  is named after: the volunteer board, the dashboard's annotation list, a record's
+  annotation history and its transcription queue line. `models.public_name()` is the
+  single rule — `None` for everyone who has not opted in, else `public_display_name or
+  display_name` — and it is applied **server-side**, because `GET /api/occurrences/{id}`
+  is unauthenticated and edge-cached, so a name left in that payload is published however
+  the page renders it. `contributor_name: null` therefore means "not for publication",
+  never "no contributor": the id always ships and `frontend/src/contributors.ts` turns
+  the pair into the same 未具名貢獻者 #<id> everywhere. The provider export is
+  deliberately excluded (`api/export.py` ships the ORCID name) — there the name is the
+  attribution the row's own CC-BY licence asks for, not site chrome, and only the
+  verified one is checkable against an iD. See *Naming a contributor* in
+  `docs/annotation-schema.md`.
+  - **Whether to be named and *as what* are separate settings.**
+    `users.public_display_name` (null = "use the ORCID name") is what an opted-in
+    contributor is published as, edited beside the opt-in on the Dashboard. It is a
+    second column rather than an edit to `display_name` because the ORCID callback
+    overwrites *that* one from the token response on every sign-in, so an in-place
+    edit would silently revert at the user's next login. Blank clears it back to null;
+    60 chars max; retroactive, since it is a name and not a per-annotation byline.
 - **Two routes reach the same AI transcription, and they differ in who waits and who
   pays.** `POST /occurrences/{id}/transcribe-request` (any contributor) persists a
   `transcribe_requests` row and pings Discord so a human knows to run `make transcribe`;

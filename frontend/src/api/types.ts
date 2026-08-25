@@ -51,7 +51,10 @@ export interface OccurrenceDetail extends OccurrenceRow {
 export interface TranscribeState {
   id: number;
   status: "pending" | "done" | "failed" | string;
+  // Named only if the requester opted in (users.show_in_ranking); the id is
+  // always here, so an opted-out requester still reads "Unnamed contributor #<id>".
   requested_by: string | null;
+  requested_by_id: number | null;
   created: string | null;
   processed_at: string | null;
   error: string | null;
@@ -169,7 +172,10 @@ export interface TranscribeConfig {
 export interface DevUser { email: string; display_name: string; role: string; }
 export interface DevLoginConfig { enabled: boolean; users: DevUser[]; }
 
-export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; show_in_ranking?: boolean; default_license?: string; }
+// `display_name` is ORCID's and is refreshed from it at every sign-in;
+// `public_display_name` is the name the user chose to be published under,
+// null meaning "use the ORCID one". Only the pair's *result* is ever public.
+export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; public_display_name?: string | null; role: string; show_in_ranking?: boolean; default_license?: string; }
 
 // A row of the public volunteer ranking. `name` is null unless the volunteer
 // opted in — render `Contributor #<user_id>` in that case.
