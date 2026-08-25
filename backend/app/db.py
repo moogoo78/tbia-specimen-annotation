@@ -94,6 +94,9 @@ def _migrate_users() -> None:
 ADDED_COLUMNS = {
     "users": [
         ("show_in_ranking", "BOOLEAN DEFAULT 0"),
+        # No default: null means "publish the ORCID name", which is what every
+        # row written before the field existed was already doing.
+        ("public_display_name", "VARCHAR(255)"),
         ("default_license", "VARCHAR(32) DEFAULT 'CC-BY-NC-4.0'"),
     ],
     "annotations": [("license", "VARCHAR(32) DEFAULT 'CC-BY-NC-4.0'")],

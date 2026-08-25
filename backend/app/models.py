@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Protocol
 
 from sqlalchemy import (
     Boolean,
@@ -64,11 +65,20 @@ class User(Base):
     # ORCID's /authenticate scope doesn't return an email, and ORCID users have
     # no local password — both are nullable (only legacy/seed rows may set them).
     email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    # The name ORCID gives us. Refreshed from the token response on **every**
+    # sign-in (api/auth.py), so it is theirs to change, not ours — which is why
+    # a chosen public name is a separate column rather than an edit to this one.
     display_name: Mapped[str] = mapped_column(String(255))
+    # What to publish instead, when the user has picked something. Null means
+    # "use `display_name`" — the ORCID name — so an untouched account behaves
+    # exactly as before. Only ever read through `public_name`.
+    public_display_name: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="contributor")
     pw_hash: Mapped[str | None] = mapped_column(String(255))
-    # Opt-in to being named on the public volunteer ranking. Off by default —
-    # the board shows "Contributor #<id>" until a user turns this on.
+    # Opt-in to being named *anywhere the site says who contributed* — the
+    # ranking, the dashboard's annotation list, a record's history, the
+    # transcription queue line. Off by default; until a user turns it on every
+    # one of those reads "Unnamed contributor #<id>". See `public_name`.
     show_in_ranking: Mapped[bool] = mapped_column(Boolean, default=False)
     # Terms new annotations are created under (LICENSES). A *default*, not a
     # policy: it seeds the picker on each submission and changing it never
@@ -80,6 +90,39 @@ class User(Base):
     annotations: Mapped[list["Annotation"]] = relationship(
         back_populates="contributor", foreign_keys="Annotation.contributor_id"
     )
+
+
+class _Nameable(Protocol):
+    """A `User`, or any query row carrying the three columns the rule reads."""
+
+    display_name: str
+    public_display_name: str | None
+    show_in_ranking: bool
+
+
+def public_name(user: _Nameable | None) -> str | None:
+    """The name to publish for a contributor, or None if they have not opted in.
+
+    One rule for every surface that says who contributed — the volunteer
+    ranking, the dashboard's annotation list, a record's annotation history,
+    the transcription queue line. Each of those used to read `display_name`
+    directly, so opting out of the ranking left the name on show everywhere
+    else. None means "not for publication": the caller already carries
+    `contributor_id`, and the UI renders "Unnamed contributor #<id>" from it.
+
+    Opting in publishes `public_display_name` when the user has set one, and
+    their ORCID `display_name` when they have not — two questions, asked
+    separately because they are separate: *whether* to be named, and *as what*.
+    An account that never answers the second is named exactly as ORCID has it.
+
+    The provider export is deliberately *not* one of these surfaces
+    (`api/export.py` ships `display_name` unconditionally): CC-BY attribution
+    is a licence term the contributor themselves chose, not site chrome, and it
+    is the ORCID-verified name that makes the attribution checkable.
+    """
+    if user is None or not user.show_in_ranking:
+        return None
+    return user.public_display_name or user.display_name
 
 
 class Annotation(Base):

@@ -13,6 +13,8 @@ class UserOut(BaseModel):
     orcid: str | None = None
     email: str | None = None
     display_name: str
+    # The name the user chose to be published under; null = use `display_name`.
+    public_display_name: str | None = None
     role: str
     show_in_ranking: bool = False
     default_license: str = DEFAULT_LICENSE

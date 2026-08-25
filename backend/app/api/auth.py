@@ -102,11 +102,20 @@ def me(user: User = Depends(auth.current_user)):
     return UserOut.model_validate(user)
 
 
+# Long enough for a full name in either script plus an affiliation initialism;
+# short enough that the byline stays a byline on a record's history line.
+MAX_PUBLIC_NAME = 60
+
+
 class MePatch(BaseModel):
     """Self-service settings. Only fields a user may change about themselves —
     role is deliberately not here. Each is optional so a client may send one
     without restating the other."""
     show_in_ranking: bool | None = None
+    # The name to be published under. "" (or blank) clears it back to the ORCID
+    # name — the field is how you *choose* a name, not how you delete one, so
+    # there has to be a way back to the default that isn't a second endpoint.
+    public_display_name: str | None = None
     default_license: str | None = None
 
 
@@ -116,7 +125,14 @@ def update_me(
     user: User = Depends(auth.current_user),
     db: Session = Depends(get_session),
 ):
-    """Ranking opt-in, and the licence new annotations start on.
+    """Ranking opt-in, the name to be published under, and the licence new
+    annotations start on.
+
+    The published name is separate from `display_name` because that one is
+    ORCID's: the callback overwrites it from the token response on every
+    sign-in, so an edit made here would survive until the user next signed in
+    and then silently revert. It also lets someone be named as 王小明 on a site
+    whose data values are Chinese while ORCID holds their name in Latin script.
 
     Changing the default is **prospective only** — it seeds the picker on the
     next submission and leaves every existing annotation exactly as contributed.
@@ -130,6 +146,16 @@ def update_me(
         user.default_license = body.default_license
     if body.show_in_ranking is not None:
         user.show_in_ranking = body.show_in_ranking
+    if body.public_display_name is not None:
+        name = " ".join(body.public_display_name.split())
+        if len(name) > MAX_PUBLIC_NAME:
+            raise HTTPException(
+                status_code=400,
+                detail=f"public_display_name must be at most {MAX_PUBLIC_NAME} characters",
+            )
+        # Blank is the reset: null means "publish the ORCID name", and storing
+        # "" instead would be a name that renders as nothing on every surface.
+        user.public_display_name = name or None
     db.add(user)
     db.commit()
     db.refresh(user)

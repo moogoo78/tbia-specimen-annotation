@@ -8,6 +8,7 @@ import { api } from "../api/client";
 import { useAuth } from "../auth";
 import { Button, Spinner, StatusPill } from "../components/ui";
 import { LICENSES, LICENSE_LABELS, asLicense, licenseLabel } from "../licenses";
+import { contributorLabel } from "../contributors";
 import type { License } from "../licenses";
 
 const STATUSES = ["submitted", "accepted", "rejected", "merged", "draft"];
@@ -82,7 +83,7 @@ export function Dashboard() {
                     {" → "}<span style={{ fontWeight: 600 }}>{a.proposed_value}</span>
                   </div>
                   <div style={{ fontSize: 10, color: t.fgSubtle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {a.contributor_name} · {licenseLabel(a.license)} · {a.dataset_name}
+                    {contributorLabel(tr, a.contributor_name, a.contributor_id)} · {licenseLabel(a.license)} · {a.dataset_name}
                   </div>
                 </Link>
               ))}
@@ -108,21 +109,38 @@ export function Dashboard() {
   );
 }
 
-// Opt in to being named on the public /contributors board. Off by default, so
-// this lives at the top of the Dashboard rather than buried in a settings page —
-// otherwise nobody would ever find it and the board stays all-pseudonyms.
+// Opt in to being named wherever the site says who contributed — the
+// /contributors board, the annotation list below, each record's history and
+// queue line (backend: models.public_name). Off by default, so this lives at the
+// top of the Dashboard rather than buried in a settings page — otherwise nobody
+// would ever find it and every contribution stays pseudonymous.
 function RankingOptIn() {
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => api.me(), retry: false });
   const toggle = useMutation({
     mutationFn: (v: boolean) => api.updateMe({ show_in_ranking: v }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["me"] });
-      qc.invalidateQueries({ queryKey: ["volunteers"] });
-    },
+    onSuccess: invalidateNamed,
+  });
+  // The name to be published under. `null` draft = "whatever the server has",
+  // so the field fills itself in once /me answers and re-syncs after a save
+  // without an effect watching the query.
+  const [draft, setDraft] = useState<string | null>(null);
+  const saveName = useMutation({
+    mutationFn: (v: string) => api.updateMe({ public_display_name: v }),
+    onSuccess: () => { setDraft(null); invalidateNamed(); },
   });
   const on = !!me.data?.show_in_ranking;
+  const saved = me.data?.public_display_name ?? "";
+  const value = draft ?? saved;
+  const dirty = value.trim() !== saved;
+
+  function invalidateNamed() {
+    qc.invalidateQueries({ queryKey: ["me"] });
+    qc.invalidateQueries({ queryKey: ["volunteers"] });
+    // Bylines carry the name, so the lists that print them are stale too.
+    qc.invalidateQueries({ queryKey: ["annotations"] });
+  }
 
   return (
     <div style={{
@@ -131,10 +149,44 @@ function RankingOptIn() {
     }}>
       <input type="checkbox" id="show-in-ranking" checked={on} disabled={me.isLoading || toggle.isPending}
         onChange={(e) => toggle.mutate(e.target.checked)} style={{ marginTop: 2, cursor: "pointer" }} />
-      <label htmlFor="show-in-ranking" style={{ cursor: "pointer", flex: 1 }}>
-        <div style={{ fontSize: 12, fontWeight: 600 }}>{tr("vol.optInLabel")}</div>
-        <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 2, lineHeight: 1.5 }}>{tr("vol.optInHint")}</div>
-      </label>
+      {/* The name field is a sibling of the label, never inside it: a click on
+          an input nested in a <label> activates the label's control, so typing
+          your name there would toggle the opt-in off. */}
+      <div style={{ flex: 1 }}>
+        <label htmlFor="show-in-ranking" style={{ cursor: "pointer", display: "block" }}>
+          <div style={{ fontSize: 12, fontWeight: 600 }}>{tr("vol.optInLabel")}</div>
+          <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 2, lineHeight: 1.5 }}>{tr("vol.optInHint")}</div>
+        </label>
+        {/* Two questions, asked in order: whether to be named, then as what. The
+            second only means anything once the first is yes, so it appears with
+            it — and the placeholder shows what leaving it blank will publish. */}
+        {on && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <label htmlFor="public-name" style={{ fontSize: 11, color: t.fgMuted }}>{tr("vol.nameLabel")}</label>
+              <input
+                id="public-name"
+                value={value}
+                maxLength={60}
+                placeholder={me.data?.display_name ?? ""}
+                disabled={saveName.isPending}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && dirty) saveName.mutate(value.trim()); }}
+                style={{
+                  flex: 1, maxWidth: 260, fontSize: 12, padding: "3px 6px",
+                  background: t.bg, color: t.fg, border: `1px solid ${t.border}`,
+                  fontFamily: t.sans,
+                }}
+              />
+              <Button small disabled={!dirty || saveName.isPending}
+                onClick={() => saveName.mutate(value.trim())}>
+                {tr("vol.nameSave")}
+              </Button>
+            </div>
+            <div style={{ fontSize: 11, color: t.fgSubtle, marginTop: 4, lineHeight: 1.5 }}>{tr("vol.nameHint")}</div>
+          </div>
+        )}
+      </div>
       <Link to="/contributors" style={{ fontSize: 11, color: t.accent, textDecoration: "none", flexShrink: 0 }}>
         {tr("vol.viewAll")}
       </Link>

@@ -2,9 +2,10 @@
 
 The only annotation-side endpoint that does *not* require a session: the point
 is to recognise contributors publicly. Names are opt-in
-(``users.show_in_ranking``); everyone else is returned without a name and shown
-as "Contributor #<id>", so the board can be public without publishing anyone's
-identity by default.
+(``users.show_in_ranking``, applied through ``models.public_name`` — the same
+call every other named surface makes); everyone else is returned without a name
+and shown as "Contributor #<id>", so the board can be public without publishing
+anyone's identity by default.
 
 Aggregated in one GROUP BY over SQLite — never by counting rows client-side the
 way the dashboard does.
@@ -20,7 +21,7 @@ from sqlalchemy.orm import Session
 from fastapi import Depends
 
 from ..db import get_session
-from ..models import Annotation, User
+from ..models import Annotation, User, public_name
 
 router = APIRouter(prefix="/api", tags=["volunteers"])
 
@@ -49,7 +50,7 @@ def volunteers(
     n_records = func.count(distinct(Annotation.occurrence_id)).label("n_records")
 
     stmt = (
-        select(User.id, User.display_name, User.show_in_ranking,
+        select(User.id, User.display_name, User.public_display_name, User.show_in_ranking,
                n_submitted, n_accepted, n_records)
         .join(Annotation, Annotation.contributor_id == User.id)
         # Drafts are private working state — never counted, never ranked.
@@ -72,7 +73,7 @@ def volunteers(
                 "user_id": r.id,
                 # Withheld unless the volunteer opted in — the display name must
                 # not leave the server for anyone who hasn't.
-                "name": r.display_name if r.show_in_ranking else None,
+                "name": public_name(r),
                 "anonymous": not r.show_in_ranking,
                 "n_submitted": r.n_submitted,
                 "n_accepted": r.n_accepted,

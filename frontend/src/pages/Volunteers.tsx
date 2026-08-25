@@ -6,10 +6,12 @@ import { Icon } from "../design/Icon";
 import { api, getToken } from "../api/client";
 import type { VolunteerRange } from "../api/types";
 import { Spinner } from "../components/ui";
+import { contributorLabel } from "../contributors";
 
 // Public leaderboard. Ranked on accepted work, with submitted and distinct
 // records alongside so the table shows each volunteer's real shape. Names are
-// opt-in (users.show_in_ranking) — everyone else is "Contributor #<id>".
+// opt-in (users.show_in_ranking) — everyone else is "Unnamed contributor #<id>" —
+// and a volunteer who set a public name is listed under that, not their ORCID one.
 export function Volunteers() {
   const { t: tr } = useTranslation();
   const [range, setRange] = useState<VolunteerRange>("all");
@@ -105,7 +107,7 @@ function Row({ v, header, isMe }: {
       <span style={cells[0]}>{v.rank}</span>
       <span style={{ ...cells[1], color: v.anonymous ? t.fgSubtle : t.fg, fontStyle: v.anonymous ? "italic" : "normal" }}
         title={v.anonymous ? tr("vol.anonymousHint") : undefined}>
-        {v.anonymous ? `${tr("vol.anonymous")} #${v.user_id}` : v.name}
+        {contributorLabel(tr, v.name, v.user_id)}
       </span>
       <span style={{ ...cells[2], fontWeight: 600, color: t.ok }}>{v.n_accepted.toLocaleString()}</span>
       <span style={{ ...cells[3], color: t.fgMuted }}>{v.n_submitted.toLocaleString()}</span>

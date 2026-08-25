@@ -109,7 +109,8 @@ export const api = {
       method: "POST", body: JSON.stringify({ code }),
     }),
   me: () => request<import("./types").User>("/auth/me"),
-  updateMe: (patch: { show_in_ranking?: boolean; default_license?: string }) =>
+  // `public_display_name: ""` clears the chosen name back to the ORCID one.
+  updateMe: (patch: { show_in_ranking?: boolean; public_display_name?: string; default_license?: string }) =>
     request<import("./types").User>("/auth/me", { method: "PATCH", body: JSON.stringify(patch) }),
 
   // Public — no token needed.

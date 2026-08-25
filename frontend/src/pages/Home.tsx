@@ -7,6 +7,7 @@ import { Icon, type IconName } from "../design/Icon";
 import { api } from "../api/client";
 import { useAuth } from "../auth";
 import { emptyFilters, type Dataset, type SourceKind } from "../api/types";
+import { contributorLabel } from "../contributors";
 import { exploreUrl } from "./exploreUrl";
 
 // Landing page: introduces the platform, then offers two card grids that drill
@@ -203,7 +204,7 @@ function TopVolunteers() {
               flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               color: v.anonymous ? t.fgSubtle : t.fg, fontStyle: v.anonymous ? "italic" : "normal",
             }}>
-              {v.anonymous ? `${tr("vol.anonymous")} #${v.user_id}` : v.name}
+              {contributorLabel(tr, v.name, v.user_id)}
             </span>
             <span style={{ fontFamily: t.mono, fontSize: 11, fontWeight: 600, color: t.ok }}>{v.n_accepted.toLocaleString()}</span>
             <span style={{ fontSize: 10, color: t.fgSubtle }}>{tr("vol.accepted")}</span>
