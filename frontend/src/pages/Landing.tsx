@@ -29,6 +29,28 @@ const GAPS = [
   { key: "date", flags: { missing_date: true } },
 ] as const;
 
+// The queue draws from two herbaria rather than all 945 datasets: HAST and the
+// NMNS vascular-plant collection, 405,009 records between them, every one a
+// pressed sheet whose determination slip and locality label are legible in the
+// image we already have. That is what makes the three tasks *doable* from the
+// card — an unidentified insect drawer photo or a GBIF row with no sheet is a
+// dead end for a first-time visitor, and offering one is how the page loses
+// them. The whole store is still one click away under 進入完整佇列.
+//
+// Pinned by tbia_dataset_id, not resolved from registry.json by institution +
+// dataset code, because NMNS gives two datasets the same code `TNM` — 維管束學門
+// and 真菌學門 — so a code lookup would quietly pull in the fungi as well. These
+// are curated institution ids, which registry.json pins and an ETL refresh does
+// not churn (only the GBIF aggregator ids turn over).
+const SOURCES = [
+  { kind: "institutions", code: "BRMAS", id: "d691141ff8980195c477f429c" },  // HAST
+  { kind: "institutions", code: "NMNS", id: "d674d7dc7c3bd2c006cefad1d" },   // TNM 維管束學門
+] as const;
+
+const DATASET_IDS = SOURCES.map((s) => s.id);
+/** The same two, in the "kind:CODE/datasetId" form links into Explore carry. */
+const SOURCE_KEYS = SOURCES.map((s) => `${s.kind}:${s.code}/${s.id}`);
+
 type Gap = (typeof GAPS)[number]["key"];
 
 /** One drawn record plus the gap it was drawn for — the card names that gap's
@@ -43,6 +65,7 @@ interface Draw {
 const filtersFor = (gap: (typeof GAPS)[number]): Filters => ({
   ...emptyFilters(),
   has_media: true,
+  tbia_dataset_id: [...DATASET_IDS],
   ...gap.flags,
 });
 
@@ -122,8 +145,14 @@ export function Landing() {
             <Icon name="refresh" size={11} />{tr("landing.drawAgain")}
           </button>
           <Link to="/story" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.readStories")}</Link>
-          <Link to={exploreUrl({ flags: { missing_identification: true, has_media: true } })}
-            style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.runQueue")}</Link>
+          {/* Carries the same two sources as the cards, so "the whole queue" is
+              the pool they were drawn from rather than a wider one the visitor
+              never asked for. Serialised as sources, which Explore expands back
+              into dataset ids on arrival — writing both would let them drift. */}
+          <Link to={exploreUrl({
+            sources: [...SOURCE_KEYS],
+            flags: { missing_identification: true, has_media: true },
+          })} style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.runQueue")}</Link>
           <Link to="/browse" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.browseAll")}</Link>
         </div>
       </div>
