@@ -41,7 +41,7 @@ const en = {
   landing: {
     eyebrow: "Random tasks",
     headline: "{{n}} specimens need help",
-    blurb: "Help complete their digitization data",
+    blurb: "Data gaps in the digitization of natural history collections",
     task: {
       identification: "Confirm the identification",
       coordinates: "Add coordinates",
@@ -517,7 +517,7 @@ const zh: typeof en = {
   landing: {
     eyebrow: "隨機任務",
     headline: "{{n}} 份標本需要幫忙",
-    blurb: "幫忙補齊數位化資料",
+    blurb: "自然史典藏數位化的資料空缺",
     task: {
       identification: "確認鑑定",
       coordinates: "補上座標",
