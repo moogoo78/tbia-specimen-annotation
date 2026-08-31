@@ -264,6 +264,26 @@ function QueueCard({ draw, hover, onHover }: {
       </div>
 
       <div style={{ padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 5, flex: 1 }}>
+        {/* Who holds it, above its number — the two together are the specimen's
+            provenance, and the card asks a stranger to work on a real object in
+            a real cabinet. The code is a chip because it is short and scannable;
+            the name runs to 15 CJK characters, so it takes the rest of the row
+            and truncates, with the full string on hover. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+          {r.institution_code && (
+            <span style={{
+              flexShrink: 0, fontFamily: t.mono, fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
+              color: t.fgMuted, background: t.panelAlt, border: `1px solid ${t.borderSoft}`,
+              padding: "1px 4px", borderRadius: 2,
+            }}>{r.institution_code}</span>
+          )}
+          {r.institution_name && (
+            <span title={r.institution_name} style={{
+              flex: 1, minWidth: 0, fontSize: 10, color: t.fgSubtle,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>{r.institution_name}</span>
+          )}
+        </div>
         <div style={{ fontFamily: t.mono, fontSize: 10, color: t.fgSubtle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {r.catalog_number || "—"}
         </div>

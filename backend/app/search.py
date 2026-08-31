@@ -26,7 +26,7 @@ LIST_COLUMNS = [
     "id", "catalog_number", "scientific_name", "name_author", "common_name_c",
     "family", "genus", "taxon_rank", "bio_group", "kingdom_c", "county", "locality",
     "standard_latitude", "standard_longitude", DATE_COL, "year", "type_status",
-    "dataset_name", "recorded_by", "record_number",
+    "dataset_name", "institution_code", "institution_name", "recorded_by", "record_number",
     "has_coordinates", "has_date", "has_identification", "has_media",
     "completeness_score", "associated_media",
 ]

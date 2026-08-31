@@ -51,6 +51,9 @@ def _build_duckdb() -> None:
             county VARCHAR, municipality VARCHAR, locality VARCHAR, recorded_by VARCHAR, record_number VARCHAR,
             standard_latitude DOUBLE, standard_longitude DOUBLE, standard_date TIMESTAMP,
             event_date VARCHAR, type_status VARCHAR, dataset_name VARCHAR, tbia_dataset_id VARCHAR,
+            -- Added to `occurrence` by ingest/build.py from registry.json, not by the
+            -- export; the dataset table below carries the same pair.
+            institution_code VARCHAR, institution_name VARCHAR,
             basis_of_record VARCHAR, rights_holder VARCHAR, resource_contacts VARCHAR,
             associated_media VARCHAR, verbatim_latitude VARCHAR, verbatim_longitude VARCHAR,
             source_scientific_name VARCHAR
@@ -65,6 +68,9 @@ def _build_duckdb() -> None:
             [rid, cat, sci, rank, grp, county, loc, lat, lon, date, ds, ds,
              "PreservedSpecimen", media, sci or "Genus species"],
         )
+    con.execute(
+        "UPDATE occurrence SET institution_code = 'TEST', institution_name = 'Test Institution'"
+    )
     # recorded_by values exercising the collector parser/seeder.
     con.execute("UPDATE occurrence SET recorded_by = 'Pi-Fong Lu (呂碧鳳)' WHERE id='r1'")
     con.execute("UPDATE occurrence SET recorded_by = '呂碧鳳' WHERE id='r2'")  # same person
