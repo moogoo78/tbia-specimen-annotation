@@ -144,6 +144,12 @@ export function Landing() {
           }}>
             <Icon name="refresh" size={11} />{tr("landing.drawAgain")}
           </button>
+          {/* The navbar is hidden on this route, and it was the only way to the
+              guide. It belongs first among the links regardless: "how do I
+              actually do this?" is the question the three cards provoke and
+              cannot answer themselves. Reuses nav.guide rather than adding a
+              second key for the same word. */}
+          <Link to="/guide" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("nav.guide")}</Link>
           <Link to="/story" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.readStories")}</Link>
           {/* Carries the same two sources as the cards, so "the whole queue" is
               the pool they were drawn from rather than a wider one the visitor

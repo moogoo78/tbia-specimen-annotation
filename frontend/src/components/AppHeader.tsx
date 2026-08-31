@@ -15,6 +15,18 @@ export function AppHeader() {
   // it would just duplicate it.
   const showCookieLink = ANALYTICS_ENABLED && consent !== "unset";
 
+  // The landing page is one decision (see pages/Landing.tsx): three records,
+  // one action each. A row of ten destinations above it is precisely the choice
+  // that page exists to remove, so the tabs are dropped there and the escape
+  // hatches at the foot of the page carry the traffic instead.
+  //
+  // What stays is what is not a destination. The language toggle is how half
+  // this site's visitors can read the front door at all, and sign-in is how a
+  // returning contributor gets back to their work — neither competes with the
+  // decision, and a public landing page cannot assume, as the mockup this came
+  // from did, an English-speaking user who is already logged in.
+  const minimal = loc.pathname === "/";
+
   const toggleLang = () => {
     const next = i18n.language === "zh" ? "en" : "zh";
     i18n.changeLanguage(next);
@@ -40,9 +52,12 @@ export function AppHeader() {
       borderBottom: `1px solid ${t.border}`, background: t.panel, fontFamily: t.sans,
       display: "flex", alignItems: "stretch", height: 38, flexShrink: 0,
     }}>
+      {/* The rule separates the brand from the tabs; with no tabs it is a
+          divider to nothing, so it goes with them. */}
       <Link to="/" style={{
         display: "flex", alignItems: "center", gap: 8, padding: "0 12px",
-        borderRight: `1px solid ${t.borderSoft}`, textDecoration: "none", color: t.fg,
+        borderRight: minimal ? "none" : `1px solid ${t.borderSoft}`,
+        textDecoration: "none", color: t.fg,
       }}>
         <div style={{
           width: 18, height: 18, background: t.fg, color: t.bg, display: "flex",
@@ -51,19 +66,21 @@ export function AppHeader() {
         <span style={{ fontSize: 12, fontWeight: 600 }}>{tr("app.short")}</span>
       </Link>
 
-      <div style={{ display: "flex", alignItems: "stretch" }}>
-        {tab("/", tr("nav.home"))}
-        {tab("/browse", tr("nav.browse"))}
-        {tab("/explore", tr("nav.explore"))}
-        {tab("/species", tr("nav.species"))}
-        {tab("/institutions", tr("nav.institutions"))}
-        {tab("/collectors", tr("nav.collectors"))}
-        {/* The chronology is a topic of the story, so /history lights this tab. */}
-        {tab("/story", tr("nav.story"), STORY_TOPICS.map((topic) => topic.path))}
-        {tab("/contributors", tr("nav.volunteers"))}
-        {tab("/dashboard", tr("nav.dashboard"))}
-        {tab("/guide", tr("nav.guide"))}
-      </div>
+      {!minimal && (
+        <div style={{ display: "flex", alignItems: "stretch" }}>
+          {tab("/", tr("nav.home"))}
+          {tab("/browse", tr("nav.browse"))}
+          {tab("/explore", tr("nav.explore"))}
+          {tab("/species", tr("nav.species"))}
+          {tab("/institutions", tr("nav.institutions"))}
+          {tab("/collectors", tr("nav.collectors"))}
+          {/* The chronology is a topic of the story, so /history lights this tab. */}
+          {tab("/story", tr("nav.story"), STORY_TOPICS.map((topic) => topic.path))}
+          {tab("/contributors", tr("nav.volunteers"))}
+          {tab("/dashboard", tr("nav.dashboard"))}
+          {tab("/guide", tr("nav.guide"))}
+        </div>
+      )}
 
       <div style={{ flex: 1 }} />
 
