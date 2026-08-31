@@ -53,6 +53,7 @@ export function AppHeader() {
 
       <div style={{ display: "flex", alignItems: "stretch" }}>
         {tab("/", tr("nav.home"))}
+        {tab("/browse", tr("nav.browse"))}
         {tab("/explore", tr("nav.explore"))}
         {tab("/species", tr("nav.species"))}
         {tab("/institutions", tr("nav.institutions"))}

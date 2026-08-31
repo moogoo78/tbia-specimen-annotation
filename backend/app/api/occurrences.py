@@ -131,6 +131,21 @@ async def occurrence_facets(f: Filters = Depends(filters_dep)):
     return await search.facets(f)
 
 
+@router.get("/occurrences/queue")
+async def occurrence_queue(
+    f: Filters = Depends(filters_dep),
+    limit: int = Query(default=3, le=24),
+):
+    """A random draw from the records matching the filters — what the landing
+    page offers as "today's queue".
+
+    Deliberately absent from `cache.STATIC_ROUTES`: the response is a fresh
+    sample every time, so an edge cache would hand every visitor the same three
+    records for an hour and turn "draw three others" into a no-op.
+    """
+    return await search.queue(f, limit=limit)
+
+
 @router.get("/occurrences/{occ_id}")
 async def occurrence_detail(occ_id: str):
     record = await search.get_detail(occ_id)

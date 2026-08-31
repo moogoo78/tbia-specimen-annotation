@@ -67,6 +67,16 @@ export interface SearchResult {
   offset: number;
 }
 
+/** A random draw from the rows matching a filter (GET /api/occurrences/queue).
+ *  `total` is the pool drawn from, not the size of the draw — the landing page
+ *  shows how many records are waiting behind the ones on screen. There is no
+ *  `offset`: a random sample has no order to page through. */
+export interface QueueResult {
+  total: number;
+  items: OccurrenceRow[];
+  limit: number;
+}
+
 export interface FacetValue { value: string; count: number; }
 export interface FacetResult {
   bio_group: FacetValue[];

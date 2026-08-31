@@ -36,6 +36,14 @@
       }
     },
     {
+      "path": "/browse",
+      "title": { "en": "Browse the collection", "zh": "瀏覽典藏" },
+      "description": {
+        "en": "The whole store at a glance: every biological group and every holding institution, each opening the records behind it, alongside the four steps of the contribution loop and the top of the contributor board.",
+        "zh": "一次看完資料庫的全貌：所有生物類群與典藏機構，點入即可看到背後的標本紀錄，並附上貢獻流程的四個步驟與貢獻者排行前幾名。"
+      }
+    },
+    {
       "path": "/species",
       "title": { "en": "Species", "zh": "物種" },
       "description": {

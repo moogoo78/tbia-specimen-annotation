@@ -10,11 +10,15 @@ import { emptyFilters, type Dataset, type SourceKind } from "../api/types";
 import { contributorLabel } from "../contributors";
 import { exploreUrl } from "./exploreUrl";
 
-// Landing page: introduces the platform, then offers two card grids that drill
-// into Explore pre-faceted — by biological group (生物類群) or by holding
-// organization (組織單位). Both navigate to /explore carrying filter state that
-// Explore consumes once on arrival.
-export function Home() {
+// The hub: two card grids that drill into Explore pre-faceted — by biological
+// group (生物類群) or by holding organization (組織單位) — wrapped around the
+// contribution loop and the top of the contributor board. Both grids navigate
+// to /explore through exploreUrl(), carrying the filter state in the URL.
+//
+// This was the landing page at `/` until the queue-first Landing replaced it
+// there. Nothing about it changed but the route: it is still the overview of
+// what the store holds, and Landing's "browse everything" link is the way in.
+export function Browse() {
   const { t: tr } = useTranslation();
   const nav = useNavigate();
 

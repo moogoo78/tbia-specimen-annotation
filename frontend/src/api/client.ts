@@ -159,6 +159,13 @@ export const api = {
   },
   facets: (f: Filters) =>
     request<import("./types").FacetResult>(`/occurrences/facets?${filtersToParams(f)}`),
+  /** A random draw from the rows matching `f`. Uncached on the server by
+   *  design, so every call — every "draw three others" — is a fresh sample. */
+  queue: (f: Filters, limit = 3) => {
+    const p = filtersToParams(f);
+    p.set("limit", String(limit));
+    return request<import("./types").QueueResult>(`/occurrences/queue?${p}`);
+  },
   detail: (id: string) => request<import("./types").OccurrenceDetail>(`/occurrences/${id}`),
   datasets: (limit = 200) => request<import("./types").Dataset[]>(`/datasets?limit=${limit}`),
   registry: () => request<import("./types").Registry>(`/registry`),

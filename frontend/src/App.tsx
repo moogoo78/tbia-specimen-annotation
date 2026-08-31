@@ -4,7 +4,8 @@ import { usePageviews } from "./analytics";
 import { useSeo } from "./seo/useSeo";
 import { AppHeader } from "./components/AppHeader";
 import { CookieConsent } from "./components/CookieConsent";
-import { Home } from "./pages/Home";
+import { Landing } from "./pages/Landing";
+import { Browse } from "./pages/Browse";
 import { Explore } from "./pages/Explore";
 import { Species } from "./pages/Species";
 import { Institutions } from "./pages/Institutions";
@@ -33,7 +34,9 @@ export default function App() {
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: t.bg, color: t.fg, fontFamily: t.sans }}>
       <AppHeader />
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Landing />} />
+        {/* The hub that used to be the landing page — kept whole, moved here. */}
+        <Route path="/browse" element={<Browse />} />
         <Route path="/explore" element={<Explore />} />
         <Route path="/species" element={<Species />} />
         <Route path="/institutions" element={<Institutions />} />

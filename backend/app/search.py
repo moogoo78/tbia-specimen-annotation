@@ -237,6 +237,30 @@ async def search(f: Filters, *, sort: str, order: str, limit: int, offset: int) 
     return {"total": total, "items": items, "limit": limit, "offset": offset}
 
 
+async def queue(f: Filters, *, limit: int) -> dict:
+    """A random draw from the rows matching ``f`` — the landing page's queue.
+
+    ``ORDER BY random()`` rather than a random OFFSET: DuckDB answers it in
+    ~80ms over the whole gap pool, where paging that far into a sorted 2M-row
+    scan costs half a second. A random draw has no stable order, so there is no
+    ``offset`` — every call is a fresh sample, which is the point.
+
+    ``total`` is the size of the pool drawn from, not of the draw, so the page
+    can say how much is waiting behind the few records it is showing.
+    """
+    where, params = build_where(f)
+    cols = ", ".join(LIST_COLUMNS)
+    total = (await duck.query_one(f"SELECT count(*) AS n FROM {TABLE}{where}", params))["n"]
+    items = await duck.query(
+        f"SELECT {cols} FROM {TABLE}{where} ORDER BY random() LIMIT ?",
+        params + [limit],
+    )
+    for row in items:
+        media = parse_media(row.pop("associated_media", None))
+        row["thumbnail"] = media[0] if media else None
+    return {"total": total, "items": items, "limit": limit}
+
+
 async def facets(f: Filters, *, top: int = 20) -> dict:
     """Counts per facet value for the current filter, plus completeness gap counts."""
     where, params = build_where(f)

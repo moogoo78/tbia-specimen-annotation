@@ -3,7 +3,7 @@ import { initReactI18next } from "react-i18next";
 
 const en = {
   app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
-  nav: { home: "Home", explore: "Explore", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  nav: { home: "Home", browse: "Browse", explore: "Explore", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
   story: {
     title: "Data stories",
     blurb: "Topics that read the collection as a narrative rather than a result set: who went where, when, and what of it can still be found in the store today. Each topic works from a published source and queries the specimen data live.",
@@ -37,6 +37,25 @@ const en = {
     tripHint: "Records by {{who}} between {{from}} and {{to}}. Collector and date only — not a claim that this trip produced them.",
     noneHint: "No records in the store for these dates",
     speciesAbsent: "No record in the store carries this name",
+  },
+  landing: {
+    eyebrow: "Today's queue",
+    headline: "{{n}} records need you.",
+    blurb: "Pick one and work it to done. The rest of the collection will still be there.",
+    task: {
+      identification: "Confirm the identification",
+      coordinates: "Add coordinates",
+      date: "Add a collecting date",
+    },
+    unnamed: "Not yet identified",
+    waiting: "{{n}} waiting",
+    poolTitle: "Records in the store with this same gap",
+    drawAgain: "Draw three others",
+    readStories: "read a data story",
+    runQueue: "run the whole queue",
+    browseAll: "or browse everything",
+    drawEmpty: "Nothing is waiting right now.",
+    drawFailed: "Could not draw from the queue.",
   },
   home: {
     tagline: "Closing gaps in specimen metadata",
@@ -452,7 +471,7 @@ const en = {
 
 const zh: typeof en = {
   app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
-  nav: { home: "首頁", explore: "探索", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
+  nav: { home: "首頁", browse: "瀏覽", explore: "探索", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
   story: {
     title: "資料說故事",
     blurb: "以敘事的方式閱讀典藏，而不只是查詢結果：誰在何時去了哪裡，以及今天在資料庫裡還找得到什麼。每則故事都以已出版的文獻為本，並即時查詢標本資料。",
@@ -486,6 +505,25 @@ const zh: typeof en = {
     tripHint: "{{who}} 在 {{from}} 至 {{to}} 之間的紀錄。僅以採集者與日期對應，不代表這些標本出自本趟行程。",
     noneHint: "資料庫中查無這幾天的紀錄",
     speciesAbsent: "資料庫中沒有以此學名登錄的紀錄",
+  },
+  landing: {
+    eyebrow: "今日待辦",
+    headline: "有 {{n}} 筆紀錄需要你。",
+    blurb: "挑一筆，把它補到完。其餘的標本不會跑掉。",
+    task: {
+      identification: "確認鑑定",
+      coordinates: "補上座標",
+      date: "補上採集日期",
+    },
+    unnamed: "尚未鑑定",
+    waiting: "還有 {{n}} 筆",
+    poolTitle: "資料庫中同樣缺這一項的紀錄數",
+    drawAgain: "換三筆",
+    readStories: "讀資料故事",
+    runQueue: "進入完整佇列",
+    browseAll: "或瀏覽全部",
+    drawEmpty: "目前沒有待處理的紀錄。",
+    drawFailed: "無法取得待處理的紀錄。",
   },
   home: {
     tagline: "填補標本後設資料的缺口",
