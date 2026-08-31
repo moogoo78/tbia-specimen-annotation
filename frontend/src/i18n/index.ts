@@ -64,7 +64,6 @@ const en = {
       title: "Closing gaps in specimen metadata",
       p1: "Digitization of natural history collections is accelerating, but a gap persists: a great many records still carry no taxonomic identification, no coordinates, or no collection date. This platform ingests specimen data from the Taiwan Biodiversity Information Alliance (TBIA) and lets anyone find those gaps and close them \u2014 by hand, or by checking an AI-assisted transcription of the specimen's own label.",
       p2: "Reviewed annotations are returned to the institutions that published the records, to be merged back into their own databases. That loop also lowers the barrier for smaller collections: they can publish specimen images early and recruit contributors to supply the data, instead of waiting for staff time that may never arrive.",
-      ref: "The collaborative model follows the European DiSSCover initiative.",
     },
   },
   home: {
@@ -542,7 +541,6 @@ const zh: typeof en = {
       title: "填補標本後設資料的缺口",
       p1: "自然史典藏的數位化持續加速，缺口卻依然存在：大量標本紀錄至今仍沒有物種鑑定、沒有座標，或沒有採集日期。本平台匯入台灣生物多樣性資訊聯盟（TBIA）的標本資料，讓任何人都能找出這些缺口並補上——用人工，或核對 AI 對標本標籤的辨識結果。",
       p2: "審核通過的標註會回饋給發布該筆紀錄的典藏機構，併回他們自己的資料庫。這個循環也降低了小型典藏單位的門檻：他們可以先發布標本影像，再邀請貢獻者補齊資料，而不必等待可能永遠不會到來的人力。",
-      ref: "協作模式參考自歐洲的 DiSSCover 計畫。",
     },
   },
   home: {

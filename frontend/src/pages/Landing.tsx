@@ -232,12 +232,9 @@ function Intro() {
         <p style={{ fontSize: 13, color: t.fgMuted, lineHeight: 1.75, margin: "0 0 14px" }}>
           {tr("landing.intro.p2")}
         </p>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <Link to="/guide" style={{ fontSize: 12, color: t.accent, textDecoration: "none" }}>
-            {tr("home.viewGuide")} →
-          </Link>
-          <span style={{ fontSize: 11, color: t.fgSubtle }}>{tr("landing.intro.ref")}</span>
-        </div>
+        <Link to="/guide" style={{ fontSize: 12, color: t.accent, textDecoration: "none" }}>
+          {tr("home.viewGuide")} →
+        </Link>
       </div>
     </div>
   );
