@@ -3,7 +3,7 @@ import { initReactI18next } from "react-i18next";
 
 const en = {
   app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
-  nav: { home: "Home", explore: "Explore", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  nav: { home: "Home", browse: "Browse", explore: "Explore", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
   story: {
     title: "Data stories",
     blurb: "Topics that read the collection as a narrative rather than a result set: who went where, when, and what of it can still be found in the store today. Each topic works from a published source and queries the specimen data live.",
@@ -37,6 +37,33 @@ const en = {
     tripHint: "Records by {{who}} between {{from}} and {{to}}. Collector and date only — not a claim that this trip produced them.",
     noneHint: "No records in the store for these dates",
     speciesAbsent: "No record in the store carries this name",
+  },
+  landing: {
+    eyebrow: "Random tasks",
+    headline: "{{n}} specimens need help",
+    blurb: "Data gaps in the digitization of natural history collections",
+    task: {
+      identification: "Confirm the identification",
+      coordinates: "Add coordinates",
+      date: "Add a collecting date",
+    },
+    unnamed: "Not yet identified",
+    waiting: "{{n}} waiting",
+    poolTitle: "Records in the store with this same gap",
+    drawAgain: "Draw three others",
+    readStories: "read a data story",
+    browseAll: "or browse everything",
+    drawEmpty: "Nothing is waiting right now.",
+    drawFailed: "Could not draw from the queue.",
+    intro: {
+      statRecords: "specimen records",
+      statNoId: "no identification",
+      statNoGeo: "no coordinates",
+      statNoDate: "no collection date",
+      title: "Closing gaps in specimen metadata",
+      p1: "Digitization of natural history collections is accelerating, but a gap persists: a great many records still carry no taxonomic identification, no coordinates, or no collection date. This platform ingests specimen data from the Taiwan Biodiversity Information Alliance (TBIA) and lets anyone find those gaps and close them \u2014 by hand, or by checking an AI-assisted transcription of the specimen's own label.",
+      p2: "Reviewed annotations are returned to the institutions that published the records, to be merged back into their own databases. That loop also lowers the barrier for smaller collections: they can publish specimen images early and recruit contributors to supply the data, instead of waiting for staff time that may never arrive.",
+    },
   },
   home: {
     tagline: "Closing gaps in specimen metadata",
@@ -452,7 +479,7 @@ const en = {
 
 const zh: typeof en = {
   app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
-  nav: { home: "首頁", explore: "探索", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
+  nav: { home: "首頁", browse: "瀏覽", explore: "探索", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
   story: {
     title: "資料說故事",
     blurb: "以敘事的方式閱讀典藏，而不只是查詢結果：誰在何時去了哪裡，以及今天在資料庫裡還找得到什麼。每則故事都以已出版的文獻為本，並即時查詢標本資料。",
@@ -486,6 +513,33 @@ const zh: typeof en = {
     tripHint: "{{who}} 在 {{from}} 至 {{to}} 之間的紀錄。僅以採集者與日期對應，不代表這些標本出自本趟行程。",
     noneHint: "資料庫中查無這幾天的紀錄",
     speciesAbsent: "資料庫中沒有以此學名登錄的紀錄",
+  },
+  landing: {
+    eyebrow: "隨機任務",
+    headline: "{{n}} 份標本需要幫忙",
+    blurb: "自然史典藏數位化的資料空缺",
+    task: {
+      identification: "確認鑑定",
+      coordinates: "補上座標",
+      date: "補上採集日期",
+    },
+    unnamed: "尚未鑑定",
+    waiting: "還有 {{n}} 筆",
+    poolTitle: "資料庫中同樣缺這一項的紀錄數",
+    drawAgain: "換三筆",
+    readStories: "讀資料故事",
+    browseAll: "或瀏覽全部",
+    drawEmpty: "目前沒有待處理的紀錄。",
+    drawFailed: "無法取得待處理的紀錄。",
+    intro: {
+      statRecords: "筆標本紀錄",
+      statNoId: "缺少物種鑑定",
+      statNoGeo: "缺少座標",
+      statNoDate: "缺少採集日期",
+      title: "填補標本後設資料的缺口",
+      p1: "自然史典藏的數位化持續加速，缺口卻依然存在：大量標本紀錄至今仍沒有物種鑑定、沒有座標，或沒有採集日期。本平台匯入台灣生物多樣性資訊聯盟（TBIA）的標本資料，讓任何人都能找出這些缺口並補上——用人工，或核對 AI 對標本標籤的辨識結果。",
+      p2: "審核通過的標註會回饋給發布該筆紀錄的典藏機構，併回他們自己的資料庫。這個循環也降低了小型典藏單位的門檻：他們可以先發布標本影像，再邀請貢獻者補齊資料，而不必等待可能永遠不會到來的人力。",
+    },
   },
   home: {
     tagline: "填補標本後設資料的缺口",

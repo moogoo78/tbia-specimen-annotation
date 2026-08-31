@@ -17,6 +17,12 @@ export interface OccurrenceRow {
   year: number | null;
   type_status: string | null;
   dataset_name: string | null;
+  // Who holds the specimen, from the registry (backend/ingest/build.py), not
+  // from the export. `institution_code` is the holding body — BRMAS, NMNS —
+  // which is coarser than the collection: HAST and ASIZ are both BRMAS, and
+  // the collection's own code is `dataset_code`, not carried on a list row.
+  institution_code: string | null;
+  institution_name: string | null;
   recorded_by: string | null;
   record_number: string | null;
   has_coordinates: boolean;
@@ -65,6 +71,16 @@ export interface SearchResult {
   items: OccurrenceRow[];
   limit: number;
   offset: number;
+}
+
+/** A random draw from the rows matching a filter (GET /api/occurrences/queue).
+ *  `total` is the pool drawn from, not the size of the draw — the landing page
+ *  shows how many records are waiting behind the ones on screen. There is no
+ *  `offset`: a random sample has no order to page through. */
+export interface QueueResult {
+  total: number;
+  items: OccurrenceRow[];
+  limit: number;
 }
 
 export interface FacetValue { value: string; count: number; }

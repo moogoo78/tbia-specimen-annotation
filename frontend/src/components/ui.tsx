@@ -12,6 +12,42 @@ export function GroupTag({ group }: { group?: string | null }) {
   );
 }
 
+// `type_status` is not a yes/no column: 66 distinct values, and the two most
+// common — 一般標本 (56k) and General (39k) — say the specimen is *not* a type.
+// So do NotAType, Standard, 珍稀標本 and the 展示品 family, which are exhibition
+// status rather than nomenclature. Rendering any of those as a type designation
+// puts a red badge on ~99k ordinary records, which is why this is a shared
+// predicate and not an `r.type_status &&` at each call site.
+//
+// It is a denylist, not a list of the type ranks: the ranks run long (Holotype,
+// Paratype, Isosyntype, Paratopotype, 副選模標 …) and an unrecognised one is a
+// real designation we should still show. The non-types are the short, stable end.
+const NOT_A_TYPE = new Set(["general", "一般標本", "notatype", "standard", "珍稀標本"]);
+const NOT_A_TYPE_PREFIX = ["一般展示品", "保育類展示品", "展示品"];
+
+/** The type designation to display, or null when the value is not one.
+ *  Multi-valued cells ("Holotype;Holotype", "Isotype;Type") are split, deduped
+ *  and rejoined, since the raw string is what the provider packed. */
+export function typeDesignation(value?: string | null): string | null {
+  if (!value) return null;
+  const parts = [...new Set(value.split(";").map((s) => s.trim()).filter(Boolean))]
+    .filter((p) => !NOT_A_TYPE.has(p.toLowerCase())
+      && !NOT_A_TYPE_PREFIX.some((prefix) => p.startsWith(prefix)));
+  return parts.length ? parts.join(" · ") : null;
+}
+
+export function TypeTag({ value, filled }: { value?: string | null; filled?: boolean }) {
+  const label = typeDesignation(value);
+  if (!label) return null;
+  return (
+    <span style={{
+      fontSize: 9, fontWeight: 700, fontFamily: t.mono, letterSpacing: 0.3,
+      color: filled ? "#fff" : t.danger, background: filled ? t.danger : "transparent",
+      padding: filled ? "1px 4px" : 0, borderRadius: filled ? 2 : 0,
+    }}>{label.toUpperCase()}</span>
+  );
+}
+
 const STATUS_TONE: Record<string, string> = {
   draft: t.fgMuted, submitted: t.warn, accepted: t.ok, rejected: t.danger, merged: t.accent,
 };

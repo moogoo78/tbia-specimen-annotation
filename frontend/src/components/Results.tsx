@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { t } from "../design/tokens";
 import { api } from "../api/client";
 import type { OccurrenceRow } from "../api/types";
-import { CompletenessDots, GroupTag } from "./ui";
+import { CompletenessDots, GroupTag, TypeTag } from "./ui";
 import { exploreUrl } from "../pages/exploreUrl";
 
 // Collector name as a link: resolves the raw recorded_by to a collector on click
@@ -110,7 +110,7 @@ export function SplitList({ rows, activeId, onSelect }: {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 1 }}>
                 <GroupTag group={r.bio_group} />
-                {r.type_status && <span style={{ fontSize: 9, fontWeight: 700, color: t.danger, letterSpacing: 0.3, fontFamily: t.mono }}>{r.type_status.toUpperCase()}</span>}
+                <TypeTag value={r.type_status} />
                 <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted, marginLeft: "auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{r.catalog_number || "—"}</span>
               </div>
               <div style={{ fontSize: 12, lineHeight: 1.2, marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
