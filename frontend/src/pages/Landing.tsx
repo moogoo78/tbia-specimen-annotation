@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -95,9 +95,13 @@ export function Landing() {
 
   return (
     <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+      {/* Top-aligned rather than centred in the viewport. Centring left ~130px
+          of dead space above the eyebrow, which pushed the introduction below
+          the fold on a laptop screen — and an introduction nobody scrolls to is
+          one we did not write. This lets its top edge show. */}
       <div style={{
-        flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", padding: "48px 24px 40px", gap: 28,
+        display: "flex", flexDirection: "column", alignItems: "center",
+        padding: "44px 24px 36px", gap: 26,
       }}>
         <div style={{ textAlign: "center", maxWidth: 560 }}>
           <div style={{
@@ -160,6 +164,79 @@ export function Landing() {
             flags: { missing_identification: true, has_media: true },
           })} style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.runQueue")}</Link>
           <Link to="/browse" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.browseAll")}</Link>
+        </div>
+      </div>
+
+      <Intro />
+    </div>
+  );
+}
+
+// What the page is, under what it asks you to do.
+//
+// The queue answers "what should I do"; until now nothing on `/` answered "what
+// is this and why does it matter" — which the hub that used to live here did,
+// and which a public front door needs, since this is the page that gets crawled,
+// indexed and unfurled into chat. The shape follows DiSSCover's landing page
+// (disscover.dissco.eu), the initiative this platform's own TDWG abstract names
+// as its reference: the scale first, then the ask. The prose is condensed from
+// `tdwg-2026-abstract.md`, so the site and the abstract say the same thing.
+function Intro() {
+  const { t: tr } = useTranslation();
+
+  // The same query Browse runs, deliberately under the same key so moving
+  // between / and /browse pays for this rollup once. It scans ~2M rows, but the
+  // route is in cache.STATIC_ROUTES and edge-cached for an hour.
+  const base = useMemo(() => ({ ...emptyFilters(), has_media: false }), []);
+  const facets = useQuery({ queryKey: ["home-facets"], queryFn: () => api.facets(base) });
+  const c = facets.data?.completeness;
+
+  // Every figure links to the records behind it. `has_media: false` is stated on
+  // each one because exploreUrl() starts from emptyFilters(), whose has_media is
+  // true — without it the landing page would quote a number Explore then fails
+  // to reproduce.
+  const stats: { n?: number; label: string; to: string }[] = [
+    { n: c?.total, label: "statRecords", to: exploreUrl({ flags: { has_media: false } }) },
+    { n: c?.missing_identification, label: "statNoId", to: exploreUrl({ flags: { missing_identification: true, has_media: false } }) },
+    { n: c?.missing_coordinates, label: "statNoGeo", to: exploreUrl({ flags: { missing_coordinates: true, has_media: false } }) },
+    { n: c?.missing_date, label: "statNoDate", to: exploreUrl({ flags: { missing_date: true, has_media: false } }) },
+  ];
+
+  return (
+    <div style={{ background: t.panel, borderTop: `1px solid ${t.border}`, padding: "30px 24px 40px" }}>
+      <div style={{ maxWidth: 860, margin: "0 auto" }}>
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 12, marginBottom: 28,
+        }}>
+          {stats.map((s) => (
+            <Link key={s.label} to={s.to} style={{
+              display: "flex", flexDirection: "column", gap: 3, textDecoration: "none",
+              color: "inherit", padding: "8px 10px", background: t.panelAlt,
+              border: `1px solid ${t.borderSoft}`,
+            }}>
+              <span style={{ fontFamily: t.mono, fontSize: 19, fontWeight: 600, letterSpacing: -0.3 }}>
+                {s.n == null ? "—" : s.n.toLocaleString()}
+              </span>
+              <span style={{ fontSize: 11, color: t.fgSubtle, lineHeight: 1.4 }}>
+                {tr(`landing.intro.${s.label}`)}
+              </span>
+            </Link>
+          ))}
+        </div>
+
+        <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 10px" }}>{tr("landing.intro.title")}</h2>
+        <p style={{ fontSize: 13, color: t.fgMuted, lineHeight: 1.75, margin: "0 0 12px" }}>
+          {tr("landing.intro.p1")}
+        </p>
+        <p style={{ fontSize: 13, color: t.fgMuted, lineHeight: 1.75, margin: "0 0 14px" }}>
+          {tr("landing.intro.p2")}
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <Link to="/guide" style={{ fontSize: 12, color: t.accent, textDecoration: "none" }}>
+            {tr("home.viewGuide")} →
+          </Link>
+          <span style={{ fontSize: 11, color: t.fgSubtle }}>{tr("landing.intro.ref")}</span>
         </div>
       </div>
     </div>
