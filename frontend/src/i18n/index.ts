@@ -39,9 +39,9 @@ const en = {
     speciesAbsent: "No record in the store carries this name",
   },
   landing: {
-    eyebrow: "Today's queue",
-    headline: "{{n}} records need you.",
-    blurb: "Pick one and work it to done. The rest of the collection will still be there.",
+    eyebrow: "Random tasks",
+    headline: "{{n}} specimens need help",
+    blurb: "Help complete their digitization data",
     task: {
       identification: "Confirm the identification",
       coordinates: "Add coordinates",
@@ -515,9 +515,9 @@ const zh: typeof en = {
     speciesAbsent: "資料庫中沒有以此學名登錄的紀錄",
   },
   landing: {
-    eyebrow: "今日待辦",
-    headline: "有 {{n}} 筆紀錄需要你。",
-    blurb: "挑一筆，把它補到完。其餘的標本不會跑掉。",
+    eyebrow: "隨機任務",
+    headline: "{{n}} 份標本需要幫忙",
+    blurb: "幫忙補齊數位化資料",
     task: {
       identification: "確認鑑定",
       coordinates: "補上座標",
