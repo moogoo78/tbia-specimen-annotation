@@ -35,21 +35,19 @@ const GAPS = [
 // image we already have. That is what makes the three tasks *doable* from the
 // card — an unidentified insect drawer photo or a GBIF row with no sheet is a
 // dead end for a first-time visitor, and offering one is how the page loses
-// them. The whole store is still one click away under 進入完整佇列.
+// them. The whole store stays a click away through the figures in the
+// introduction below, each of which opens the records it counts.
 //
-// Pinned by tbia_dataset_id, not resolved from registry.json by institution +
-// dataset code, because NMNS gives two datasets the same code `TNM` — 維管束學門
-// and 真菌學門 — so a code lookup would quietly pull in the fungi as well. These
-// are curated institution ids, which registry.json pins and an ETL refresh does
-// not churn (only the GBIF aggregator ids turn over).
-const SOURCES = [
-  { kind: "institutions", code: "BRMAS", id: "d691141ff8980195c477f429c" },  // HAST
-  { kind: "institutions", code: "NMNS", id: "d674d7dc7c3bd2c006cefad1d" },   // TNM 維管束學門
-] as const;
-
-const DATASET_IDS = SOURCES.map((s) => s.id);
-/** The same two, in the "kind:CODE/datasetId" form links into Explore carry. */
-const SOURCE_KEYS = SOURCES.map((s) => `${s.kind}:${s.code}/${s.id}`);
+// Pinned by tbia_dataset_id, and deliberately nothing else: resolving these
+// from registry.json by institution + dataset code would quietly pull in the
+// fungi, because NMNS gives two of its datasets the same code `TNM` — 維管束學門
+// and 真菌學門. Ids rather than codes is the whole point, so ids are all this
+// holds. They are curated institution ids, which registry.json pins and an ETL
+// refresh does not churn (only the GBIF aggregator ids turn over).
+const DATASET_IDS = [
+  "d691141ff8980195c477f429c",  // BRMAS — HAST, 中央研究院生物多樣性中心植物標本館
+  "d674d7dc7c3bd2c006cefad1d",  // NMNS  — TNM 維管束學門
+];
 
 type Gap = (typeof GAPS)[number]["key"];
 
@@ -155,14 +153,6 @@ export function Landing() {
               second key for the same word. */}
           <Link to="/guide" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("nav.guide")}</Link>
           <Link to="/story" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.readStories")}</Link>
-          {/* Carries the same two sources as the cards, so "the whole queue" is
-              the pool they were drawn from rather than a wider one the visitor
-              never asked for. Serialised as sources, which Explore expands back
-              into dataset ids on arrival — writing both would let them drift. */}
-          <Link to={exploreUrl({
-            sources: [...SOURCE_KEYS],
-            flags: { missing_identification: true, has_media: true },
-          })} style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.runQueue")}</Link>
           <Link to="/browse" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.browseAll")}</Link>
         </div>
       </div>
