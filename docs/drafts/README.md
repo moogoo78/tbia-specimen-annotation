@@ -6,6 +6,7 @@ directory is documentation, and nothing here is read by the app or the build.
 | Draft | Where it actually ships |
 |---|---|
 | `ai-transcribe-walkthrough.zh-TW.md` | `/guide/ai-transcribe` — text in `frontend/src/i18n/index.ts` (`walk`) |
+| `begonia.md` | `/story/begonia` — transcribed into `data/story_begonia.json` |
 
 Why keep them at all: web copy is easier to write and review as Markdown than
 as TypeScript string literals, and a screenshot-heavy page is easier to lay out
