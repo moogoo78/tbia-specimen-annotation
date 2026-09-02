@@ -143,6 +143,19 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
   (remembered in `localStorage`): it changes what a thumbnail opens, never the thumbnail
   itself, so choosing 4096px costs no page weight. The copy-paste prompt still lists the
   export's own URLs.
+- **We send the image bytes; we do not hand the API a URL to fetch.** An `image`
+  block can name a URL instead, and that costs us no bandwidth — but it is only as
+  reliable as the least cooperative media host. NMNS's (`collections.culture.tw`,
+  157k records) defeats it twice: the export's `ShowGalImage.aspx` URL 302s to an
+  extensionless path, and the JPEG comes back as `Content-Type: image/jpg`, which is
+  not one of the four media types the API accepts. Either alone answers with the same
+  opaque *"Unable to connect to the remote server"* 400, after the call is billed.
+  `pipeline._image_blocks` therefore fetches each image, follows the redirect, and
+  states the media type itself. Its `_SSL` context is the third quirk of the same host:
+  the normal context minus `VERIFY_X509_STRICT` (chain, expiry and hostname still
+  checked), because that CA chain is missing a Subject Key Identifier and Python 3.13
+  rejects it by default. A fetch that fails **raises** — `process_one` records the real
+  reason on the request, which is the whole improvement over a 400 that named nothing.
 - **Every annotation carries the licence its contributor released it under**, and
   the rules are **iNaturalist's** — that is the deliberate reference point, not a
   coincidence. `models.LICENSES`: `CC0-1.0` / `CC-BY-4.0` / `CC-BY-NC-4.0`, SPDX ids

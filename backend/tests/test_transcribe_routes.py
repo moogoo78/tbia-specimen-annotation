@@ -46,6 +46,24 @@ class _Client:
     messages = _Messages()
 
 
+class _Fetched:
+    content = b"\xff\xd8\xffpixels"
+
+    def raise_for_status(self) -> "_Fetched":
+        return self
+
+
+class _HTTP:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def get(self, url: str) -> _Fetched:
+        return _Fetched()
+
+
 @pytest.fixture
 def stub_claude(monkeypatch):
     # The key too, not just the client: `pipeline._client()` refuses before it
@@ -53,6 +71,9 @@ def stub_claude(monkeypatch):
     # whether the machine running it happens to have a real key in .env.
     monkeypatch.setattr(pipeline.settings, "anthropic_api_key", "test-key")
     monkeypatch.setattr(pipeline.anthropic, "Anthropic", lambda *a, **k: _Client())
+    # Images travel as bytes now, so a transcription reads its record's media
+    # before it ever reaches Claude — and these records' URLs are fictional.
+    monkeypatch.setattr(pipeline.httpx, "Client", lambda **kw: _HTTP())
 
 
 @pytest.fixture(autouse=True)

@@ -19,10 +19,14 @@ parser), so the pipeline and the manual flow stay in lockstep.
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
+import ssl
 from datetime import datetime, timezone
 
 import anthropic
+import certifi
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -246,11 +250,45 @@ def _image_urls(record: dict) -> list[str]:
     return [media.at_size(u, settings.ocr_image_size) for u in urls]
 
 
+# collections.culture.tw (NMNS, 157k records) presents a CA chain that Python
+# 3.13's default strict X.509 check rejects, for a missing Subject Key
+# Identifier — a formatting defect in a government CA, not evidence about who we
+# are talking to. Chain, expiry and hostname are still verified, here and
+# everywhere else; curl and every browser accept the same chain.
+_SSL = ssl.create_default_context(cafile=certifi.where())
+_SSL.verify_flags &= ~ssl.VERIFY_X509_STRICT
+
+
 def _image_blocks(image_urls: list[str]) -> list[dict]:
-    """One `image` content block per URL, in order — the API takes several in a
-    single user message, and the prompt that follows them explains that they are
-    one specimen."""
-    return [{"type": "image", "source": {"type": "url", "url": url}} for url in image_urls]
+    """One `image` content block per URL, in order, carrying the bytes we read.
+
+    The API takes several in a single user message, and the prompt that follows
+    them explains that they are one specimen.
+
+    An `image` block can name a URL for the API to fetch instead, which costs us
+    no bandwidth — but it is only as reliable as the least cooperative media
+    host, and NMNS's defeats it twice: the export's `ShowGalImage.aspx` URL 302s
+    to an extensionless path, and the JPEG comes back labelled
+    `Content-Type: image/jpg`, which is not one of the four media types the API
+    accepts. Either alone answers with the same opaque
+    *"Unable to connect to the remote server"* 400, after the call is billed.
+
+    Fetching here settles both: we follow the redirect, and we say what the
+    bytes are rather than repeating what the server claimed. A fetch that fails
+    raises, and `process_one` records the real reason on the request — which is
+    the point, since the failure it replaces named nothing at all."""
+    blocks = []
+    with httpx.Client(follow_redirects=True, timeout=30.0, verify=_SSL) as client:
+        for url in image_urls:
+            data = client.get(url).raise_for_status().content
+            blocks.append({"type": "image", "source": {
+                "type": "base64",
+                # The export is JPEG throughout; PNG is the only other thing a
+                # source has any business serving here.
+                "media_type": "image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg",
+                "data": base64.standard_b64encode(data).decode("ascii"),
+            }})
+    return blocks
 
 
 async def process_one(db: Session, req: TranscribeRequest) -> int:
