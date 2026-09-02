@@ -68,6 +68,21 @@ const ANNOTATABLE_GROUPS: { labelKey: string; fields: FieldDef[] }[] = [
 ];
 const ALL_FIELDS: FieldDef[] = ANNOTATABLE_GROUPS.flatMap((g) => g.fields);
 
+// A transcription offered to the form. Either route produces one: the platform's
+// own AI (stored on the record's transcribe request, so it survives a reload) or
+// the contributor's own AI chat (parsed from a paste). Neither is a contribution
+// — an annotation exists only once a person submits one.
+type Proposal = {
+  fields: ExtractedField[];
+  model: string | null;
+  service?: string | null;
+  extracted_at?: string | null;
+};
+type ProposalMeta = { confidence?: number | null; model?: string | null };
+// What the AI said for a field the contributor is now editing. Kept even when
+// they agree with it: "agreed" and "no AI involved" are different facts.
+type AiSeed = { value: string; confidence: number | null; model: string | null };
+
 
 // Composite widgets keep their parts under dotted sub-keys in the values map;
 // these turn the sub-keys into the single string that gets submitted.
@@ -351,9 +366,24 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   );
   // Proposed values keyed by field — many fields can be edited at once.
   const [values, setValues] = useState<Record<string, string>>({});
-  // AI value that was applied into a field (from a draft). Lets submit tell
-  // apart ai (kept verbatim), mixed (AI value then edited), manual (typed).
-  const [aiSeed, setAiSeed] = useState<Record<string, string>>({});
+  // What the AI proposed for a field that was seeded from it, kept beside the
+  // editable value. Lets submit tell apart ai (kept verbatim), mixed (AI value
+  // then edited) and manual (typed) — and lets it send the AI's own value along,
+  // so a correction is stored as data rather than inferred from a label.
+  const [aiSeed, setAiSeed] = useState<Record<string, AiSeed>>({});
+  // A transcription the contributor pasted back from their own AI chat (route
+  // B). It wins over the stored server-side proposal while it is on screen: it
+  // is the newer answer, and an explicit act rather than something that arrived.
+  const [pasted, setPasted] = useState<Proposal | null>(null);
+  // The proposal in force: whichever of the two the contributor is working from.
+  // The server-side one lives on the record (transcribe.fields), so it survives
+  // a reload and reaches whoever comes back for it later.
+  const proposal: Proposal | null = useMemo(() => {
+    if (pasted) return pasted;
+    const q = record.transcribe;
+    if (!q || !q.fields || q.fields.length === 0) return null;
+    return { fields: q.fields, model: q.model, service: q.service, extracted_at: q.processed_at };
+  }, [pasted, record.transcribe]);
   const [note, setNote] = useState("");
   // Terms this submission is released under. Applies to every field submitted
   // in one click — the form writes one annotation per filled field, and they
@@ -408,33 +438,120 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   const sourceFor = (name: string, value: string): string => {
     const seed = aiSeed[name];
     if (seed === undefined) return "manual";
-    return value === seed ? "ai" : "mixed";
+    return value === seed.value ? "ai" : "mixed";
   };
-  // Record that a field was seeded from an AI draft (used by sourceFor).
-  const seed = (name: string, value: string) => setAiSeed((s) => ({ ...s, [name]: value }));
+  // Record that a field was seeded from an AI proposal (used by sourceFor, and
+  // sent with the submission as ai_value / ai_confidence / ai_model).
+  const seed = (name: string, value: string, meta?: ProposalMeta) =>
+    setAiSeed((s) => ({
+      ...s,
+      [name]: { value, confidence: meta?.confidence ?? null, model: meta?.model ?? null },
+    }));
 
-  // Apply an AI draft into the form. Most fields are a plain string, but the
+  // Apply an AI proposal into the form. Most fields are a plain string, but the
   // eventDate composite must be split into its year/month/day sub-inputs;
   // seed the serialized (padded) form so sourceFor still classifies it "ai".
-  const applyDraft = (name: string, value: string) => {
-    if (name !== "eventDate") { setVal(name, value); seed(name, value); return; }
+  const applyDraft = (name: string, value: string, meta?: ProposalMeta) => {
+    if (name !== "eventDate") { setVal(name, value); seed(name, value, meta); return; }
     const m = value.trim().match(/^(\d{4})(?:[-/.](\d{1,2}))?(?:[-/.](\d{1,2}))?/);
     const y = m?.[1] ?? "";
     const mo = m?.[2] ? String(parseInt(m[2], 10)) : "";
     const d = m?.[3] ? String(parseInt(m[3], 10)) : "";
     setValues((s) => ({ ...s, "eventDate.y": y, "eventDate.mo": mo, "eventDate.d": d }));
-    seed(name, y ? `${y.padStart(4, "0")}-${(mo || "").padStart(2, "0")}-${(d || "").padStart(2, "0")}` : "");
+    seed(name, y ? `${y.padStart(4, "0")}-${(mo || "").padStart(2, "0")}-${(d || "").padStart(2, "0")}` : "", meta);
+  };
+  // Apply one proposed field, and bring its class tab forward so the value is
+  // where the contributor is looking rather than behind a tab.
+  const useProposed = (f: ExtractedField) => {
+    applyDraft(f.field, f.value, { confidence: f.confidence, model: proposal?.model ?? null });
+    const g = groupOf(f.field); if (g) setActiveGroup(g);
   };
 
+  // Empty every field still holding its AI value verbatim, and forget the seed.
+  // Only those: a value the contributor edited is theirs now, and clearing it
+  // would throw away work rather than an AI's suggestion.
+  const clearAi = () => {
+    const drop = ALL_FIELDS.filter((fd) => {
+      const s = aiSeed[fd.name];
+      return s !== undefined && serializeField(fd, values) === s.value;
+    });
+    if (drop.length === 0) return;
+    setValues((v) => {
+      const next = { ...v };
+      for (const fd of drop) {
+        if (fd.widget === "date") { next["eventDate.y"] = ""; next["eventDate.mo"] = ""; next["eventDate.d"] = ""; }
+        else if (fd.widget === "dms") { for (const part of ["deg", "min", "sec"]) next[`${fd.name}.${part}`] = ""; }
+        else next[fd.name] = "";
+        if (fd.decimalField) next[fd.decimalField] = "";
+      }
+      return next;
+    });
+    setAiSeed((s) => {
+      const next = { ...s };
+      for (const fd of drop) delete next[fd.name];
+      return next;
+    });
+  };
+
+  // ── Auto-fill ─────────────────────────────────────────────────────────────
+  // A proposal lands in the widgets rather than waiting behind a button: the
+  // contributor's job is to read the label and decide, and an empty form with a
+  // list beside it makes them copy before they can judge.
+  //
+  // Twice never, though. It fills only fields that are *empty* — never over
+  // typing, and never back into something deliberately cleared — and only once
+  // per distinct proposal, so a poll or a re-render cannot undo an edit. A field
+  // this contributor already submitted from the same AI value is skipped too:
+  // coming back to a record should not re-offer work already done.
+  const autoFilled = useRef<string>("");
+  const proposalSig = proposal ? proposal.fields.map((f) => `${f.field}=${f.value}`).join("|") : "";
+  useEffect(() => {
+    if (!proposal || proposalSig === autoFilled.current) return;
+    autoFilled.current = proposalSig;
+    const acted = new Set(
+      record.annotations
+        .filter((a) => a.contributor_id === user?.id && a.ai_value != null)
+        .map((a) => `${a.field}=${a.ai_value}`)
+    );
+    const got: string[] = [];
+    for (const f of proposal.fields) {
+      const fd = ALL_FIELDS.find((x) => x.name === f.field);
+      if (!fd || serializeField(fd, values) !== "") continue;
+      if (acted.has(`${f.field}=${f.value}`)) continue;
+      applyDraft(f.field, f.value, { confidence: f.confidence, model: proposal.model ?? null });
+      const g = groupOf(f.field);
+      if (g && !got.includes(g)) got.push(g);
+    }
+    // Which tab to leave them on. Stay where the panel already is if that class
+    // got something — it was chosen from the record's own gap, which is why the
+    // contributor is here. Otherwise the first class that did, skipping "other":
+    // full_text leads every transcription, so following the proposal's order
+    // blindly would always land on the whole-label textarea and hide the fields.
+    const next = got.includes(activeGroup) ? activeGroup
+      : got.find((g) => g !== "annotate.grpOther") ?? got[0];
+    if (next) setActiveGroup(next);
+    // `values` is read, not tracked: re-running on every keystroke is exactly
+    // what the signature guard above exists to prevent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposalSig, record.annotations, user?.id, activeGroup]);
+
   const createMut = useMutation({
-    mutationFn: (status: string) => Promise.all(filled.map(({ fd, value }) =>
-      api.createAnnotation(record.id, {
+    mutationFn: (status: string) => Promise.all(filled.map(({ fd, value }) => {
+      const ai = aiSeed[fd.name];
+      return api.createAnnotation(record.id, {
         field: fd.name, proposed_value: value, original_value: originalFor(record, fd.name),
         note: note || null,
+        // The AI's own answer travels with the human's. Sent whether or not they
+        // differ — agreement is as much a measurement of the transcription as a
+        // correction is, and only the pair says which one this row records.
         source: sourceFor(fd.name, value),
+        ai_value: ai?.value ?? null,
+        ai_confidence: ai?.confidence ?? null,
+        ai_model: ai?.model ?? null,
         status, license,
-      }))),
-    onSuccess: () => { setValues({}); setAiSeed({}); setNote(""); refresh(); },
+      });
+    })),
+    onSuccess: () => { setValues({}); setAiSeed({}); setNote(""); setPasted(null); refresh(); },
   });
   const reviewMut = useMutation({
     mutationFn: ({ annId, status }: { annId: number; status: string }) => api.updateAnnotation(annId, { status }),
@@ -468,10 +585,19 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
         <Icon name="spark" size={11} />{tr("annotate.title")}
       </div>
       <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-        <AiAssist record={record} onUse={(field, value) => {
-          applyDraft(field, value);
-          const g = groupOf(field); if (g) setActiveGroup(g);
-        }} />
+        <AiAssist record={record} onProposal={setPasted} />
+
+        {/* The proposal, kept on screen after it has been poured into the form:
+            it is how a field the auto-fill skipped (one already filled, one
+            already submitted) can still be applied by hand, and how a value can
+            be checked against what the AI actually said after an edit. */}
+        {proposal && (
+          <ProposalList p={proposal} onUse={useProposed}
+            onClear={clearAi} clearable={ALL_FIELDS.some((fd) => {
+              const seeded = aiSeed[fd.name];
+              return seeded !== undefined && serializeField(fd, values) === seeded.value;
+            })} />
+        )}
 
         {/* manual form — class tabs, each editing all its fields at once */}
         <div style={{ borderTop: `1px solid ${t.borderSoft}`, paddingTop: 8 }}>
@@ -502,7 +628,10 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
               <div key={fd.name} style={{ marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 3 }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: t.fgMuted }}>{tr(`fields.${fd.name}`, fd.name)}</span>
-                  {serializeField(fd, values) !== "" && <SourceTag source={sourceFor(fd.name, serializeField(fd, values))} />}
+                  {serializeField(fd, values) !== "" && (
+                    <SourceTag source={sourceFor(fd.name, serializeField(fd, values))}
+                      confidence={aiSeed[fd.name]?.confidence ?? null} />
+                  )}
                   {orig != null && (
                     <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                       title={orig}>{tr("annotate.current")}: {orig}</span>
@@ -603,16 +732,17 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
 //      submitted annotations (arrives later, shows up in History).
 //   B. do it yourself — copy the prompt into your own AI chat, paste the JSON
 //      reply back (no platform API cost, results land in the form immediately).
-// `onUse` loads one proposed value into the manual form below.
-function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: string, value: string) => void }) {
+// Neither route contributes anything: both end in a *proposal* the contributor
+// reads, edits and submits — `onProposal` hands route B's up to the form (route
+// A's arrives on the record itself, so it survives a reload).
+function AiAssist({ record, onProposal }: {
+  record: OccurrenceDetail; onProposal: (p: Proposal) => void;
+}) {
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
   const [open, setOpen] = useState<"queue" | "paste" | null>(null);
   const [pasteRaw, setPasteRaw] = useState("");
   const [copied, setCopied] = useState(false);
-  const [drafts, setDrafts] = useState<ExtractedField[]>([]);
-  // Provenance of the last pasted AI draft: service · model (date).
-  const [prov, setProv] = useState<{ model: string; service?: string | null; extracted_at?: string | null } | null>(null);
 
   const hasImage = record.media.length > 0;
   const q = record.transcribe;   // durable queue state (survives reload)
@@ -650,7 +780,9 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
   const pasteMut = useMutation({
     mutationFn: () => api.extractPaste(record.id, pasteRaw),
     onSuccess: (res) => {
-      setDrafts(res.fields); setProv({ model: res.model, service: res.service, extracted_at: res.extracted_at });
+      onProposal({
+        fields: res.fields, model: res.model, service: res.service, extracted_at: res.extracted_at,
+      });
       setOpen(null); setPasteRaw("");
     },
   });
@@ -734,7 +866,7 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
             <div style={{ fontSize: 10, color: nowMut.data.status === "failed" ? t.danger : t.ok }}>
               {nowMut.data.status === "failed"
                 ? `${tr("annotate.qFailed")} — ${nowMut.data.error ?? ""}`
-                : tr("annotate.nowDone", { n: nowMut.data.n_annotations })}
+                : tr("annotate.nowDone", { n: nowMut.data.n_fields })}
             </div>
           )}
           {nowMut.isPending && <div style={{ fontSize: 10, color: t.warn }}>{tr("annotate.nowRunning")}</div>}
@@ -805,32 +937,42 @@ function AiAssist({ record, onUse }: { record: OccurrenceDetail; onUse: (field: 
         </OptionCard>
       </div>
 
-      {/* proposals from route B — route A's land in History instead */}
-      {drafts.length > 0 && (
-        <div style={{ borderTop: `1px solid ${t.borderSoft}`, padding: 8, background: t.panel }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-            <span style={{ fontSize: 11, fontWeight: 600 }}>{tr("annotate.draftsTitle")} · {drafts.length}</span>
-            <div style={{ flex: 1 }} />
-            {drafts.length > 1 && (
-              <Button small onClick={() => drafts.forEach((d) => onUse(d.field, d.value))}>{tr("annotate.applyAll")}</Button>
-            )}
-          </div>
-          <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.5, marginBottom: 6 }}>{tr("annotate.draftsHint")}</div>
-          {prov && (
-            <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginBottom: 4 }}>
-              {[prov.service, prov.model].filter(Boolean).join(" · ")}{prov.extracted_at ? `, ${prov.extracted_at}` : ""}
-            </div>
-          )}
-          {drafts.map((d, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", marginBottom: 3, background: t.panelAlt, border: `1px solid ${t.borderSoft}`, fontSize: 11 }}>
-              <span style={{ fontSize: 10, color: t.fgMuted, width: 78, flexShrink: 0 }} title={d.field}>{tr(`fields.${d.field}`, d.field)}</span>
-              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.value}>{d.value}</span>
-              <span style={{ fontSize: 9, color: t.ok, fontFamily: t.mono }} title={tr("annotate.confidence")}>{Math.round(d.confidence * 100)}%</span>
-              <Button small onClick={() => onUse(d.field, d.value)}>{tr("annotate.apply")}</Button>
-            </div>
-          ))}
+    </div>
+  );
+}
+
+// The transcription, listed beside the form it has already been poured into.
+// Not a queue of things to accept — the values are in the widgets — but the
+// record of what the AI said: what it was sure about, and what it proposed for a
+// field the auto-fill left alone because the contributor was already working in
+// it, or had already submitted from the same proposal.
+function ProposalList({ p, onUse, onClear, clearable }: {
+  p: Proposal; onUse: (f: ExtractedField) => void; onClear: () => void; clearable: boolean;
+}) {
+  const { t: tr } = useTranslation();
+  return (
+    <div style={{ border: `1px solid ${t.borderSoft}`, background: t.panel, padding: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+        <span style={{ fontSize: 11, fontWeight: 600 }}>{tr("annotate.draftsTitle")} · {p.fields.length}</span>
+        <div style={{ flex: 1 }} />
+        {clearable && <Button small onClick={onClear}>{tr("annotate.clearAi")}</Button>}
+        {p.fields.length > 1 && (
+          <Button small onClick={() => p.fields.forEach(onUse)}>{tr("annotate.applyAll")}</Button>
+        )}
+      </div>
+      <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.5, marginBottom: 6 }}>{tr("annotate.draftsHint")}</div>
+      <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginBottom: 4 }}>
+        {[p.service, p.model].filter(Boolean).join(" · ")}
+        {p.extracted_at ? `, ${String(p.extracted_at).slice(0, 16).replace("T", " ")}` : ""}
+      </div>
+      {p.fields.map((d, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 6px", marginBottom: 3, background: t.panelAlt, border: `1px solid ${t.borderSoft}`, fontSize: 11 }}>
+          <span style={{ fontSize: 10, color: t.fgMuted, width: 78, flexShrink: 0 }} title={d.field}>{tr(`fields.${d.field}`, d.field)}</span>
+          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.value}>{d.value}</span>
+          <span style={{ fontSize: 9, color: t.ok, fontFamily: t.mono }} title={tr("annotate.confidence")}>{Math.round(d.confidence * 100)}%</span>
+          <Button small onClick={() => onUse(d)}>{tr("annotate.apply")}</Button>
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -915,7 +1057,7 @@ function QueueStatus({ q }: { q: NonNullable<OccurrenceDetail["transcribe"]> }) 
 
 // Value provenance: ai (kept verbatim) · mixed (AI, then human-edited) ·
 // manual (typed). Legacy rows may be blank → treated as manual (no tag).
-function SourceTag({ source }: { source: string }) {
+function SourceTag({ source, confidence }: { source: string; confidence?: number | null }) {
   const { t: tr } = useTranslation();
   if (source !== "ai" && source !== "mixed") return null;
   const tone = source === "ai" ? t.accent : t.warn;
@@ -925,6 +1067,9 @@ function SourceTag({ source }: { source: string }) {
       fontFamily: t.mono, color: tone, border: `1px solid ${tone}`, padding: "0 3px",
     }}>
       <Icon name="spark" size={8} />{tr(`annotate.src_${source}`)}
+      {/* How sure the model was about the value now sitting in the widget —
+          the one number that says which proposals to read twice. */}
+      {confidence != null && <span title={tr("annotate.confidence")}>{Math.round(confidence * 100)}%</span>}
     </span>
   );
 }

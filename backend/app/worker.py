@@ -27,7 +27,7 @@ async def _run(limit: int | None) -> None:
     finally:
         duck.close()
     logging.getLogger("worker").info(
-        "transcribed: %(done)s done, %(failed)s failed, %(annotations)s annotations "
+        "transcribed: %(done)s done, %(failed)s failed, %(fields)s fields proposed "
         "(%(requests)s pending picked up)", summary,
     )
     print(summary)

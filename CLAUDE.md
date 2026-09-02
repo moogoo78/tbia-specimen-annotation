@@ -193,12 +193,36 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
   `transcribe_requests` row and pings Discord so a human knows to run `make transcribe`;
   `POST /occurrences/{id}/transcribe-now` writes the same row and then calls
   `pipeline.process_one` inline — no Discord ping, since it has already been drained.
-  Both end in `ai` annotation drafts (`status="submitted"`), so a record looks identical
-  afterwards whichever ran it. A pipeline failure on the run-now route is **not** a 500 —
+  Both end in the same place — the transcription stored on the request that asked for it
+  (`transcribe_requests.result_json`) — so a record looks identical afterwards whichever
+  ran it. A pipeline failure on the run-now route is **not** a 500 —
   `process_one` records it and the response carries `status="failed"` + `error`, exactly
   as the worker would. `process_one` runs the (synchronous) Anthropic call through
   `asyncio.to_thread`, which is what stops one admin's 30-second transcription from
   stalling every other request the API is serving.
+- **An AI transcription is a proposal, not a contribution — nothing the model reads is
+  attributed to anyone until a person submits it.** `pipeline.process_one` stores the
+  whole `ExtractResponse` on the request and writes no annotations (there is no
+  `build_annotations` any more; `import_results.py` lands its files the same way). The
+  record detail serves it back as `transcribe.fields`, and the record page **auto-fills
+  the annotation form** with it: only fields still empty, only once per proposal, and
+  never one this contributor already submitted from the same AI value — so it can never
+  overwrite typing or re-offer work already done. The panel keeps listing the proposal
+  beside the form, because a field the auto-fill skipped still has to be reachable by
+  hand. The copy-paste route (option 2) already worked this way and is unchanged; it now
+  feeds the same `proposal` state.
+  - **A submission records what the AI said next to what the person sent.**
+    `annotations.ai_value` + `ai_confidence` + `ai_model`, beside the `source` the form
+    already computed (`ai` kept verbatim / `mixed` edited / `manual` typed). Sent whether
+    or not they differ, because "a person read it and agreed" and "no AI was involved"
+    are different facts, and `ai_value != proposed_value` is the only record of what
+    human judgement actually corrected. Null on a manual row. That pair is the reason the
+    whole change exists: it is the measurement of how well the transcription reads a
+    label, and the old flow lost it in the edit.
+  - Unused proposals are kept too — an untouched transcription is still evidence of what
+    the model reads, and is what a correction rate is measured against.
+  - Rows written by the old flow (`source="ai"`, `status="submitted"`, no `ai_value`) are
+    left exactly as they are: real history, still reviewable. Nothing new creates them.
 - **Which route a click takes is one system-wide setting, not a per-caller choice.**
   `app/policy.py` holds it in `app_settings` (annotation store, so it is durable and
   backed up): `queue` (the default) or `now`. An **admin** moves it from the Dashboard

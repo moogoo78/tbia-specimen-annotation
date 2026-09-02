@@ -43,6 +43,38 @@ def test_annotation_lifecycle_and_role_gating(client):
     assert any(a["id"] == ann_id and a["status"] == "accepted" for a in detail["annotations"])
 
 
+def test_a_correction_keeps_what_the_ai_said(client):
+    """The point of storing `ai_value`: an edited AI value is the one measurement
+    of how well the transcription reads a label, and it is only visible as a pair
+    — what the model proposed next to what the person actually sent."""
+    cur = auth_header(client, CURATOR)
+
+    corrected = client.post("/api/occurrences/r2/annotations", headers=cur, json={
+        "field": "locality", "proposed_value": "野柳", "source": "mixed",
+        "ai_value": "野柳村", "ai_confidence": 0.72, "ai_model": "stub-model",
+        "status": "submitted",
+    }).json()
+    assert corrected["source"] == "mixed"
+    assert corrected["ai_value"] == "野柳村" and corrected["proposed_value"] == "野柳"
+    assert corrected["ai_confidence"] == 0.72 and corrected["ai_model"] == "stub-model"
+
+    # Agreement is stored the same way: `ai_value` equal to the submitted value
+    # says a person read it and kept it, which is not the same fact as "no AI".
+    kept = client.post("/api/occurrences/r2/annotations", headers=cur, json={
+        "field": "recordNumber", "proposed_value": "1234", "source": "ai",
+        "ai_value": "1234", "ai_confidence": 0.95, "ai_model": "stub-model",
+        "status": "submitted",
+    }).json()
+    assert kept["source"] == "ai" and kept["ai_value"] == kept["proposed_value"]
+
+    # ...and a typed value carries none of it.
+    typed = client.post("/api/occurrences/r2/annotations", headers=cur, json={
+        "field": "catalogNumber", "proposed_value": "HAST-1", "status": "submitted",
+    }).json()
+    assert typed["source"] == "manual"
+    assert typed["ai_value"] is None and typed["ai_model"] is None
+
+
 def test_transcribe_config_reports_resolved_models(client):
     """The "auto" preset sends no overrides, so the UI reads the resolved models
     from here rather than showing an opaque "Auto"."""

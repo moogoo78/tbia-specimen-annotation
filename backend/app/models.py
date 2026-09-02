@@ -138,8 +138,22 @@ class Annotation(Base):
     original_value: Mapped[str | None] = mapped_column(Text)
     proposed_value: Mapped[str | None] = mapped_column(Text)
 
+    # How this value came to be: typed by hand, kept from an AI proposal
+    # verbatim, or an AI proposal the contributor edited. Nothing but a person
+    # submitting the form writes a row here at all — an AI run produces a
+    # *proposal* (TranscribeRequest.result_json), never a contribution.
     source: Mapped[str] = mapped_column(String(16), default="manual")  # manual | ai | mixed
+    # What the AI proposed for this field, and how sure it was, when the value
+    # was seeded from a proposal. `ai_value` is kept even when it equals
+    # `proposed_value`, because "the human agreed" and "no AI was involved" are
+    # different facts: with `source`, `ai_value != proposed_value` is the record
+    # of what a person corrected, which is the only way to measure how well the
+    # transcription actually reads a label. Null on a manual row.
+    ai_value: Mapped[str | None] = mapped_column(Text)
     ai_confidence: Mapped[float | None] = mapped_column(Float)
+    # Which model said it (the chain, for two-stage), so accuracy can be read
+    # per model rather than as one undifferentiated average.
+    ai_model: Mapped[str | None] = mapped_column(String(128))
     ai_raw: Mapped[str | None] = mapped_column(Text)  # JSON payload from extractor
 
     note: Mapped[str | None] = mapped_column(Text)
@@ -167,8 +181,14 @@ Index("idx_ann_occ_status", Annotation.occurrence_id, Annotation.status)
 
 
 class TranscribeRequest(Base):
-    """A contributor scheduling a record for (AI) transcription. Deliberately
-    minimal — just the TBIA occurrence id and who scheduled it (+ when)."""
+    """A contributor scheduling a record for (AI) transcription — and, once it
+    has run, the transcription itself.
+
+    The result lives here rather than in `annotations` because a machine reading
+    a label is not a contribution: it is a *proposal* the person who asked for it
+    decides about. It reaches them through the record's annotation form, and only
+    their submit creates an `Annotation` (which then records what the AI said
+    beside what they sent — see `Annotation.ai_value`)."""
 
     __tablename__ = "transcribe_requests"
 
@@ -186,6 +206,12 @@ class TranscribeRequest(Base):
     mode: Mapped[str | None] = mapped_column(String(16))
     ocr_model: Mapped[str | None] = mapped_column(String(64))
     field_model: Mapped[str | None] = mapped_column(String(64))
+    # The run's own output: a serialized `schemas.ExtractResponse` (fields +
+    # confidences + model + service + the image URLs it actually read). Kept
+    # whether or not anyone ever acts on it — an unused transcription is still
+    # evidence of what the model reads off a label, and is the corpus a
+    # correction rate is measured against. Null while pending, and on a failure.
+    result_json: Mapped[str | None] = mapped_column(Text)
 
 
 class AppSetting(Base):

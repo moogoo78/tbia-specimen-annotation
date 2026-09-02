@@ -1,9 +1,14 @@
 """Import transcription result JSON files into the annotation store.
 
 The sibling of `app.worker`: same destination, different source. The worker calls
-Claude and writes what comes back; this reads result JSON that was produced
+Claude and stores what comes back; this reads result JSON that was produced
 elsewhere — an agent session, a contributor's own AI chat, a re-run of a batch —
 and lands it through the same code path.
+
+What it lands is a **proposal**, not a contribution: like the worker, it stores
+the result on the `transcribe_request` that asked for it, and the person who
+asked still decides field by field in the record's annotation form. Importing a
+file therefore never writes an annotation in anyone's name.
 
     python -m app.import_results results/                 # dry run, whole directory
     python -m app.import_results results/ --commit        # actually write
@@ -42,13 +47,12 @@ from sqlalchemy.orm import Session
 from . import duck, extract, search
 from .db import SessionLocal, init_db
 from .models import TranscribeRequest
-from .pipeline import build_annotations
 
 log = logging.getLogger("import_results")
 
-# What the annotation note credits when a file carries no meta.service. Not
-# "anthropic": these rows did not necessarily come from our pipeline, and a
-# reviewer reading the note should be able to tell.
+# What the stored result credits when a file carries no meta.service. Not
+# "anthropic": these did not necessarily come from our pipeline, and whoever
+# reads the proposal should be able to tell.
 DEFAULT_SERVICE = "imported JSON"
 
 
@@ -106,26 +110,21 @@ async def import_file(db: Session, path: Path, *, commit: bool) -> str:
 
         result = extract.parse_pasted(occ_id, raw)  # validates, clamps, drops unknowns
         result.image_urls = extract.images(record)
+        result.service = result.service or DEFAULT_SERVICE
 
-        rows = build_annotations(
-            result, record, req.contributor_id, default_service=DEFAULT_SERVICE,
-        )
-        for ann in rows:
-            db.add(ann)
-
+        req.result_json = result.model_dump_json()
         req.status = "done"
         req.processed_at = datetime.now(timezone.utc)
         req.error = None
 
         if commit:
             db.commit()
-        print(f"  {path.name}: {len(rows)} annotations -> request {req.id} done")
-        for ann in rows:
-            value = (ann.proposed_value or "").replace("\n", "⏎")
+        print(f"  {path.name}: {len(result.fields)} fields -> request {req.id} done")
+        for f in result.fields:
+            value = f.value.replace("\n", "⏎")
             if len(value) > 46:
                 value = value[:45] + "…"
-            conf = f"{ann.ai_confidence:.2f}" if ann.ai_confidence is not None else "  — "
-            print(f"      {ann.field:<26} {conf}  {value}")
+            print(f"      {f.field:<26} {f.confidence:.2f}  {value}")
         return "done"
 
     except Exception as exc:  # noqa: BLE001 - isolate one file's failure
@@ -144,7 +143,7 @@ async def _run(paths: list[str], commit: bool) -> dict:
     files = discover(paths)
     if not files:
         print("no .json files found")
-        return {"files": 0, "done": 0, "failed": 0, "skipped": 0, "annotations": 0}
+        return {"files": 0, "done": 0, "failed": 0, "skipped": 0, "fields": 0}
 
     init_db()
     duck.connect()

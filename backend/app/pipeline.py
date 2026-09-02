@@ -2,9 +2,14 @@
 
 A contributor schedules a record (``TranscribeRequest``, status ``pending``);
 this module drains the queue: for each request it fetches the occurrence, sends
-the specimen image + the label-transcription prompt to Claude vision, and turns
-the response into ``ai`` annotation drafts (status ``submitted``) attributed to
-the scheduling contributor. Runs from ``app.worker`` (cron / ``make transcribe``).
+the specimen image + the label-transcription prompt to Claude vision, and stores
+what comes back on the request itself (``result_json``). Runs from ``app.worker``
+(cron / ``make transcribe``).
+
+**It writes no annotations.** A transcription is a proposal, not a contribution:
+it reaches the person who asked for it as prefilled values in the record's
+annotation form, and their submit is what creates rows — carrying the AI's own
+value alongside theirs, so a correction is recorded rather than lost in the edit.
 
 The transcription itself reuses ``extract.build_prompt`` (the field list the
 copy-paste flow already uses) and ``extract.parse_pasted`` (the defensive JSON
@@ -23,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from . import extract, media, search
 from .config import settings
-from .models import Annotation, TranscribeRequest
+from .models import TranscribeRequest
 from .schemas import ExtractedField, ExtractResponse
 
 log = logging.getLogger("pipeline")
@@ -48,15 +53,6 @@ _OCR_PROMPT_MULTI = (
     "summarize, or add commentary. Mark unreadable parts as [illegible]; write "
     "[no text] for an image that carries none."
 )
-
-# tbia annotation field -> occurrence column, for the annotation's original_value
-# (reference/diff). `annotation*`/`verbatim*` fields have no occurrence value.
-_ORIGINAL_COLUMN = {
-    "catalogNumber": "catalog_number", "typeStatus": "type_status",
-    "recordedBy": "recorded_by", "recordNumber": "record_number",
-    "taxonRank": "taxon_rank", "eventDate": "standard_date", "locality": "locality",
-}
-
 
 class MissingAPIKey(RuntimeError):
     """No Anthropic credentials on this deployment. Its own type so a caller can
@@ -257,45 +253,14 @@ def _image_blocks(image_urls: list[str]) -> list[dict]:
     return [{"type": "image", "source": {"type": "url", "url": url}} for url in image_urls]
 
 
-def build_annotations(
-    result: ExtractResponse, record: dict, contributor_id: int,
-    *, default_service: str = "anthropic",
-) -> list[Annotation]:
-    """Turn a transcription result into `ai` annotation drafts (status `submitted`).
-
-    Shared by the worker and by `app.import_results`, so a draft written from an
-    imported JSON file is indistinguishable in shape from one the worker wrote —
-    and the note format only has to be maintained in one place. `default_service`
-    is what the note credits when the result carries no `meta.service`; importers
-    should pass something that is not "anthropic", since an imported file did not
-    necessarily come from this pipeline.
-    """
-    note = f"AI transcription ({result.service or default_service} · {result.model})"
-    # No `license` here: an AI draft takes the column default (the narrowest of
-    # the three), because nobody picked terms for it — the request that produced
-    # it carries no licence choice, and inventing a wider grant on the
-    # requester's behalf is exactly what the default exists to avoid. A
-    # contributor who wants other terms sets them on the draft while it is
-    # pending (PATCH /annotations/{id}).
-    return [
-        Annotation(
-            occurrence_id=result.occurrence_id,
-            dataset_name=record.get("dataset_name"),
-            field=field.field,
-            original_value=_original(record, field.field),
-            proposed_value=field.value,
-            source="ai",
-            ai_confidence=field.confidence,
-            note=note,
-            status="submitted",
-            contributor_id=contributor_id,
-        )
-        for field in result.fields
-    ]
-
-
 async def process_one(db: Session, req: TranscribeRequest) -> int:
-    """Transcribe one pending request into annotation rows; returns the count.
+    """Transcribe one pending request; returns how many fields it read.
+
+    The result is stored on the request (``result_json``) rather than written out
+    as annotations: it is what the model proposes, and the person who asked for
+    it decides what to do with it in the annotation form. Storing it whole also
+    keeps the fields nobody submits, which a correction rate has to be measured
+    against.
 
     Marks the request done/failed and commits. Never raises — a bad request fails
     just itself, not the batch (and not the HTTP request, on the run-now route).
@@ -313,15 +278,12 @@ async def process_one(db: Session, req: TranscribeRequest) -> int:
             record, mode=req.mode, ocr_model=req.ocr_model, field_model=req.field_model,
         )
 
-        n = 0
-        for ann in build_annotations(result, record, req.contributor_id):
-            db.add(ann)
-            n += 1
-
+        req.result_json = result.model_dump_json()
         req.status = "done"
         req.processed_at = datetime.now(timezone.utc)
+        req.error = None
         db.commit()
-        return n
+        return len(result.fields)
     except Exception as exc:  # noqa: BLE001 - isolate one request's failure
         db.rollback()
         req.status = "failed"
@@ -342,24 +304,16 @@ async def process_pending(db: Session, limit: int | None = None) -> dict:
         .limit(limit)
     ).scalars().all()
 
-    annotations = 0
+    fields = 0
     done = 0
     for req in pending:
         n = await process_one(db, req)
-        annotations += n
+        fields += n
         if req.status == "done":
             done += 1
     return {
         "requests": len(pending),
         "done": done,
         "failed": len(pending) - done,
-        "annotations": annotations,
+        "fields": fields,
     }
-
-
-def _original(record: dict, field: str) -> str | None:
-    col = _ORIGINAL_COLUMN.get(field)
-    if not col:
-        return None
-    val = record.get(col)
-    return None if val is None else str(val)

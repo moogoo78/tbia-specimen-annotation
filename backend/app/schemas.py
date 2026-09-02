@@ -61,8 +61,15 @@ class AnnotationCreate(BaseModel):
     proposed_value: str | None = None
     original_value: str | None = None
     note: str | None = None
+    # How the value came to be, and — when an AI proposal was involved — what
+    # that proposal actually said. The form sends all four together: `source`
+    # classifies (`ai` kept verbatim / `mixed` edited / `manual` typed) and
+    # `ai_value` is what it was classified against, so a correction survives as
+    # data rather than only as a label.
     source: str = "manual"
+    ai_value: str | None = None
     ai_confidence: float | None = None
+    ai_model: str | None = None
     ai_raw: str | None = None
     status: str = "submitted"  # contributors may save "draft" or "submitted"
     # Terms this contribution is released under (models.LICENSES). Absent means
@@ -88,7 +95,9 @@ class AnnotationOut(BaseModel):
     original_value: str | None
     proposed_value: str | None
     source: str
+    ai_value: str | None = None
     ai_confidence: float | None
+    ai_model: str | None = None
     note: str | None
     status: str
     license: str
@@ -177,4 +186,7 @@ class TranscribeRequestOut(BaseModel):
     status: str = "pending"
     processed_at: datetime | None = None
     error: str | None = None
-    n_annotations: int = 0
+    # Fields the transcription read. Not annotations — nothing is contributed by
+    # a run; the proposal is delivered into the record's annotation form, and
+    # the record detail is where a queued request's outcome shows up.
+    n_fields: int = 0

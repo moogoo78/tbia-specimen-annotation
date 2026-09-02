@@ -111,7 +111,11 @@ async def schedule_transcribe(
 ):
     """Schedule a record for transcription: persist the request (occurrence id +
     who scheduled it + optional pipeline overrides) and ping Discord. The Discord
-    ping is best-effort and never blocks the request."""
+    ping is best-effort and never blocks the request.
+
+    The worker later stores what it read on this same row (`result_json`); the
+    record page turns that into prefilled form values for whoever asked. Nothing
+    here or there writes an annotation — a person does, by submitting."""
     record = await duck.query_one("SELECT id FROM occurrence WHERE id = ?", [occ_id])
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")
@@ -143,11 +147,15 @@ async def transcribe_now(
 ):
     """Transcribe a record **now**, in this request, instead of queueing it.
 
-    Same destination as the queue: one `transcribe_requests` row and `ai`
-    annotation drafts written by `pipeline.process_one`, so a record looks the
-    same afterwards whichever route produced it. What differs is who waits and
-    who pays — the caller holds the connection for the tens of seconds a vision
-    call takes, and the call is billed the moment they click.
+    Same destination as the queue: one `transcribe_requests` row carrying the
+    transcription in `result_json`, so a record looks the same afterwards
+    whichever route produced it. What differs is who waits and who pays — the
+    caller holds the connection for the tens of seconds a vision call takes, and
+    the call is billed the moment they click.
+
+    Neither route contributes anything. The proposal reaches the person who
+    asked for it as prefilled values in the record's annotation form, and their
+    submit is what writes annotations.
 
     **Who may call it is policy, not role alone.** An admin always may. Everyone
     else may exactly when an admin has switched the system-wide route to "now"
@@ -200,7 +208,7 @@ async def transcribe_now(
     db.refresh(req)
 
     out = TranscribeRequestOut.model_validate(req)
-    out.n_annotations = n
+    out.n_fields = n
     return out
 
 
@@ -232,7 +240,9 @@ async def create_annotation(
         original_value=body.original_value,
         proposed_value=body.proposed_value,
         source=body.source,
+        ai_value=body.ai_value,
         ai_confidence=body.ai_confidence,
+        ai_model=body.ai_model,
         ai_raw=body.ai_raw,
         note=body.note,
         status=body.status,

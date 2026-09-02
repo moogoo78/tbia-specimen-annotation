@@ -61,6 +61,35 @@ draft ──> submitted ──> accepted ──> merged
 - `merged` means the value was handed back to the data provider. Export
   (`/api/export/*`) defaults to `statuses=accepted,merged`.
 
+## AI provenance
+
+An AI transcription is a **proposal**, and a proposal is not a contribution. A run
+(`transcribe-request` → worker, or `transcribe-now`) stores what it read on the request
+that asked for it — `transcribe_requests.result_json`, a serialized `ExtractResponse` —
+and writes no annotations. The record page fills the annotation form with it; the
+contributor's submit is what creates rows.
+
+Three columns on `annotations` then record what the AI had to do with the value:
+
+| column | meaning |
+| --- | --- |
+| `source` | `manual` (typed) · `ai` (an AI value kept verbatim) · `mixed` (an AI value edited) |
+| `ai_value` | what the AI proposed for this field |
+| `ai_confidence` | how sure it was (0–1) |
+| `ai_model` | the model, or the two-stage chain, that proposed it |
+
+- **They are sent whether or not the human agreed.** `ai_value == proposed_value` says a
+  person read the proposal and kept it; `ai_value != proposed_value` is a correction;
+  `ai_value IS NULL` says no AI was involved at all. Only the pair distinguishes them,
+  and the middle one — what human judgement actually changed — is the measurement the
+  platform exists to produce. Storing only `source` lost it in the edit.
+- **Proposals nobody submits are kept too**, in `result_json`. An untouched transcription
+  is still evidence of what the model reads off a label, and is the denominator a
+  correction rate is measured against.
+- Rows written before this (`source="ai"`, `status="submitted"`, no `ai_value`) are AI
+  output that was contributed in the requester's name by the pipeline itself. They are
+  left as they are — real history, still reviewable — and nothing creates more.
+
 ## Licensing
 
 Every annotation carries the terms its contributor released it under —
@@ -96,8 +125,9 @@ contribution that could never be delivered.
   `user.default_license`, falling back to `DEFAULT_LICENSE`. The SQLite
   `ADD COLUMN` that brings an existing deployment forward backfills
   `CC-BY-NC-4.0`, so work contributed when the form asked for no terms is read
-  conservatively rather than as an open grant. An AI draft
-  (`pipeline.build_annotations`) takes the column default: nobody picked for it.
+  conservatively rather than as an open grant. An AI transcription raises no licence
+  question of its own — it contributes nothing (see *AI provenance*); the terms are
+  chosen by the person who submits a value, exactly as for a typed one.
 - **Only the contributor may relicense — but at any time, in any status.** A
   reviewer may edit a *value* in any status (that is the job) and may not restate
   someone else's terms; not even an admin inherits that. There is deliberately no

@@ -57,6 +57,12 @@ export interface OccurrenceDetail extends OccurrenceRow {
 export interface TranscribeState {
   id: number;
   status: "pending" | "done" | "failed" | string;
+  /** What the run read — the proposal, not a contribution. Empty while pending,
+   *  on a failure, and for runs processed before results were stored (those
+   *  wrote `ai` annotations, which are still in the record's history). */
+  fields: ExtractedField[];
+  model: string | null;
+  service: string | null;
   // Named only if the requester opted in (users.show_in_ranking); the id is
   // always here, so an opted-out requester still reads "Unnamed contributor #<id>".
   requested_by: string | null;
@@ -121,8 +127,14 @@ export interface Annotation {
   field: string;
   original_value: string | null;
   proposed_value: string | null;
+  /** manual (typed) | ai (an AI proposal kept verbatim) | mixed (edited). */
   source: string;
+  /** What the AI proposed for this field. Equal to `proposed_value` means the
+   *  contributor agreed with it; different means they corrected it; null means
+   *  no AI was involved. */
+  ai_value: string | null;
   ai_confidence: number | null;
+  ai_model: string | null;
   note: string | null;
   status: string;
   license: string;
@@ -164,7 +176,9 @@ export interface TranscribeRequest {
   status: "pending" | "done" | "failed" | string;
   processed_at: string | null;
   error: string | null;
-  n_annotations: number;
+  /** Fields the transcription read. Not annotations: a run contributes nothing,
+   *  it proposes — the form is where a person turns a proposal into work. */
+  n_fields: number;
 }
 
 export interface TranscribeOptions {

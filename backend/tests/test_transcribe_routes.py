@@ -1,9 +1,13 @@
 """The two server-side transcription routes.
 
-Both land in the same place — a `transcribe_requests` row plus `ai` annotation
-drafts — and differ only in who waits and who pays: the queue hands the record
-to the batch worker and pings Discord, run-now spends the API call inside the
-request.
+Both land in the same place — a `transcribe_requests` row carrying the
+transcription it produced — and differ only in who waits and who pays: the queue
+hands the record to the batch worker and pings Discord, run-now spends the API
+call inside the request.
+
+Neither writes an annotation. A transcription is a proposal: it reaches the
+person who asked for it as prefilled values in the record's annotation form, and
+their submit is what contributes.
 
 Which one a click takes is *system-wide policy an admin sets* (`app/policy.py`),
 not a per-caller choice: an admin may always run one, and everyone else may
@@ -116,22 +120,38 @@ def test_an_unknown_route_is_rejected(client):
     assert client.get("/api/transcribe/config").json()["route"] == "queue"
 
 
-def test_run_now_writes_drafts_in_the_request(client, stub_claude):
+def test_run_now_proposes_without_contributing(client, stub_claude):
+    """The whole point of the change: a run reads a label, and that is all it
+    does. Nobody's name is on anything until they submit the form."""
     res = client.post("/api/occurrences/r4/transcribe-now", headers=auth_header(client, ADMIN))
     assert res.status_code == 200
     data = res.json()
-    # Already processed by the time it answers — that is the whole point.
+    # Already processed by the time it answers — that is the run-now point.
     assert data["status"] == "done"
-    assert data["n_annotations"] >= 1
+    assert data["n_fields"] >= 1
     assert data["error"] is None
 
-    # Same destination as the queue: the record carries the request and the
-    # drafts, so a reload shows what the worker would have produced.
+    # The proposal rides on the record, so a reload (or a colleague, or the
+    # contributor coming back tomorrow) finds it — and no annotation exists.
     detail = client.get("/api/occurrences/r4").json()
     assert detail["transcribe"]["status"] == "done"
-    ai = [a for a in detail["annotations"] if a["source"] == "ai"]
-    assert {a["field"] for a in ai} >= {"locality"}
-    assert all(a["status"] == "submitted" for a in ai)
+    assert {f["field"] for f in detail["transcribe"]["fields"]} >= {"locality"}
+    assert detail["transcribe"]["model"]  # the chain that read it, for the panel
+    assert detail["annotations"] == []
+
+
+def test_a_pending_request_carries_no_proposal_yet(client, monkeypatch):
+    """`fields` is the run's output, not a placeholder: empty until there is
+    one, so the form has nothing to fill and the panel nothing to list."""
+    def _boom(*a, **k):
+        raise AssertionError("queueing must not call the model")
+
+    monkeypatch.setattr(pipeline, "transcribe_record", _boom)
+    client.post("/api/occurrences/r3/transcribe-request", headers=auth_header(client, CURATOR))
+
+    q = client.get("/api/occurrences/r3").json()["transcribe"]
+    assert q["status"] == "pending"
+    assert q["fields"] == [] and q["model"] is None
 
 
 def test_run_now_reports_pipeline_failure_in_band(client, monkeypatch):
@@ -145,7 +165,7 @@ def test_run_now_reports_pipeline_failure_in_band(client, monkeypatch):
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "failed"
-    assert data["n_annotations"] == 0
+    assert data["n_fields"] == 0
     assert "ANTHROPIC_API_KEY" in data["error"]
 
 
@@ -161,7 +181,7 @@ def test_a_deployment_without_a_key_says_which_file_to_put_it_in(client, monkeyp
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "failed"
-    assert data["n_annotations"] == 0
+    assert data["n_fields"] == 0
     assert "ANTHROPIC_API_KEY" in data["error"] and "backend/.env" in data["error"]
 
 
@@ -203,4 +223,4 @@ def test_queue_route_stays_open_to_contributors_and_does_not_transcribe(client, 
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "pending"
-    assert data["n_annotations"] == 0
+    assert data["n_fields"] == 0

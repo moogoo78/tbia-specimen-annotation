@@ -99,7 +99,18 @@ ADDED_COLUMNS = {
         ("public_display_name", "VARCHAR(255)"),
         ("default_license", "VARCHAR(32) DEFAULT 'CC-BY-NC-4.0'"),
     ],
-    "annotations": [("license", "VARCHAR(32) DEFAULT 'CC-BY-NC-4.0'")],
+    "annotations": [
+        ("license", "VARCHAR(32) DEFAULT 'CC-BY-NC-4.0'"),
+        # No default on either: null means "no AI behind this value", which is
+        # exactly what every row written before the form sent them was — the
+        # pipeline's own rows carried their model in `note`, not here.
+        ("ai_value", "TEXT"),
+        ("ai_model", "VARCHAR(128)"),
+    ],
+    # The transcription itself, on the request that asked for it. Null on every
+    # existing row: those runs wrote `ai` annotations instead, which are left
+    # exactly as they are.
+    "transcribe_requests": [("result_json", "TEXT")],
 }
 
 
