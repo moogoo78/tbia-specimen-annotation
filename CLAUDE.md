@@ -596,6 +596,10 @@ the home page. `useSeo` sets the real one client-side.
   editing the file and committing it; there is deliberately no override flag.
 - **`tsc` and `vite build` say nothing about whether the UI works.** Both stayed green
   through a bug that broke every facet checkbox. For anything interactive, drive the real
-  page: `make test-web` for Explore, or headless Chrome over CDP the same way
-  (`frontend/tests/explore-url.mjs` is the worked example). The Chrome browser-automation
-  tools are connected when the extension is running, which is the other way to check.
+  page: `make test-web` runs `frontend/tests/explore-url.mjs` (Explore's URL) and
+  `nav-menu.mjs` (the header's dropdown groups, and that the row stays 38px down to 1024).
+  Both are thin: `tests/cdp.mjs` holds the browser — a CDP client over Node's own
+  WebSocket, `launchChrome`, and the `check`/`test`/`report` harness — so a new test is a
+  `Page` subclass with the reads its own page needs, and there is one definition of how we
+  drive Chrome. The browser-automation tools are connected when the Chrome extension is
+  running, which is the other way to check.

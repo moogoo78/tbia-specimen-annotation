@@ -81,6 +81,7 @@ test:
 # Override the target with WEB_URL=, the browser with CHROME_BIN=.
 test-web:
 	node frontend/tests/explore-url.mjs
+	node frontend/tests/nav-menu.mjs
 
 build:
 	cd frontend && npm run build

@@ -20,61 +20,19 @@
  *   make test-web                      # needs `make api` + `make web` running
  *   WEB_URL=http://localhost:4173 node frontend/tests/explore-url.mjs
  */
-import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import {
+  Page, WEB, check, launchChrome, report, requireServer, sleep, test,
+} from "./cdp.mjs";
 
-const WEB = (process.env.WEB_URL || "http://localhost:5173").replace(/\/+$/, "");
-const PORT = Number(process.env.CDP_PORT || 9333);
-const CHROME = process.env.CHROME_BIN || "chromium";
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// ---------------------------------------------------------------- CDP client
-class Page {
-  #ws; #id = 0; #pending = new Map();
-  static async open(url) {
-    const tab = await (await fetch(`http://localhost:${PORT}/json/new?${encodeURIComponent(url)}`,
-      { method: "PUT" })).json();
-    const p = new Page();
-    p.tabId = tab.id;
-    p.#ws = new WebSocket(tab.webSocketDebuggerUrl);
-    p.#ws.onmessage = (e) => {
-      const m = JSON.parse(e.data);
-      if (m.id && p.#pending.has(m.id)) { p.#pending.get(m.id)(m); p.#pending.delete(m.id); }
-    };
-    await new Promise((r) => (p.#ws.onopen = r));
-    return p;
-  }
-  #send(method, params = {}) {
-    return new Promise((res) => {
-      const id = ++this.#id;
-      this.#pending.set(id, res);
-      this.#ws.send(JSON.stringify({ id, method, params }));
-    });
-  }
-  /** Evaluate in the page and return the value (throws on a page-side error). */
-  async eval(expression) {
-    const r = await this.#send("Runtime.evaluate",
-      { expression, awaitPromise: true, returnByValue: true });
-    const err = r.result?.exceptionDetails;
-    if (err) throw new Error(`page error: ${err.exception?.description || err.text}`);
-    return r.result?.result?.value;
-  }
-  async goto(path) {
-    await this.eval(`location.href = ${JSON.stringify(WEB + path)}`);
-    await this.settle();
-  }
-  /** Wait for the result count to stop changing — the queries are debounced. */
-  async settle(ms = 900) { await sleep(ms); }
-  url() { return this.eval("decodeURIComponent(location.pathname + location.search)"); }
+// ------------------------------------------------------- Explore's own reads
+/** The CDP plumbing lives in cdp.mjs; what is Explore-specific stays here. */
+class ExplorePage extends Page {
   /** The pager's "1–100 ／ 12,345" total, as a number.
    *  Reads the pager span itself: scanning `body.innerText` for the same shape
    *  matched a facet row further up the page and reported its count instead. */
   async total() {
     const raw = await this.eval(`(() => {
-      const re = /^\\d+[\u2013-]\\d+\\s*\\S*\\s*([\\d,]+)$/;
+      const re = /^\\d+[–-]\\d+\\s*\\S*\\s*([\\d,]+)$/;
       for (const el of document.querySelectorAll("span")) {
         const m = el.textContent.trim().match(re);
         if (m) return m[1];
@@ -113,46 +71,13 @@ class Page {
     })()`);
     await this.settle();
   }
-  async close() {
-    try { await fetch(`http://localhost:${PORT}/json/close/${this.tabId}`); } catch { /* going away */ }
-    this.#ws.close();
-  }
-}
-
-// ------------------------------------------------------------------ harness
-let failures = 0;
-const results = [];
-function check(name, ok, detail) {
-  results.push({ name, ok, detail });
-  if (!ok) failures++;
-  console.log(`${ok ? "  ok  " : "  FAIL"} ${name}${detail ? `  — ${detail}` : ""}`);
-}
-async function test(name, fn) {
-  console.log(`\n${name}`);
-  try { await fn(); } catch (e) { check(name, false, e.message); }
 }
 
 // --------------------------------------------------------------------- main
 async function main() {
-  const res = await fetch(WEB).catch(() => null);
-  if (!res?.ok) {
-    console.error(`explore-url: nothing serving ${WEB}. Start it first:\n` +
-      `  make api    # :8000, the data\n  make web    # :5173, the app`);
-    process.exit(1);
-  }
-
-  const profile = mkdtempSync(join(tmpdir(), "explore-test-"));
-  const chrome = spawn(CHROME, [
-    "--headless=new", "--disable-gpu", "--no-sandbox", "--no-first-run",
-    `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, "about:blank",
-  ], { stdio: "ignore" });
-
-  for (let i = 0; i < 40; i++) {
-    if (await fetch(`http://localhost:${PORT}/json/version`).then((r) => r.ok).catch(() => false)) break;
-    await sleep(250);
-  }
-
-  const page = await Page.open(`${WEB}/explore`);
+  await requireServer("explore-url");
+  const stopChrome = await launchChrome();
+  const page = await ExplorePage.open(`${WEB}/explore`);
   await sleep(2500); // first paint + the initial search
   try {
     // The landing default. `emptyFilters()` starts has_media true while the API
@@ -231,13 +156,9 @@ async function main() {
     });
   } finally {
     await page.close();
-    chrome.kill();
-    rmSync(profile, { recursive: true, force: true });
+    stopChrome();
   }
-
-  const total = results.length;
-  console.log(`\n${total - failures}/${total} checks passed`);
-  process.exit(failures ? 1 : 0);
+  report();
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

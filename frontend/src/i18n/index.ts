@@ -11,7 +11,9 @@ const en = {
     // a name nobody can expand is just a word.
     expansion: "Integrated Specimen Labels: Annotation, Network, Discovery",
   },
-  nav: { home: "Home", browse: "Browse", explore: "Explore", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  // `data` and `participate` label the two dropdown groups in the header; the
+  // rest are the destinations inside them.
+  nav: { home: "Home", browse: "Browse", explore: "Explore", data: "Data", participate: "Take part", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
   story: {
     title: "Data stories",
     blurb: "Topics that read the collection as a narrative rather than a result set: who went where, when, and what of it can still be found in the store today. Each topic works from a published source and queries the specimen data live.",
@@ -491,7 +493,7 @@ const zh: typeof en = {
     short: "TBIA 標本標註平台",
     expansion: "整合標本標籤：標註、連結、探索",
   },
-  nav: { home: "首頁", browse: "瀏覽", explore: "探索", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
+  nav: { home: "首頁", browse: "瀏覽", explore: "探索", data: "資料", participate: "參與", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
   story: {
     title: "資料說故事",
     blurb: "以敘事的方式閱讀典藏，而不只是查詢結果：誰在何時去了哪裡，以及今天在資料庫裡還找得到什麼。每則故事都以已出版的文獻為本，並即時查詢標本資料。",
