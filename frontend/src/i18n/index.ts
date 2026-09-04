@@ -488,7 +488,7 @@ const en = {
 const zh: typeof en = {
   app: {
     title: "ISLAND · TBIA 自然史標本標註平台",
-    short: "TBIA 自然史標本標註平台",
+    short: "TBIA 標本標註平台",
     expansion: "整合標本標籤：標註、連結、探索",
   },
   nav: { home: "首頁", browse: "瀏覽", explore: "探索", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
