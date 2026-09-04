@@ -18,6 +18,10 @@ Disallow: /api/
 Disallow: /record/
 Disallow: /explore
 Disallow: /dashboard
+# A contributor's own view, drafts included — it needs a session anyway, so a
+# crawler would only ever index the sign-in prompt. Their *public* page under
+# /contributors/ stays allowed, like /collectors/ below.
+Disallow: /me
 Disallow: /login
 Disallow: /auth/
 Crawl-delay: 10

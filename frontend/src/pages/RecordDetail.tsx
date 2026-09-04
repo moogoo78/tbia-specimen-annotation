@@ -162,6 +162,9 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
 
   if (q.isLoading || !q.data) return <Spinner />;
   const r = q.data;
+  // The annotations, indexed by the field each one answers, so the record's own
+  // fields can show what has been contributed to them.
+  const enrich = enrichments(r.annotations);
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: t.panelAlt, overflow: "auto" }}>
@@ -171,15 +174,38 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <GroupTag group={r.bio_group} />
-            <span style={{ fontFamily: t.mono, fontSize: 11, color: t.fgMuted, fontWeight: 600 }}>{r.catalog_number}</span>
+            <span style={{ fontFamily: t.mono, fontSize: 11, color: t.fgMuted, fontWeight: 600 }}
+              title={enrich["catalogNumber"] ? `${tr("detail.wasValue")} ${r.catalog_number || "∅"}` : undefined}>
+              {enrich["catalogNumber"]?.proposed_value || r.catalog_number}
+            </span>
             <CompletenessDots row={r} size={8} />
             <span style={{ flex: 1 }} />
             <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>{String(r.id)}</span>
           </div>
+          {/* The identification gap is the one this platform exists to close, so
+              it is the one place the enrichment has to be visible without
+              scrolling: a record annotated with a name reads as that name, with
+              the status beside it and the provider's own value struck through
+              below rather than replaced. */}
           <h2 style={{ fontSize: 19, margin: "2px 0", fontWeight: 500 }}>
-            <i>{r.scientific_name || <span style={{ color: t.danger }}>{tr("facet.missing_identification")}</span>}</i>
+            <i>{enrich["annotationScientificName"]?.proposed_value
+              || r.scientific_name
+              || <span style={{ color: t.danger }}>{tr("facet.missing_identification")}</span>}</i>
             <span style={{ color: t.fgMuted, fontSize: 13, fontWeight: 400 }}> {r.name_author}</span>
+            {enrich["annotationScientificName"] && (
+              <span style={{ marginLeft: 8, verticalAlign: "middle" }}>
+                <StatusPill status={enrich["annotationScientificName"].status} />
+              </span>
+            )}
           </h2>
+          {enrich["annotationScientificName"] && (
+            <div style={{ fontSize: 10, color: t.fgSubtle, marginBottom: 2 }}>
+              {tr("detail.wasValue")}{" "}
+              {r.scientific_name
+                ? <span style={{ textDecoration: "line-through" }}>{r.scientific_name}</span>
+                : <span style={{ color: t.danger }}>{tr("facet.missing_identification")}</span>}
+            </div>
+          )}
           <div style={{ fontSize: 12, color: t.fgMuted }}>
             {r.common_name_c ? r.common_name_c + " · " : ""}<span style={{ fontFamily: t.mono }}>{r.dataset_name}</span>
           </div>
@@ -192,16 +218,19 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
           <Section title={tr("detail.taxonomy")}><Taxonomy r={r} /></Section>
           <Section title={tr("detail.event")}>
             <CollectorField recordedBy={r.recorded_by as string} />
-            <Field k={tr("col.date")} v={r.standard_date} missing={!r.has_date} verbatim={r.event_date as string} />
-            <Field k={tr("col.county")} v={[r.county, r.municipality].filter(Boolean).join(" ")} />
-            <Field k={tr("col.locality")} v={r.locality} />
+            <Field k={tr("col.date")} v={r.standard_date} missing={!r.has_date}
+              verbatim={r.event_date as string} ann={enrich["eventDate"]} />
+            <Field k={tr("col.county")} v={[r.county, r.municipality].filter(Boolean).join(" ")}
+              ann={enrich["annotationCounty"] || enrich["annotationMunicipality"]} />
+            <Field k={tr("col.locality")} v={r.locality} ann={enrich["locality"]} />
             <Field k={tr("detail.coordinates")}
               v={r.has_coordinates ? `${r.standard_latitude}, ${r.standard_longitude}` : null} missing={!r.has_coordinates}
-              verbatim={[r.verbatim_latitude, r.verbatim_longitude].filter(Boolean).join(", ") || undefined} />
+              verbatim={[r.verbatim_latitude, r.verbatim_longitude].filter(Boolean).join(", ") || undefined}
+              ann={coordinateAnnotation(enrich)} />
           </Section>
           <Section title={tr("detail.record")}>
             <Field k="basisOfRecord" v={r.basis_of_record as string} mono />
-            <Field k="typeStatus" v={r.type_status as string} mono />
+            <Field k="typeStatus" v={r.type_status as string} mono ann={enrich["typeStatus"]} />
             <Field k="preservation" v={r.preservation as string} />
             <Field k="license" v={r.license as string} mono />
           </Section>
@@ -236,17 +265,25 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Field({ k, v, mono, missing, verbatim }: {
+function Field({ k, v, mono, missing, verbatim, ann }: {
   k: string; v: unknown; mono?: boolean; missing?: boolean; verbatim?: string;
+  /** An annotation to show in place of the provider's value — see `Enriched`. */
+  ann?: Enrichment;
 }) {
   const { t: tr } = useTranslation();
   const has = v != null && v !== "";
+  // A filled gap stops being a gap: the red rule marks what still needs work,
+  // and leaving it on a field somebody has just answered would say the
+  // contribution never happened.
+  const gap = missing && !ann;
   return (
-    <div style={{ display: "flex", gap: 8, padding: "3px 0", alignItems: "baseline", lineHeight: 1.4, borderLeft: missing ? `2px solid ${t.danger}` : "2px solid transparent", paddingLeft: 6, marginLeft: -6 }}>
+    <div style={{ display: "flex", gap: 8, padding: "3px 0", alignItems: "baseline", lineHeight: 1.4, borderLeft: gap ? `2px solid ${t.danger}` : ann ? `2px solid ${t.ok}` : "2px solid transparent", paddingLeft: 6, marginLeft: -6 }}>
       <span style={{ width: 110, fontSize: 10, color: t.fgSubtle, flexShrink: 0 }}>{k}</span>
-      <span style={{ flex: 1, fontSize: 12, fontFamily: mono ? t.mono : undefined, wordBreak: "break-word" }}>
-        {has ? String(v) : <span style={{ color: t.danger, fontSize: 11 }}>{tr("detail.missing")}</span>}
-        {!has && verbatim && <span style={{ color: t.warn, fontSize: 10, marginLeft: 6 }}>verbatim: {verbatim}</span>}
+      <span style={{ flex: 1, fontSize: 12, fontFamily: mono && !ann ? t.mono : undefined, wordBreak: "break-word" }}>
+        {ann
+          ? <Enriched a={ann} original={v} mono={mono} />
+          : has ? String(v) : <span style={{ color: t.danger, fontSize: 11 }}>{tr("detail.missing")}</span>}
+        {!has && !ann && verbatim && <span style={{ color: t.warn, fontSize: 10, marginLeft: 6 }}>verbatim: {verbatim}</span>}
       </span>
     </div>
   );
@@ -299,6 +336,82 @@ function Taxonomy({ r }: { r: OccurrenceDetail }) {
       ))}
       {chain.length === 0 && <span style={{ color: t.danger }}>—</span>}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Enrichment: an annotation shown as the record's own value.
+//
+// The occurrence store is read-only and stays that way — nothing here writes
+// back. This is a *read-time overlay*: the record still ships its provider
+// value, and the page shows the latest annotation on top of it with the
+// original struck through beneath, so the two are never confused for one
+// another. It is the whole point of the platform made visible on the record:
+// until now a filled gap only showed up as a row in the annotation history,
+// while the field it filled still read "missing".
+//
+// "Latest" is per field, and the detail payload arrives `created desc`, so the
+// first row for a field is the newest. Two statuses are skipped rather than
+// shown: `draft` is private working state that has no business on a public
+// page, and `rejected` is a reviewer having said no — displaying either as the
+// specimen's value would publish something nobody stands behind.
+type Enrichment = OccurrenceDetail["annotations"][number];
+
+const OVERLAY_SKIP = new Set(["draft", "rejected"]);
+
+function enrichments(annotations: OccurrenceDetail["annotations"]): Record<string, Enrichment> {
+  const out: Record<string, Enrichment> = {};
+  for (const a of annotations) {
+    if (OVERLAY_SKIP.has(a.status)) continue;
+    if (!a.proposed_value) continue;
+    if (!out[a.field]) out[a.field] = a;
+  }
+  return out;
+}
+
+/** A coordinate is two annotations, and a field is one value — so the pair is
+ *  folded into a synthetic row reading "lat, lon". Either half alone still
+ *  shows, because half a georeference is what a contributor may have had. The
+ *  decimal fields are preferred over the verbatim ones: they are what the
+ *  provider's own `standard_latitude/longitude` would be replaced by. */
+function coordinateAnnotation(e: Record<string, Enrichment>): Enrichment | undefined {
+  const lat = e["annotationLatitudeDecimal"] || e["annotationLatitudeDMS"] || e["verbatimLatitude"];
+  const lon = e["annotationLongitudeDecimal"] || e["annotationLongitudeDMS"] || e["verbatimLongitude"];
+  if (!lat && !lon) return undefined;
+  const base = lat || lon;
+  return {
+    ...(base as Enrichment),
+    proposed_value: [lat?.proposed_value, lon?.proposed_value].filter(Boolean).join(", "),
+  };
+}
+
+/** The enriched value, with what it replaced. `original` is the record's own
+ *  value rather than the annotation's `original_value`, so the strike-through
+ *  is what the provider actually ships today even if an earlier annotation in
+ *  the chain recorded something else. */
+function Enriched({ a, original, mono }: { a: Enrichment; original?: unknown; mono?: boolean }) {
+  const { t: tr } = useTranslation();
+  const had = original != null && original !== "";
+  return (
+    <span>
+      <span style={{ fontWeight: 600, fontFamily: mono ? t.mono : undefined }}>{a.proposed_value}</span>
+      <span style={{ marginLeft: 6, display: "inline-flex", alignItems: "baseline", gap: 4 }}>
+        <StatusPill status={a.status} />
+      </span>
+      <span style={{ display: "block", fontSize: 10, color: t.fgSubtle, marginTop: 1 }}>
+        {tr("detail.wasValue")}{" "}
+        {had
+          ? <span style={{ textDecoration: "line-through" }}>{String(original)}</span>
+          : <span style={{ color: t.danger }}>{tr("detail.missing")}</span>}
+        {" · "}
+        <Link to={`/contributors/${a.contributor_id}`} style={{
+          color: t.fgSubtle, textDecoration: "none",
+          fontStyle: isAnonymous(a.contributor_name) ? "italic" : "normal",
+        }}>
+          {contributorLabel(tr, a.contributor_name, a.contributor_id)}
+        </Link>
+      </span>
+    </span>
   );
 }
 
@@ -422,16 +535,22 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
   const filled = ALL_FIELDS
     .map((fd) => ({ fd, value: serializeField(fd, values) }))
     .filter((x) => x.value !== "");
-  const setVal = (f: string, v: string) => setValues((s) => ({ ...s, [f]: v }));
+  // Every edit clears the receipt: it reports the *last* submission, and left
+  // sitting above a half-filled form it would read as a report on this one.
+  // `setVal` is where typing lands (input, textarea and select all use it), and
+  // the two composite widgets below call it out on their own paths.
+  const setVal = (f: string, v: string) => { setReceipt(null); setValues((s) => ({ ...s, [f]: v })); };
   const groupOf = (name: string) =>
     ANNOTATABLE_GROUPS.find((g) => g.fields.some((f) => f.name === name))?.labelKey;
   // A DMS sub-part changed: store it and keep the sibling decimal field in sync.
-  const setDms = (fd: FieldDef, part: "hemi" | "deg" | "min" | "sec", v: string) =>
+  const setDms = (fd: FieldDef, part: "hemi" | "deg" | "min" | "sec", v: string) => {
+    setReceipt(null);
     setValues((s) => {
       const next = { ...s, [`${fd.name}.${part}`]: v };
       if (fd.decimalField) next[fd.decimalField] = dmsToDecimal(fd, next);
       return next;
     });
+  };
 
   // ai = kept the AI value verbatim; mixed = AI value the human edited;
   // manual = typed with no AI seed for this field.
@@ -457,6 +576,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
     const y = m?.[1] ?? "";
     const mo = m?.[2] ? String(parseInt(m[2], 10)) : "";
     const d = m?.[3] ? String(parseInt(m[3], 10)) : "";
+    setReceipt(null);
     setValues((s) => ({ ...s, "eventDate.y": y, "eventDate.mo": mo, "eventDate.d": d }));
     seed(name, y ? `${y.padStart(4, "0")}-${(mo || "").padStart(2, "0")}-${(d || "").padStart(2, "0")}` : "", meta);
   };
@@ -535,6 +655,13 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proposalSig, record.annotations, user?.id, activeGroup]);
 
+  // What the last submission did, shown until the contributor starts typing
+  // again. Submitting used to be silent — the form cleared and nothing said the
+  // work had landed, let alone where it went. This is also the one moment a
+  // contributor is guaranteed to be looking, so it is the cheapest place to
+  // learn that their work has a page.
+  const [receipt, setReceipt] = useState<{ n: number; draft: boolean } | null>(null);
+
   const createMut = useMutation({
     mutationFn: (status: string) => Promise.all(filled.map(({ fd, value }) => {
       const ai = aiSeed[fd.name];
@@ -551,7 +678,11 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
         status, license,
       });
     })),
-    onSuccess: () => { setValues({}); setAiSeed({}); setNote(""); setPasted(null); refresh(); },
+    onSuccess: (created, status) => {
+      setValues({}); setAiSeed({}); setNote(""); setPasted(null);
+      setReceipt({ n: created.length, draft: status === "draft" });
+      refresh();
+    },
   });
   const reviewMut = useMutation({
     mutationFn: ({ annId, status }: { annId: number; status: string }) => api.updateAnnotation(annId, { status }),
@@ -585,6 +716,31 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
         <Icon name="spark" size={11} />{tr("annotate.title")}
       </div>
       <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* Submitting used to say nothing at all. This is the confirmation and
+            the way to the rest of your work, in the one place a contributor is
+            certainly looking. The record's own history below still shows the
+            new rows in context. */}
+        {receipt && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "6px 8px",
+            background: t.accentSoft, border: `1px solid ${t.border}`, fontSize: 11,
+          }}>
+            <Icon name="check" size={12} />
+            <span>{tr(receipt.draft ? "annotate.draftSavedN" : "annotate.submittedN", { n: receipt.n })}</span>
+            <div style={{ flex: 1 }} />
+            <Link to="/me" style={{ color: t.accent, textDecoration: "none", whiteSpace: "nowrap" }}>
+              {tr("annotate.seeMine")} →
+            </Link>
+          </div>
+        )}
+        {createMut.isError && (
+          <div style={{
+            padding: "6px 8px", border: `1px solid ${t.danger}`, fontSize: 11, color: t.danger,
+          }}>
+            {tr("annotate.submitFailed")} — {(createMut.error as Error).message}
+          </div>
+        )}
+
         <AiAssist record={record} onProposal={setPasted} />
 
         {/* The proposal, kept on screen after it has been poured into the form:
@@ -1107,9 +1263,17 @@ function History({ annotations, isReviewer, onReview, userId, onRelicense }: {
                 it here at any time, in any status: what an earlier export
                 delivered stays as delivered, and this sets what the next one
                 says. Everyone else reads it. */}
-            <span style={{ fontSize: 10, color: t.fgSubtle, fontStyle: isAnonymous(a.contributor_name) ? "italic" : "normal" }}
+            {/* The byline opens that contributor's work. A name on a record was
+                the end of the trail; it is now the way into everything else
+                they have done. */}
+            <span style={{ fontSize: 10, color: t.fgSubtle }}>— </span>
+            <Link to={`/contributors/${a.contributor_id}`}
+                  style={{ fontSize: 10, color: t.fgSubtle, textDecoration: "none",
+                           fontStyle: isAnonymous(a.contributor_name) ? "italic" : "normal" }}
                   title={isAnonymous(a.contributor_name) ? tr("vol.anonymousHint") : undefined}>
-              — {contributorLabel(tr, a.contributor_name, a.contributor_id)} ·</span>
+              {contributorLabel(tr, a.contributor_name, a.contributor_id)}
+            </Link>
+            <span style={{ fontSize: 10, color: t.fgSubtle }}>·</span>
             {userId === a.contributor_id && onRelicense ? (
               <select value={asLicense(a.license)} title={tr("annotate.licenseChange")}
                 onChange={(e) => onRelicense(a.id, e.target.value as License)}

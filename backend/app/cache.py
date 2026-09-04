@@ -65,6 +65,13 @@ STATIC_ROUTES = frozenset({
 # someone who just had work accepted.
 LIVE_ROUTES = frozenset({
     "/api/volunteers",
+    # A contributor's public page. Same tier as the board it is opened from:
+    # it changes as they work, and a minute behind is invisible. The private
+    # "/api/annotations/mine" is deliberately in neither set.
+    "/api/contributors/{user_id}",
+    "/api/contributors/{user_id}/annotations",
+    # The public activity feed on /contributors.
+    "/api/contributions",
 })
 
 # Everything unlisted -- /api/health, all of /api/auth, the annotation writes and

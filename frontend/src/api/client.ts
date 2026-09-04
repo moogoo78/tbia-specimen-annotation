@@ -98,6 +98,16 @@ export function paramsToFilters(p: URLSearchParams): Filters {
   return f;
 }
 
+/** Shared query string for the paged contribution routes — an absent status
+ *  means "every status the route is willing to show", never `status=`. */
+function pageParams(p: { status?: string; limit?: number; offset?: number }): string {
+  const qs = new URLSearchParams();
+  if (p.status) qs.set("status", p.status);
+  if (p.limit != null) qs.set("limit", String(p.limit));
+  if (p.offset) qs.set("offset", String(p.offset));
+  return qs.toString();
+}
+
 export const api = {
   // ORCID-only sign-in. `orcidConfig` returns the public params for building the
   // authorize URL; `orcidCallback` exchanges the returned code for our JWT.
@@ -247,9 +257,29 @@ export const api = {
     request<import("./types").Annotation>(`/annotations/${annId}`, {
       method: "PATCH", body: JSON.stringify(body),
     }),
+  // Items carry their specimen (`Contribution`, not `Annotation`) so the
+  // dashboard can group by the record rather than list fields with no subject.
   listAnnotations: (params: Record<string, string>) =>
-    request<{ total: number; items: import("./types").Annotation[] }>(
+    request<import("./types").ContributionPage &
+            { summary: import("./types").ContributionSummary }>(
       `/annotations?${new URLSearchParams(params)}`),
+
+  // A contributor's work as a place. The first two are public — they are what a
+  // record byline and a ranking row open into — and never include drafts; the
+  // third is the signed-in contributor's own view, drafts and real totals
+  // included. Separate routes rather than one with a "me": only the public pair
+  // is edge-cacheable.
+  /** The platform's public activity: everyone's contributions, never drafts. */
+  contributions: (p: { status?: string; limit?: number; offset?: number } = {}) =>
+    request<import("./types").ContributionPage &
+            { summary: import("./types").ContributionSummary }>(`/contributions?${pageParams(p)}`),
+  contributor: (id: number) =>
+    request<import("./types").ContributorProfile>(`/contributors/${id}`),
+  contributorAnnotations: (id: number, p: { status?: string; limit?: number; offset?: number } = {}) =>
+    request<import("./types").ContributionPage>(`/contributors/${id}/annotations?${pageParams(p)}`),
+  myAnnotations: (p: { status?: string; limit?: number; offset?: number } = {}) =>
+    request<import("./types").ContributionPage & { summary: import("./types").ContributionSummary }>(
+      `/annotations/mine?${pageParams(p)}`),
   exportProvider: (datasetName: string) =>
     request<{ dataset_name: string; count: number; deltas: Record<string, unknown>[] }>(
       `/export/provider?dataset_name=${encodeURIComponent(datasetName)}&format=json`),

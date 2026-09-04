@@ -70,10 +70,10 @@
     },
     {
       "path": "/contributors",
-      "title": { "en": "Top contributors", "zh": "貢獻者排行" },
+      "title": { "en": "Contributors", "zh": "貢獻者" },
       "description": {
-        "en": "Ranked by annotations a reviewer accepted — the work that actually reached a data provider.",
-        "zh": "依審核通過的註記數排名——也就是真正回饋給資料提供者的成果。"
+        "en": "The platform's contribution record in public: how much has been contributed, who has contributed most, and what has been contributed lately — each entry opening the specimen it improved. Ranked by annotations a reviewer accepted, the work that actually reached a data provider.",
+        "zh": "公開呈現這個平台的貢獻紀錄：累積了多少、誰貢獻最多、最近補了哪些資料——每一筆都可以連到它補齊的標本。排名依審核通過的註記數，也就是真正回饋給資料提供者的成果。"
       }
     },
     {
@@ -125,6 +125,14 @@
         "inLanguage": "zh-Hant",
         "about": { "@type": "Person", "name": "彭鏡毅 Ching-I Peng" },
         "citation": "中央研究院生物多樣性研究博物館（BRMAS）數位策展。"
+      }
+    },
+    {
+      "path": "/privacy",
+      "title": { "en": "Privacy and data use", "zh": "隱私與資料使用" },
+      "description": {
+        "en": "What this platform collects and what it does with it: what signing in with ORCID stores, that annotations are public, that the copy returned to a collection carries your ORCID name under CC-BY, and the one analytics cookie you can decline.",
+        "zh": "本平台蒐集哪些資料、又如何使用：以 ORCID 登入會存下什麼、標註為何是公開的、回饋給典藏機構的資料為何依 CC-BY 附上你的 ORCID 姓名，以及那個你可以拒絕的分析 Cookie。"
       }
     },
     {

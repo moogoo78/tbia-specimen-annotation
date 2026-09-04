@@ -16,16 +16,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query
-from sqlalchemy import distinct, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from fastapi import Depends
 
+from ..contributions_store import ACCEPTED, count_columns  # noqa: F401  (ACCEPTED re-exported)
 from ..db import get_session
 from ..models import Annotation, User, public_name
 
 router = APIRouter(prefix="/api", tags=["volunteers"])
-
-ACCEPTED = ("accepted", "merged")
 
 
 def _month_start() -> datetime:
@@ -45,9 +44,10 @@ def volunteers(
     reported alongside — a volunteer who fills eight fields on one specimen and
     one who improves eight specimens both show their real shape.
     """
-    n_submitted = func.count().label("n_submitted")
-    n_accepted = func.count().filter(Annotation.status.in_(ACCEPTED)).label("n_accepted")
-    n_records = func.count(distinct(Annotation.occurrence_id)).label("n_records")
+    # The same three columns a contributor's own profile selects
+    # (contributions_store.count_columns), so a board row and the page it opens
+    # cannot print different numbers for the same person.
+    n_submitted, n_accepted, n_records = count_columns()
 
     stmt = (
         select(User.id, User.display_name, User.public_display_name, User.show_in_ranking,

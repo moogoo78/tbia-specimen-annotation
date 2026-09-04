@@ -10,14 +10,16 @@ import { Explore } from "./pages/Explore";
 import { Species } from "./pages/Species";
 import { Institutions } from "./pages/Institutions";
 import { Volunteers } from "./pages/Volunteers";
+import { Contributor } from "./pages/Contributor";
+import { MyContributions } from "./pages/MyContributions";
 import { Collector } from "./pages/Collector";
 import { Collectors } from "./pages/Collectors";
 import { History } from "./pages/History";
 import { Story } from "./pages/Story";
 import { StoryTopic } from "./pages/StoryTopic";
 import { RecordDetail } from "./pages/RecordDetail";
-import { Dashboard } from "./pages/Dashboard";
 import { Guide } from "./pages/Guide";
+import { Privacy } from "./pages/Privacy";
 import { AiWalkthrough } from "./pages/AiWalkthrough";
 import { Login } from "./pages/Login";
 import { OrcidCallback } from "./pages/OrcidCallback";
@@ -41,6 +43,10 @@ export default function App() {
         <Route path="/species" element={<Species />} />
         <Route path="/institutions" element={<Institutions />} />
         <Route path="/contributors" element={<Volunteers />} />
+        {/* One contributor's work in public — where a record's byline and a
+            board row lead. `/me` is the same shape for your own, plus drafts. */}
+        <Route path="/contributors/:id" element={<Contributor />} />
+        <Route path="/me" element={<MyContributions />} />
         {/* The board was /volunteers (志工) until the rename; keep old links working. */}
         <Route path="/volunteers" element={<Navigate to="/contributors" replace />} />
         <Route path="/collectors" element={<Collectors />} />
@@ -51,8 +57,12 @@ export default function App() {
             collector pages and from the chronology's own citation. */}
         <Route path="/history" element={<History />} />
         <Route path="/record/:id" element={<RecordDetail />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        {/* The dashboard was both halves at once — your settings above
+            everyone's annotations. The public half is /contributors and the
+            personal half is /me, so this is only an old link now. */}
+        <Route path="/dashboard" element={<Navigate to="/me" replace />} />
         <Route path="/guide" element={<Guide />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/guide/ai-transcribe" element={<AiWalkthrough />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/orcid/callback" element={<OrcidCallback />} />

@@ -143,9 +143,11 @@ export function AppHeader() {
             // The chronology is a topic of the story, so /history lights this one.
             { to: "/story", label: tr("nav.story"), also: STORY_TOPICS.map((topic) => topic.path) },
           ])}
+          {/* The two halves of "contribution", named apart: what everybody has
+              done, and what you have. */}
           {group("take-part", tr("nav.participate"), [
             { to: "/contributors", label: tr("nav.volunteers") },
-            { to: "/dashboard", label: tr("nav.dashboard") },
+            { to: "/me", label: tr("nav.myContributions"), also: ["/dashboard"] },
           ])}
           {tab("/guide", tr("nav.guide"))}
         </div>
@@ -262,7 +264,7 @@ function UserMenu({ open, onOpen }: { open: boolean; onOpen: (id: string | null)
             <div style={{ fontSize: 12, color: t.fg, whiteSpace: "nowrap" }}>{user.display_name}</div>
             <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, textTransform: "uppercase" }}>{user.role}</div>
           </div>
-          <Link to="/dashboard" role="menuitem" style={item}>{tr("nav.dashboard")}</Link>
+          <Link to="/me" role="menuitem" style={item}>{tr("nav.myContributions")}</Link>
           <button
             onClick={() => { onOpen(null); logout(); }} role="menuitem"
             style={{ ...item, width: "100%", background: "transparent", border: "none", cursor: "pointer", fontFamily: t.sans }}

@@ -154,6 +154,9 @@ export function Landing() {
           <Link to="/guide" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("nav.guide")}</Link>
           <Link to="/story" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.readStories")}</Link>
           <Link to="/browse" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("landing.browseAll")}</Link>
+          {/* The one page a visitor should be able to reach before deciding to
+              take part, and the navbar is hidden on this route. */}
+          <Link to="/privacy" style={{ color: t.fgSubtle, fontSize: 11 }}>{tr("privacy.title")}</Link>
         </div>
       </div>
 
