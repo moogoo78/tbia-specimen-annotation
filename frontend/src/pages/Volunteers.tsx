@@ -1,20 +1,39 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api, getToken } from "../api/client";
 import type { VolunteerRange } from "../api/types";
-import { Spinner } from "../components/ui";
+import { Spinner, StatusPill } from "../components/ui";
 import { contributorLabel } from "../contributors";
+import { ContributionList, Pager } from "../components/Contributions";
 
-// Public leaderboard. Ranked on accepted work, with submitted and distinct
-// records alongside so the table shows each volunteer's real shape. Names are
-// opt-in (users.show_in_ranking) — everyone else is "Unnamed contributor #<id>" —
-// and a volunteer who set a public name is listed under that, not their ORCID one.
+// 貢獻者 — the platform's contribution record, in public.
+//
+// Three things, in the order a visitor wants them: how much has been
+// contributed, who contributed most, and what has been contributed lately. The
+// last two used to be split across a public leaderboard and a page behind a
+// login, which meant the only way to see what the community was actually doing
+// was to have an account — though every row of it is already visible on its own
+// record page. What is *yours* lives at /me instead; this page is nobody's in
+// particular.
+//
+// Names are opt-in (users.show_in_ranking) — everyone else is "Unnamed
+// contributor #<id>" — and a contributor who set a public name is listed under
+// that, not their ORCID one.
+const FEED = 30;
+const STATUSES = ["submitted", "accepted", "merged", "rejected"];
+
 export function Volunteers() {
   const { t: tr } = useTranslation();
   const [range, setRange] = useState<VolunteerRange>("all");
+  const [offset, setOffset] = useState(0);
+  const feed = useQuery({
+    queryKey: ["contributions", offset],
+    queryFn: () => api.contributions({ limit: FEED, offset }),
+  });
   const board = useQuery({
     queryKey: ["volunteers", range],
     queryFn: () => api.volunteers(range, 100),
@@ -57,6 +76,25 @@ export function Volunteers() {
         </div>
       )}
 
+      {/* How much has been contributed, over the whole platform. Counted in SQL
+          over every non-draft row, so it does not quietly become a count of
+          whatever the feed below happens to have fetched. */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {STATUSES.map((s) => (
+          <div key={s} style={{ background: t.panel, border: `1px solid ${t.border}`, padding: "8px 14px", minWidth: 110 }}>
+            <div style={{ fontSize: 22, fontWeight: 600, fontFamily: t.mono }}>
+              {(feed.data?.summary?.[s] ?? 0).toLocaleString()}
+            </div>
+            <StatusPill status={s} />
+          </div>
+        ))}
+      </div>
+
+      <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px" }}>{tr("vol.rankTitle")}</h3>
+      <p style={{ fontSize: 11, color: t.fgMuted, margin: "0 0 10px", maxWidth: 620, lineHeight: 1.6 }}>
+        {tr("vol.rankBlurb")}
+      </p>
+
       {board.isLoading ? <Spinner /> : items.length === 0 ? (
         <div style={{ padding: 20, fontSize: 12, color: t.fgSubtle }}>{tr("vol.empty")}</div>
       ) : (
@@ -67,6 +105,20 @@ export function Volunteers() {
           ))}
         </div>
       )}
+
+      {/* What has been contributed lately — grouped by specimen, because
+          someone who fixed a date, a locality and a coordinate on one sheet did
+          one piece of work. Drafts never appear: they are private working
+          state, and this is the published record. */}
+      <div style={{ maxWidth: 720, marginTop: 22 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 8px" }}>{tr("vol.recentTitle")}</h3>
+        <div style={{ background: t.panel, border: `1px solid ${t.border}` }}>
+          {feed.isLoading ? <Spinner /> : (
+            <ContributionList items={feed.data?.items ?? []} byline empty={tr("vol.empty")} />
+          )}
+          <Pager total={feed.data?.total ?? 0} limit={FEED} offset={offset} onOffset={setOffset} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -102,8 +154,13 @@ function Row({ v, header, isMe }: {
     );
   }
   if (!v) return null;
+  // The whole row opens that contributor's work. The board was a table of
+  // numbers with nowhere to go — the rank is the summary, the page is the work.
   return (
-    <div style={{ ...base, background: isMe ? t.accentSoft : "transparent" }}>
+    <Link to={`/contributors/${v.user_id}`} style={{
+      ...base, background: isMe ? t.accentSoft : "transparent",
+      textDecoration: "none", color: t.fg,
+    }}>
       <span style={cells[0]}>{v.rank}</span>
       <span style={{ ...cells[1], color: v.anonymous ? t.fgSubtle : t.fg, fontStyle: v.anonymous ? "italic" : "normal" }}
         title={v.anonymous ? tr("vol.anonymousHint") : undefined}>
@@ -112,6 +169,6 @@ function Row({ v, header, isMe }: {
       <span style={{ ...cells[2], fontWeight: 600, color: t.ok }}>{v.n_accepted.toLocaleString()}</span>
       <span style={{ ...cells[3], color: t.fgMuted }}>{v.n_submitted.toLocaleString()}</span>
       <span style={{ ...cells[4], color: t.fgMuted }}>{v.n_records.toLocaleString()}</span>
-    </div>
+    </Link>
   );
 }

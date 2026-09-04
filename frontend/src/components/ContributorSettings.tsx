@@ -1,120 +1,26 @@
+// The standing choices and role-gated controls that used to sit on the
+// dashboard. They moved out of a page and into a module when /dashboard became
+// /me (個人貢獻): a settings card is not the property of whichever page happened
+// to hold it first, and the personal page should not have to import from
+// another page to show them.
+
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
 import { useAuth } from "../auth";
-import { Button, Spinner, StatusPill } from "../components/ui";
-import { LICENSES, LICENSE_LABELS, asLicense, licenseLabel } from "../licenses";
-import { contributorLabel } from "../contributors";
+import { Button, Spinner } from "../components/ui";
+import { LICENSES, LICENSE_LABELS, asLicense } from "../licenses";
 import type { License } from "../licenses";
-
-const STATUSES = ["submitted", "accepted", "rejected", "merged", "draft"];
-
-export function Dashboard() {
-  const { t: tr } = useTranslation();
-  const { user } = useAuth();
-  const [scope, setScope] = useState<"all" | "mine">("all");
-
-  const anns = useQuery({
-    queryKey: ["annotations", scope],
-    queryFn: () => api.listAnnotations(scope === "mine" ? { mine: "true", limit: "500" } : { limit: "500" }),
-    enabled: !!user,
-  });
-  const datasets = useQuery({ queryKey: ["datasets"], queryFn: () => api.datasets(40) });
-
-  if (!user) {
-    return (
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: t.fgMuted }}>
-        <Link to="/login" style={{ color: t.accent }}>{tr("annotate.loginToAnnotate")} →</Link>
-      </div>
-    );
-  }
-
-  const items = anns.data?.items ?? [];
-  const byStatus = STATUSES.map((s) => ({ status: s, count: items.filter((a) => a.status === s).length }));
-  const isReviewer = user.role === "reviewer" || user.role === "admin";
-
-  return (
-    <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>{tr("dash.title")}</h2>
-
-      <RankingOptIn />
-      <DefaultLicense />
-      {user.role === "admin" && <TranscribeRoutePolicy />}
-
-      {/* status summary */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {byStatus.map((s) => (
-          <div key={s.status} style={{ background: t.panel, border: `1px solid ${t.border}`, padding: "8px 14px", minWidth: 110 }}>
-            <div style={{ fontSize: 22, fontWeight: 600, fontFamily: t.mono }}>{s.count}</div>
-            <StatusPill status={s.status} />
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }}>
-        {/* annotation list */}
-        <div style={{ background: t.panel, border: `1px solid ${t.border}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: t.panelAlt, borderBottom: `1px solid ${t.borderSoft}` }}>
-            <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: t.fgMuted, letterSpacing: 0.3 }}>{tr("detail.annotations")}</span>
-            <div style={{ flex: 1 }} />
-            <Button small primary={scope === "all"} onClick={() => setScope("all")}>{tr("dash.all")}</Button>
-            <Button small primary={scope === "mine"} onClick={() => setScope("mine")}>{tr("dash.mine")}</Button>
-          </div>
-          {anns.isLoading ? <Spinner /> : (
-            <div style={{ maxHeight: 460, overflow: "auto" }}>
-              {items.length === 0 && <div style={{ padding: 16, color: t.fgSubtle, fontSize: 12 }}>—</div>}
-              {items.map((a) => (
-                <Link key={a.id} to={`/record/${a.occurrence_id}`} style={{
-                  display: "block", padding: "6px 10px", borderBottom: `1px solid ${t.borderSoft}`,
-                  textDecoration: "none", color: t.fg,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
-                    <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted }}>{a.field}</span>
-                    {a.source === "ai" && <Icon name="spark" size={10} />}
-                    <span style={{ flex: 1 }} />
-                    <StatusPill status={a.status} />
-                  </div>
-                  <div style={{ fontSize: 11, marginTop: 1 }}>
-                    <span style={{ color: t.fgSubtle, textDecoration: "line-through" }}>{a.original_value || "∅"}</span>
-                    {" → "}<span style={{ fontWeight: 600 }}>{a.proposed_value}</span>
-                  </div>
-                  <div style={{ fontSize: 10, color: t.fgSubtle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {contributorLabel(tr, a.contributor_name, a.contributor_id)} · {licenseLabel(a.license)} · {a.dataset_name}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* institutions + export */}
-        <div style={{ background: t.panel, border: `1px solid ${t.border}` }}>
-          <div style={{ padding: "6px 10px", background: t.panelAlt, borderBottom: `1px solid ${t.borderSoft}`, fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: t.fgMuted, letterSpacing: 0.3 }}>
-            {tr("dash.byInstitution")}
-          </div>
-          {datasets.isLoading ? <Spinner /> : (
-            <div style={{ maxHeight: 460, overflow: "auto" }}>
-              {datasets.data?.map((d) => (
-                <InstitutionRow key={d.dataset_name} d={d} isReviewer={isReviewer} />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Opt in to being named wherever the site says who contributed — the
 // /contributors board, the annotation list below, each record's history and
 // queue line (backend: models.public_name). Off by default, so this lives at the
 // top of the Dashboard rather than buried in a settings page — otherwise nobody
 // would ever find it and every contribution stays pseudonymous.
-function RankingOptIn() {
+export function RankingOptIn() {
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => api.me(), retry: false });
@@ -187,9 +93,6 @@ function RankingOptIn() {
           </div>
         )}
       </div>
-      <Link to="/contributors" style={{ fontSize: 11, color: t.accent, textDecoration: "none", flexShrink: 0 }}>
-        {tr("vol.viewAll")}
-      </Link>
     </div>
   );
 }
@@ -202,7 +105,7 @@ function RankingOptIn() {
 // It sits beside the ranking opt-in for the same reason: a standing choice about
 // how your own contributions are published belongs somewhere you can find it,
 // not re-asked on every record.
-function DefaultLicense() {
+export function DefaultLicense() {
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
   const { refreshUser } = useAuth();
@@ -247,7 +150,7 @@ function DefaultLicense() {
 // pays for it. It lives here instead: one setting, one place, stated as applying
 // to all users. The server enforces the same value (`policy.transcribe_route`),
 // so this is the decision itself rather than a view of it.
-function TranscribeRoutePolicy() {
+export function TranscribeRoutePolicy() {
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
   const cfg = useQuery({ queryKey: ["transcribe-config"], queryFn: () => api.transcribeConfig() });
@@ -315,6 +218,55 @@ function InstitutionRow({ d, isReviewer }: { d: import("../api/types").Dataset; 
         )}
       </div>
       {result != null && <div style={{ fontSize: 10, color: t.accent, marginTop: 2 }}>{result} {tr("dash.exported")}</div>}
+    </div>
+  );
+}
+
+
+/** Per-dataset completeness, with the reviewer's provider-export button beside
+ *  each row. Neither personal nor public: the numbers are open data, but the
+ *  control that acts on them is a reviewer's, so the whole panel lives in the
+ *  personal page's 管理 section and renders for nobody else.
+ */
+export function InstitutionPanel({ isReviewer }: { isReviewer: boolean }) {
+  const { t: tr } = useTranslation();
+  const datasets = useQuery({ queryKey: ["datasets"], queryFn: () => api.datasets(40) });
+  return (
+    <div style={{ background: t.panel, border: `1px solid ${t.border}` }}>
+      <div style={{
+        padding: "6px 10px", background: t.panelAlt, borderBottom: `1px solid ${t.borderSoft}`,
+        fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: t.fgMuted, letterSpacing: 0.3,
+      }}>
+        {tr("dash.byInstitution")}
+      </div>
+      {datasets.isLoading ? <Spinner /> : (
+        <div style={{ maxHeight: 460, overflow: "auto" }}>
+          {datasets.data?.map((d) => (
+            <InstitutionRow key={d.dataset_name} d={d} isReviewer={isReviewer} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The 管理 block: everything on this page that belongs to a role rather than
+ *  to the person. Renders nothing for a plain contributor, so the personal page
+ *  stays personal for the people it is mostly for. */
+export function AdminSection({ role }: { role: string }) {
+  const { t: tr } = useTranslation();
+  const isReviewer = role === "reviewer" || role === "admin";
+  if (!isReviewer) return null;
+  return (
+    <div style={{ marginTop: 20 }}>
+      <h3 style={{
+        fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3,
+        color: t.fgMuted, margin: "0 0 8px",
+      }}>
+        {tr("dash.adminTitle")}
+      </h3>
+      {role === "admin" && <TranscribeRoutePolicy />}
+      <InstitutionPanel isReviewer={isReviewer} />
     </div>
   );
 }

@@ -178,6 +178,10 @@ class Annotation(Base):
 
 
 Index("idx_ann_occ_status", Annotation.occurrence_id, Annotation.status)
+# A contributor's own page reads their rows newest-first; `contributor_id`
+# alone would still sort the whole set. `create_all` adds it to an existing
+# table at startup, so there is no migration step.
+Index("idx_ann_contrib_modified", Annotation.contributor_id, Annotation.modified)
 
 
 class TranscribeRequest(Base):

@@ -201,9 +201,10 @@ function TopVolunteers() {
       <Section title={tr("vol.homeTitle")} icon="rows" />
       <div style={{ background: t.panel, border: `1px solid ${t.border}`, maxWidth: 520 }}>
         {items.map((v) => (
-          <div key={v.user_id} style={{
+          <Link key={v.user_id} to={`/contributors/${v.user_id}`} style={{
             display: "flex", alignItems: "center", gap: 10, padding: "6px 10px",
             borderBottom: `1px solid ${t.borderSoft}`, fontSize: 12,
+            textDecoration: "none", color: t.fg,
           }}>
             <span style={{ width: 20, textAlign: "right", fontFamily: t.mono, fontSize: 11, color: t.fgSubtle }}>{v.rank}</span>
             <span style={{
@@ -214,7 +215,7 @@ function TopVolunteers() {
             </span>
             <span style={{ fontFamily: t.mono, fontSize: 11, fontWeight: 600, color: t.ok }}>{v.n_accepted.toLocaleString()}</span>
             <span style={{ fontSize: 10, color: t.fgSubtle }}>{tr("vol.accepted")}</span>
-          </div>
+          </Link>
         ))}
         <Link to="/contributors" style={{
           display: "block", padding: "6px 10px", fontSize: 11, color: t.accent, textDecoration: "none",

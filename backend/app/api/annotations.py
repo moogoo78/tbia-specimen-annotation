@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from .. import auth, duck, extract, notify, pipeline, policy, search
 from ..annotations_store import _serialize
 from ..config import settings
+from ..contributions_store import attach_records, status_counts
 from ..db import get_session
 from ..models import (
     DEFAULT_LICENSE,
@@ -323,7 +324,7 @@ def update_annotation(
 
 
 @router.get("/annotations")
-def list_annotations(
+async def list_annotations(
     status: str | None = None,
     dataset_name: str | None = None,
     mine: bool = False,
@@ -333,19 +334,31 @@ def list_annotations(
     user: User = Depends(auth.current_user),
     db: Session = Depends(get_session),
 ):
-    conds = []
-    if status:
-        conds.append(Annotation.status == status)
+    # Everything except the status filter. The per-status summary is built over
+    # this, so narrowing the list to one status leaves the breakdown whole --
+    # otherwise picking "accepted" would report that nothing else exists.
+    base = []
     if dataset_name:
-        conds.append(Annotation.dataset_name == dataset_name)
+        base.append(Annotation.dataset_name == dataset_name)
     if occurrence_id:
-        conds.append(Annotation.occurrence_id == occurrence_id)
+        base.append(Annotation.occurrence_id == occurrence_id)
     if mine:
-        conds.append(Annotation.contributor_id == user.id)
+        base.append(Annotation.contributor_id == user.id)
+    conds = base + ([Annotation.status == status] if status else [])
 
     total = db.scalar(select(func.count()).select_from(Annotation).where(*conds))
     rows = db.execute(
         select(Annotation).where(*conds)
         .order_by(Annotation.modified.desc()).limit(limit).offset(offset)
     ).scalars().all()
-    return {"total": total, "items": [_out(db, a) for a in rows], "limit": limit, "offset": offset}
+    items = [_out(db, a) for a in rows]
+    # The specimen each annotation improved, so a caller can group by it. Same
+    # lookup the contributor pages use — "an annotation with its record" has one
+    # definition, and the dashboard's list stops being a column of field names
+    # with no way to tell which specimen any of them belongs to.
+    await attach_records(items)
+    # Counted in SQL over every matching row, not by filtering `items`: the
+    # dashboard's tiles are a claim about all of the work, and `items` is one
+    # page of it.
+    return {"total": total, "items": items, "limit": limit, "offset": offset,
+            "summary": status_counts(db, base)}

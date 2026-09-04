@@ -28,14 +28,25 @@ def test_public_reads_are_cacheable(client, path):
     assert f"max-age={settings.cache_browser_ttl}" in cc
 
 
-def test_live_tier_gets_the_short_ttl(client):
-    assert f"s-maxage={settings.cache_live_ttl}" in _cc(client, "/api/volunteers")
+@pytest.mark.parametrize("path", [
+    "/api/volunteers",
+    # A contributor's public work, opened from a board row or a record byline.
+    # Its sibling "/api/contributors/{id}" 404s until someone has contributed,
+    # and a 404 is never cached — so that one is asserted in test_contributions,
+    # where there is a contributor to ask about.
+    "/api/contributors/1/annotations",
+])
+def test_live_tier_gets_the_short_ttl(client, path):
+    assert f"s-maxage={settings.cache_live_ttl}" in _cc(client, path)
 
 
 @pytest.mark.parametrize("path", [
     "/api/health",
     "/api/auth/orcid/config",
     "/api/transcribe/config",
+    # A contributor's own view depends on who is asking, so it must never be
+    # storable — even though its public sibling above is.
+    "/api/annotations/mine",
 ])
 def test_unlisted_routes_are_never_stored(client, path):
     assert _cc(client, path) == cache.PRIVATE

@@ -146,6 +146,41 @@ export interface Annotation {
   modified: string;
 }
 
+/** An annotation with its specimen put back beside it. The occurrence lives in
+ *  DuckDB and the annotation in SQLite, so these two arrive from a lookup the
+ *  server does per page — null when the store no longer holds the record. */
+export interface Contribution extends Annotation {
+  scientific_name: string | null;
+  catalog_number: string | null;
+}
+
+/** One contributor's public standing. `name` null means the name is withheld
+ *  (`users.show_in_ranking`), never that there is no contributor — render it
+ *  through `contributorLabel`. The ORCID iD travels with the name or not at
+ *  all. */
+export interface ContributorProfile {
+  user_id: number;
+  name: string | null;
+  anonymous: boolean;
+  orcid: string | null;
+  n_submitted: number;
+  n_accepted: number;
+  n_records: number;
+  first: string | null;
+  last: string | null;
+}
+
+export interface ContributionPage {
+  total: number;
+  items: Contribution[];
+  limit: number;
+  offset: number;
+}
+
+/** Per-status totals over *all* of the signed-in contributor's rows, not just
+ *  the page — keyed by status, plus `total`. */
+export type ContributionSummary = Record<string, number>;
+
 export interface ExtractedField { field: string; value: string; confidence: number; }
 export interface ExtractResponse {
   occurrence_id: string;

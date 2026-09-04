@@ -85,7 +85,8 @@ backend/ingest/     common.py (export access, registry, column baseline), inspec
                     (survey an export), build.py (export -> DuckDB), prepare.py
                     (derive flags), columns.json (the pinned export header)
 backend/tests/      conftest.py builds a tiny DuckDB+SQLite; test_search, test_annotations
-frontend/src/       pages/ (Explore + exploreUrl.ts, RecordDetail, Dashboard, Login), components/,
+frontend/src/       pages/ (Explore + exploreUrl.ts, RecordDetail, Volunteers, MyContributions,
+                    Contributor, Login), components/,
                     api/, i18n/, design/, seo/ (pages.json + useSeo.ts)
 data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
                     reference.sqlite (seeded) + registry.json + media_variants.json
@@ -183,8 +184,8 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
     vary row by row. See *Licensing* in `docs/annotation-schema.md`.
 - **A contributor's name is published only if they opted in.** `users.show_in_ranking`
   is one switch over *every* surface that names a contributor, not just the ranking it
-  is named after: the volunteer board, the dashboard's annotation list, a record's
-  annotation history and its transcription queue line. `models.public_name()` is the
+  is named after: the contributor board, the public activity feed, a contributor's
+  own page, a record's annotation history and its transcription queue line. `models.public_name()` is the
   single rule — `None` for everyone who has not opted in, else `public_display_name or
   display_name` — and it is applied **server-side**, because `GET /api/occurrences/{id}`
   is unauthenticated and edge-cached, so a name left in that payload is published however
@@ -197,7 +198,7 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
   `docs/annotation-schema.md`.
   - **Whether to be named and *as what* are separate settings.**
     `users.public_display_name` (null = "use the ORCID name") is what an opted-in
-    contributor is published as, edited beside the opt-in on the Dashboard. It is a
+    contributor is published as, edited beside the opt-in on `/me`. It is a
     second column rather than an edit to `display_name` because the ORCID callback
     overwrites *that* one from the token response on every sign-in, so an in-place
     edit would silently revert at the user's next login. Blank clears it back to null;
@@ -239,7 +240,8 @@ data/               tbia.duckdb (ETL export) + annotations.sqlite (user work) +
     left exactly as they are: real history, still reviewable. Nothing new creates them.
 - **Which route a click takes is one system-wide setting, not a per-caller choice.**
   `app/policy.py` holds it in `app_settings` (annotation store, so it is durable and
-  backed up): `queue` (the default) or `now`. An **admin** moves it from the Dashboard
+  backed up): `queue` (the default) or `now`. An **admin** moves it from `/me`'s
+  admin section
   (`PUT /api/transcribe/config`); `GET /api/transcribe/config` reports it to everyone
   alongside the model chain, and the record page's AI panel renders whichever route is in
   force. Under `now` it is *every contributor's* click that runs and bills inline, which
@@ -336,6 +338,76 @@ grouping, so paging in SQL would pay the full scan per request. Nothing is persi
 picker. A row links into Explore through `exploreUrl()` (see *Explore's URL* below) and must
 clear `has_media`, which `emptyFilters()` defaults to `true`; without that the landing page
 would report fewer records than the row it was opened from.
+
+## Contributions: public vs personal
+
+**Two questions, two pages, and the split is who the answer is about.** There used
+to be one `/dashboard` holding both — your name opt-in and your default licence
+above a list of *everyone's* annotations and a table of every institution — so
+neither question had a page that answered it. `/dashboard` is now only a redirect.
+
+- **`/contributors` (公開貢獻, public, unauthenticated)** — the platform's
+  contribution record: per-status totals, the ranking board, and the recent
+  activity feed. Nothing here needs a session, because every row of it is already
+  visible on its own record page; putting it behind a login only hid it.
+- **`/me` (個人貢獻, needs a session)** — one person's own work, their standing
+  choices (`show_in_ranking` + `public_display_name`, `default_license`), and,
+  for those who hold a role, the 管理 block (the system-wide AI transcription
+  route, the per-dataset provider export).
+- **`/contributors/{id}` (public)** — one contributor's work, as others see it.
+  It is `/me` minus the drafts, the settings and the admin block.
+
+**Drafts are the line between the two.** They are private working state: they
+appear on `/me` and nowhere else — not on the feed, not on a contributor's public
+page, not in the ranking, and not as an overlay on a record. `api/contributions.py`
+enforces this per route (`status=draft` is a 400 on the public ones), and
+`OVERLAY_SKIP` in `RecordDetail.tsx` enforces it on the record.
+
+Three shared pieces stop the surfaces from drifting:
+
+- `contributions_store.count_columns()` — one definition of `n_submitted /
+  n_accepted / n_records`, selected by both the board (`api/volunteers`) and a
+  contributor's profile, so a board row and the page it opens cannot print
+  different numbers.
+- `contributions_store.status_counts()` — per-status totals **in SQL**, over
+  conditions that deliberately exclude the caller's own `status` filter, so
+  narrowing a list to one status leaves the breakdown whole. The tiles were
+  `items.filter(...)` over one fetched page, which was silently wrong past row
+  500 and said nothing about it.
+- `contributions_store.attach_records()` — the specimen each annotation
+  improved. One bounded `occurrence` lookup for the page's ids, **not** the
+  federated `JOIN occurrence` in `api/export.py`: paging and ordering stay in
+  SQLite where the rows live and `contributor_id` is indexed, it needs no
+  `annotations_attached()` guard, and an id a re-ingested store no longer holds
+  comes back null instead of dropping the row the way an inner join would.
+
+**A contribution is displayed grouped by specimen** (`components/Contributions.tsx`,
+`groupByRecord` + `ContributionList`), because someone who fixed a date, a locality
+and a coordinate on one sheet did *one* piece of work and a flat list prints it as
+three unrelated lines naming no specimen at all. The record heading is a group's
+only link — a row-level link would have to nest inside it, which is invalid HTML,
+and is why the byline could not be a link before.
+
+## Annotations on the record itself
+
+`GET /api/occurrences/{id}` already ships a record's annotation history, and
+`RecordDetail.tsx` renders the latest one **as the field's value**, with the
+provider's own value struck through beneath it and the status beside it
+(`enrichments()` / `Enriched` / `Field`'s `ann` prop). The occurrence store stays
+read-only — this is a read-time overlay, nothing is written back — and the red
+"gap" rule on a field turns green once something answers it.
+
+- **Latest per field wins.** The detail payload arrives `created desc`, so the
+  first row for a field is the newest.
+- **`draft` and `rejected` never overlay** (`OVERLAY_SKIP`): one is private
+  working state on a page that is unauthenticated and edge-cached, the other is
+  a reviewer having said no. Showing either as the specimen's value would
+  publish something nobody stands behind.
+- A coordinate is two annotations and a field is one value, so
+  `coordinateAnnotation()` folds the lat/lon pair into one synthetic row.
+- The identification gap gets the header: a record annotated with a
+  `annotationScientificName` reads as that name, since that is the gap the
+  platform exists to close.
 
 ## Explore's URL
 

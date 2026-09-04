@@ -13,7 +13,7 @@ const en = {
   },
   // `data` and `participate` label the two dropdown groups in the header; the
   // rest are the destinations inside them.
-  nav: { home: "Home", browse: "Browse", explore: "Explore", data: "Data", participate: "Take part", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  nav: { home: "Home", browse: "Browse", explore: "Explore", data: "Data", participate: "Take part", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", myContributions: "My contributions", guide: "Guide", login: "Sign in", logout: "Sign out" },
   story: {
     title: "Data stories",
     blurb: "Topics that read the collection as a narrative rather than a result set: who went where, when, and what of it can still be found in the store today. Each topic works from a published source and queries the specimen data live.",
@@ -88,8 +88,10 @@ const en = {
   },
   inst: { title: "Collection institutions", datasets: "datasets", records: "records", viewAll: "View all records", viewOnTbia: "View this dataset on the TBIA portal" },
   vol: {
-    title: "Top contributors",
-    blurb: "Ranked by annotations a reviewer accepted — the work that actually reached a data provider. Submitted counts everything proposed; records counts distinct specimens improved.",
+    title: "Contributors",
+    blurb: "The platform's contribution record, in public: how much has been contributed, who has contributed most, and what has been contributed lately. Your own work — drafts included — is on your contributions page.",
+    rankTitle: "Top contributors",
+    rankBlurb: "Ranked by annotations a reviewer accepted — the work that actually reached a data provider. Submitted counts everything proposed; records counts distinct specimens improved.",
     rangeAll: "All time", rangeMonth: "This month",
     rank: "#", volunteer: "Contributor", submitted: "Submitted", accepted: "Accepted", records: "Records",
     anonymous: "Unnamed contributor",
@@ -100,9 +102,27 @@ const en = {
     nameHint: "Leave blank to use your ORCID name. Changing it renames you everywhere at once, including on work already contributed.",
     nameSave: "Save",
     nameSaved: "Saved",
-    optInHint: "Off by default. When off you appear as \"Unnamed contributor #<id>\" everywhere the site names a contributor — this ranking, the dashboard's annotation list, and each record's annotation history. Your contribution counts are shown either way, and annotations exported to a data provider still carry your name, because the CC-BY licences ask for attribution.",
+    optInHint: "Off by default. When off you appear as \"Unnamed contributor #<id>\" everywhere the site names a contributor — the ranking, the recent-contributions feed, your own contributor page, and each record's annotation history. Your contribution counts are shown either way, and annotations exported to a data provider still carry your name, because the CC-BY licences ask for attribution.",
     empty: "No contributions yet.",
     homeTitle: "Top contributors", viewAll: "View the full ranking",
+    recentTitle: "Recent contributions",
+  },
+  // A contributor's own work, as a place: `prof` is the public page anyone can
+  // open from a byline or a ranking row, `mine` is the signed-in contributor's
+  // own view of the same work plus their drafts.
+  prof: {
+    notFound: "No such contributor, or they have not contributed yet.",
+    contributions: "Contributions",
+    since: "contributing since",
+    orcid: "ORCID",
+    anonymousBlurb: "This contributor has not opted in to being named. Their work is shown; their name and ORCID iD are not.",
+  },
+  mine: {
+    title: "My contributions",
+    blurb: "Everything you have annotated, grouped by specimen and newest first — drafts included, since they are yours alone. The counts are over all of your work, not just this page. What everyone has contributed is on the contributors page.",
+    empty: "Nothing here yet.",
+    filterAll: "All",
+    viewPublic: "See everyone's contributions",
   },
   sp: {
     title: "Species",
@@ -206,10 +226,15 @@ const en = {
     // so choosing 4096px doesn't make the page heavier.
     openAt: "Open at",
     openAtHint: "The label is usually only legible at 2048px or above.",
+    // Precedes the provider's own value under an annotated field. The record
+    // is never overwritten — this is what the annotation is shown on top of.
+    wasValue: "was",
   },
   annotate: {
     title: "Fill the gaps", field: "Field", proposed: "Proposed value",
     note: "Note (optional)", submit: "Submit annotation", saveDraft: "Save draft",
+    submittedN: "{{n}} annotations submitted", draftSavedN: "{{n}} drafts saved",
+    seeMine: "See all your contributions", submitFailed: "Could not submit",
     confidence: "confidence", accept: "Accept", reject: "Reject", merge: "Mark merged",
     loginToAnnotate: "Sign in to annotate", history: "Annotation history",
     apply: "Use", applyAll: "Use all", clearAi: "Clear AI", model: "Model",
@@ -286,6 +311,10 @@ const en = {
     georeferenced: "Georeferenced", dated: "Dated", media: "Media",
     completeness: "Avg completeness", export: "Export deltas", exported: "deltas ready to return",
     pending: "Pending review", mine: "My annotations", all: "All annotations",
+    // The list groups by specimen; this counts the fields annotated on one.
+    nFields_one: "{{count}} field", nFields_other: "{{count}} fields",
+    // The role-gated block on the personal page: neither yours nor public.
+    adminTitle: "Administration",
     // Admin-only card: the system-wide AI transcription route.
     aiRouteTitle: "AI transcription route",
     aiRouteHint: "Applies to everyone, not just you. Queue: a click is saved for the batch worker and Discord is pinged. Now: every contributor's click calls the AI inside their own request — they wait around half a minute and the API is billed immediately.",
@@ -316,13 +345,55 @@ const en = {
     annotationLatitudeDecimal: "Latitude (decimal)", annotationLongitudeDecimal: "Longitude (decimal)",
     annotationCounty: "County", annotationMunicipality: "Municipality",
   },
+  // Privacy notice (/privacy). Every claim here is checkable against the code —
+  // api/auth.py for what sign-in stores, models.public_name for the naming
+  // opt-in, api/export.py for the ORCID name in the provider export, and
+  // analytics.ts for the cookie. Change one of those and change this.
+  privacy: {
+    title: "Privacy and how your data is used",
+    lead: "Short version: signing in stores your ORCID iD and name; your annotations are public; and the copy returned to the collection that holds the specimen carries your ORCID name, because the licence asks for attribution. The analytics cookie is the least of it, and it is off until you accept.",
+    updated: "This page describes what the platform does today.",
+
+    signinTitle: "When you sign in",
+    signin1: "Sign-in is ORCID only — there is no password, and this platform never sees one.",
+    signin2: "ORCID returns your iD and your name, and we store those plus an email address if ORCID supplies one. Nothing else is requested.",
+    signin3: "Your iD is the account. Signing in again on any device reaches the same work.",
+
+    annotationTitle: "Your annotations",
+    annotation1: "Each annotation stores the field, the value you proposed, the value it replaces, an optional note, the licence you chose, when it was written, and which account wrote it.",
+    annotation2: "Annotations are public. They appear on the specimen's own record page, in the recent-contributions feed, and on a contributor page — to anyone, signed in or not.",
+    annotation3: "A draft is the exception: drafts are private working state, visible only to you, and appear on no public page.",
+    annotation4: "If AI transcription proposed a value, what it said is stored beside what you sent. That pair is how we measure the transcription, and it is why an unedited proposal and an original are told apart.",
+
+    nameTitle: "Whether you are named",
+    name1: "Off by default. Until you turn it on you appear everywhere on the site as \"Unnamed contributor #<id>\" — the ranking, the activity feed, your contributor page, and each record's annotation history.",
+    name2: "The suppression is applied on the server, not by the page, so a name that has not been opted in never leaves it.",
+    name3: "You can choose a different name to be published under, and change or withdraw either choice at any time.",
+
+    exportTitle: "What reaches the collections — read this one",
+    export1: "Reviewed annotations are returned to the institution holding the specimen, and each row carries the licence you released it under and the name on your ORCID record.",
+    export2: "That name is included whether or not you turned on \"Show my name publicly\". The site opt-in governs the site; the export is an attribution the CC-BY licences ask for, and it has to be checkable against a real iD.",
+    export3: "An export is a snapshot of the terms in force when it ran. You can relicense your own annotation at any time and the next export carries the change — but a copy a collection already took keeps the terms it was given.",
+
+    cookieTitle: "Cookies",
+    cookie1: "This site sets two cookies, both Google Analytics: _ga and _ga_<id>. Neither exists until you accept.",
+    cookie2: "After you accept, Google receives the page address and title, and — as GA4 does automatically — a client identifier, your approximate location derived from your IP address, your browser and device, and the referring page.",
+    cookie3: "You can withdraw at any time from \"Cookies\" in the header. That expires the cookies and asks again. Declining is remembered too, so you are asked once.",
+
+    storageTitle: "What stays in your browser",
+    storage1: "Your sign-in token, your language, your cookie answer, and small display preferences are kept in your browser's local storage. These are not cookies and are never sent to us or to anyone else.",
+
+    openTitle: "The specimen records themselves",
+    open1: "The occurrence records are TBIA's, read-only here, and were already public. This platform never writes to them — an enrichment exists only as an annotation.",
+  },
   consent: {
-    text: "We'd like to use Google Analytics cookies to see which parts of the platform get used. Nothing is collected unless you accept, and this has no effect on your annotations.",
+    text: "This site uses cookies to analyse how the site is used",
     accept: "Accept",
     decline: "Decline",
     title: "Cookies",
     manage: "Cookies",
     manageTitle: "Change your analytics cookie choice",
+    more: "What we collect",
   },
   // Guide page (/guide) — the four Get-started steps written out, plus tips and
   // FAQ. Lifted from docs/user-manual-slides.md; keep the two decks in step.
@@ -493,7 +564,7 @@ const zh: typeof en = {
     short: "TBIA 標本標註平台",
     expansion: "整合標本標籤：標註、連結、探索",
   },
-  nav: { home: "首頁", browse: "瀏覽", explore: "探索", data: "資料", participate: "參與", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
+  nav: { home: "首頁", browse: "瀏覽", explore: "探索", data: "資料", participate: "參與", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者", myContributions: "個人貢獻", guide: "使用說明", login: "登入", logout: "登出" },
   story: {
     title: "資料說故事",
     blurb: "以敘事的方式閱讀典藏，而不只是查詢結果：誰在何時去了哪裡，以及今天在資料庫裡還找得到什麼。每則故事都以已出版的文獻為本，並即時查詢標本資料。",
@@ -568,8 +639,10 @@ const zh: typeof en = {
   },
   inst: { title: "典藏機構", datasets: "個資料集", records: "筆紀錄", viewAll: "查看全部紀錄", viewOnTbia: "在 TBIA 資料入口查看此資料集" },
   vol: {
-    title: "貢獻者排行",
-    blurb: "依審核通過的註記數排名——也就是真正回饋給資料提供者的成果。「提交」計入所有提出的註記，「標本數」計入改善過的不重複標本。",
+    title: "貢獻者",
+    blurb: "公開呈現這個平台的貢獻紀錄：累積了多少、誰貢獻最多、最近補了哪些資料。你自己的貢獻（含草稿）請見「個人貢獻」。",
+    rankTitle: "貢獻者排行",
+    rankBlurb: "依審核通過的註記數排名——也就是真正回饋給資料提供者的成果。「提交」計入所有提出的註記，「標本數」計入改善過的不重複標本。",
     rangeAll: "全部時間", rangeMonth: "本月",
     rank: "#", volunteer: "貢獻者", submitted: "提交", accepted: "通過", records: "標本數",
     anonymous: "未具名貢獻者",
@@ -580,9 +653,24 @@ const zh: typeof en = {
     nameHint: "留空則使用 ORCID 上的姓名。修改後所有位置同時更新，包含已提交的標註。",
     nameSave: "儲存",
     nameSaved: "已儲存",
-    optInHint: "預設為關閉。關閉時，凡是網站標示貢獻者之處——貢獻者排行、儀表板的標註清單、每筆紀錄的標註紀錄——都顯示為「未具名貢獻者 #<id>」。無論是否開啟，貢獻數字都會列出；匯出給資料提供者的標註仍會附上您的姓名，因為 CC-BY 授權要求標示。",
+    optInHint: "預設為關閉。關閉時，凡是網站標示貢獻者之處——貢獻者排行、最新貢獻列表、你自己的貢獻者頁面，以及每筆紀錄的標註紀錄——都顯示為「未具名貢獻者 #<id>」。無論是否開啟，貢獻數字都會列出；匯出給資料提供者的標註仍會附上您的姓名，因為 CC-BY 授權要求標示。",
     empty: "尚無貢獻紀錄。",
     homeTitle: "貢獻者排行", viewAll: "查看完整排行",
+    recentTitle: "最新貢獻",
+  },
+  prof: {
+    notFound: "找不到這位貢獻者，或對方尚未有任何貢獻。",
+    contributions: "貢獻紀錄",
+    since: "開始貢獻",
+    orcid: "ORCID",
+    anonymousBlurb: "這位貢獻者尚未選擇公開姓名。這裡呈現的是貢獻內容，不含姓名與 ORCID iD。",
+  },
+  mine: {
+    title: "個人貢獻",
+    blurb: "你標註過的所有內容，依標本分組、由新到舊，並包含只有你看得到的草稿。統計數字涵蓋你的全部貢獻，不只這一頁。所有人的貢獻請見「貢獻者」頁面。",
+    empty: "目前還沒有內容。",
+    filterAll: "全部",
+    viewPublic: "看所有人的貢獻",
   },
   sp: {
     title: "物種",
@@ -683,10 +771,13 @@ const zh: typeof en = {
     resize: "拖曳調整寬度",
     openAt: "開啟尺寸",
     openAtHint: "標籤文字通常要 2048px 以上才看得清楚。",
+    wasValue: "原值",
   },
   annotate: {
     title: "補齊缺漏資料", field: "欄位", proposed: "建議值",
     note: "備註（選填）", submit: "送出標註", saveDraft: "儲存草稿",
+    submittedN: "已送出 {{n}} 筆標註", draftSavedN: "已儲存 {{n}} 筆草稿",
+    seeMine: "查看我的所有貢獻", submitFailed: "送出失敗",
     confidence: "信心值", accept: "採納", reject: "退回", merge: "標記為已合併",
     loginToAnnotate: "登入後即可標註", history: "標註紀錄",
     apply: "填入", applyAll: "全部填入", clearAi: "清除 AI 值", model: "模型",
@@ -761,6 +852,8 @@ const zh: typeof en = {
     georeferenced: "有座標", dated: "有日期", media: "有影像",
     completeness: "平均完整度", export: "匯出補遺", exported: "筆補遺可回饋",
     pending: "待審核", mine: "我的標註", all: "所有標註",
+    nFields_one: "{{count}} 個欄位", nFields_other: "{{count}} 個欄位",
+    adminTitle: "管理",
     aiRouteTitle: "AI 轉錄執行方式",
     aiRouteHint: "此設定適用於所有使用者，不只您自己。排入佇列：按下後僅記錄下來，交由批次程式處理並通知 Discord。立即執行：每位協作者按下時都會在自己的請求中直接呼叫 AI — 需等待約半分鐘，並立即產生 API 費用。",
     aiRouteNowWarn: "目前所有協作者都是立即執行，每次點擊都會產生 AI 費用。",
@@ -790,13 +883,51 @@ const zh: typeof en = {
     annotationLatitudeDecimal: "緯度(十進位)", annotationLongitudeDecimal: "經度(十進位)",
     annotationCounty: "縣市", annotationMunicipality: "鄉鎮市區",
   },
+  privacy: {
+    title: "隱私與資料使用",
+    lead: "簡短版本：登入會存下你的 ORCID iD 與姓名；你的標註是公開的；而回饋給典藏機構的那份資料會附上你的 ORCID 姓名，因為授權條款要求標示來源。Cookie 反而是其中最小的一件事，而且要你同意之後才會建立。",
+    updated: "本頁描述的是平台目前的實際做法。",
+
+    signinTitle: "登入時",
+    signin1: "只用 ORCID 登入，沒有密碼，本平台也不會看到任何密碼。",
+    signin2: "ORCID 會回傳你的 iD 與姓名，我們儲存這兩項，以及 ORCID 有提供時的 Email。除此之外不會索取其他資料。",
+    signin3: "iD 就是你的帳號。在任何裝置上再次登入，看到的都是同一批成果。",
+
+    annotationTitle: "你的標註",
+    annotation1: "每一筆標註會存下欄位、你提出的值、它取代的原值、選填的備註、你選擇的授權條款、寫入時間，以及是哪個帳號寫的。",
+    annotation2: "標註是公開的。它會出現在該標本的紀錄頁、最新貢獻列表，以及貢獻者頁面上——不論對方有沒有登入。",
+    annotation3: "草稿是唯一的例外：草稿屬於個人的工作狀態，只有你看得到，不會出現在任何公開頁面。",
+    annotation4: "如果有 AI 轉錄提出過建議值，系統會把 AI 說的內容存在你送出的內容旁邊。這一組對照是我們衡量轉錄品質的依據，也是「原封不動採用」與「人工修正」得以區分的原因。",
+
+    nameTitle: "是否具名",
+    name1: "預設為關閉。在你開啟之前，網站上凡是標示貢獻者之處都顯示為「未具名貢獻者 #<id>」——包括排行、最新貢獻列表、你的貢獻者頁面，以及每筆紀錄的標註紀錄。",
+    name2: "隱藏是在伺服器端完成的，不是靠頁面不顯示，所以未選擇公開的姓名根本不會離開伺服器。",
+    name3: "你也可以指定另一個公開使用的名稱，並隨時更改或收回這兩項設定。",
+
+    exportTitle: "回饋給典藏機構的內容——這段請務必看",
+    export1: "通過審核的標註會回饋給典藏該標本的機構，每一列都會附上你所選擇的授權條款，以及你 ORCID 紀錄上的姓名。",
+    export2: "不論你有沒有開啟「公開顯示我的姓名」，這個姓名都會包含在內。網站上的設定管的是網站；匯出的姓名是 CC-BY 授權要求的來源標示，而且必須能對得上一個真實的 iD。",
+    export3: "每次匯出都是當下授權狀態的快照。你隨時可以更改自己標註的授權條款，下一次匯出就會採用新的條款——但機構已經取得的那一份，維持它當時取得的條款。",
+
+    cookieTitle: "Cookie",
+    cookie1: "本網站只建立兩個 Cookie，都屬於 Google Analytics：_ga 與 _ga_<id>。在你同意之前，兩者都不存在。",
+    cookie2: "同意之後，Google 會收到頁面網址與標題，以及 GA4 自動蒐集的項目：一個用戶識別碼、由 IP 推估的大致地區、你的瀏覽器與裝置，以及來源頁面。",
+    cookie3: "你可以隨時從頁首的「Cookie 設定」收回同意。收回會清除這些 Cookie 並重新詢問。不同意的選擇同樣會被記住，所以我們只會問一次。",
+
+    storageTitle: "留在你瀏覽器裡的資料",
+    storage1: "登入憑證、語言、你對 Cookie 的選擇，以及一些顯示偏好，存放在你瀏覽器的 local storage。這些不是 Cookie，也不會傳送給我們或任何第三方。",
+
+    openTitle: "標本紀錄本身",
+    open1: "標本紀錄屬於 TBIA，在本平台為唯讀，而且原本就是公開資料。本平台不會寫入這些紀錄——補遺只以標註的形式存在。",
+  },
   consent: {
-    text: "本站希望使用 Google Analytics cookie，以了解平台各功能的使用情形。未經您同意不會蒐集任何資料，也不影響您的標註內容。",
+    text: "本網站使用 Cookie 進行網站使用分析",
     accept: "同意",
     decline: "不同意",
     title: "Cookie 使用",
     manage: "Cookie 設定",
     manageTitle: "變更分析 cookie 的同意設定",
+    more: "資料使用說明",
   },
   // 使用說明頁 (/guide) — 首頁四步驟的完整版，加上實用訣竅與常見問題。
   // 內容取自 docs/user-manual-slides.zh-TW.md，兩邊請一起維護。
