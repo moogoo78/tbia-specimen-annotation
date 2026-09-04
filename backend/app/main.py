@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     duck.close()
 
 
-app = FastAPI(title="TBIA Specimen Annotation Platform", lifespan=lifespan)
+app = FastAPI(title="ISLAND — TBIA Specimen Label Annotation Platform", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

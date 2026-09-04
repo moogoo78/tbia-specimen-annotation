@@ -1,5 +1,5 @@
 ---
-title: TBIA 標本資料補遺平台 — 使用手冊
+title: ISLAND 島 — 使用手冊
 tags: manual, tbia, guide, zh-TW
 type: slide
 slideOptions:
@@ -10,9 +10,11 @@ slideOptions:
 
 <!-- .slide: style="text-align:center" -->
 
-# 🔬 TBIA 標本資料補遺平台
+# 🔬 ISLAND 島
 
 ### 使用手冊 — 一般使用者版
+
+*整合標本標籤：標註、連結、探索*
 
 補齊自然史標本的缺漏資訊
 
@@ -346,4 +348,4 @@ Note:
 
 ### 找到缺漏 → 補齊它 → 讓它回饋出去
 
-<small>TBIA 標本資料補遺平台 · *Closing Gaps in Specimen Metadata*</small>
+<small>ISLAND 島 · *Closing Gaps in Specimen Metadata*</small>

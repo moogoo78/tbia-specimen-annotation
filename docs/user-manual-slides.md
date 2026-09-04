@@ -1,5 +1,5 @@
 ---
-title: TBIA Specimen Annotation — User Manual
+title: ISLAND — User Manual
 tags: manual, tbia, guide
 type: slide
 slideOptions:
@@ -10,9 +10,11 @@ slideOptions:
 
 <!-- .slide: style="text-align:center" -->
 
-# 🔬 TBIA Specimen Annotation Platform
+# 🔬 ISLAND
 
 ### User Manual — for general users
+
+*Integrated Specimen Labels: Annotation, Network, Discovery*
 
 Closing gaps in natural-history specimen metadata
 
@@ -348,4 +350,4 @@ for research, conservation, and education.
 
 ### Find a gap → fill it → help it flow back
 
-<small>TBIA Specimen Annotation Platform · *Closing Gaps in Specimen Metadata*</small>
+<small>ISLAND · *Closing Gaps in Specimen Metadata*</small>

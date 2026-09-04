@@ -1,10 +1,11 @@
-# TBIA Specimen Annotation Platform — Build Summary
+# ISLAND — Build Summary
 
 *How this site was made: the concept, the design, and the you-plus-Claude-Code collaboration.*
 
 ## What you're building
 
-**TBIA Specimen Annotation & Feedback Platform** — a collaborative tool tied to the
+**ISLAND** — *Integrated Specimen Labels: Annotation, Network, Discovery* — a
+collaborative tool tied to the
 **TDWG 2026 abstract, *"Closing Gaps in Specimen Metadata."*** The core idea: natural-history
 specimen records (from the Taiwan Biodiversity Information Alliance, ~2M occurrences) are often
 missing key metadata — taxonomic ID, coordinates, or collection date. The platform lets
