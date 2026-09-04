@@ -71,7 +71,7 @@ function cardHtml(page) {
   .dot { width: 11px; height: 11px; border-radius: 50%; background: ${T.fg}; opacity: .6; }
   </style></head><body>
     <div>
-      <div class="eyebrow">ISLAND 島 · TBIA 自然史標本</div>
+      <div class="eyebrow">ISLAND · TBIA 自然史標本</div>
       <h1 style="margin-top:22px">${esc(title)}</h1>
     </div>
     <p>${esc(desc)}</p>

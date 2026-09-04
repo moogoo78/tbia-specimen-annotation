@@ -1,5 +1,5 @@
 ---
-title: ISLAND 島 — 使用手冊
+title: ISLAND — 使用手冊
 tags: manual, tbia, guide, zh-TW
 type: slide
 slideOptions:
@@ -10,7 +10,7 @@ slideOptions:
 
 <!-- .slide: style="text-align:center" -->
 
-# 🔬 ISLAND 島
+# 🔬 ISLAND
 
 ### 使用手冊 — 一般使用者版
 
@@ -348,4 +348,4 @@ Note:
 
 ### 找到缺漏 → 補齊它 → 讓它回饋出去
 
-<small>ISLAND 島 · *Closing Gaps in Specimen Metadata*</small>
+<small>ISLAND · *Closing Gaps in Specimen Metadata*</small>

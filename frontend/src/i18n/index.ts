@@ -4,7 +4,9 @@ import { initReactI18next } from "react-i18next";
 const en = {
   app: {
     title: "ISLAND — TBIA Specimen Label Annotation Platform",
-    short: "ISLAND",
+    // Kept short deliberately: this sits beside eleven tabs, and the English
+    // strings are the wide ones — the full name wraps the 38px header at 1280.
+    short: "TBIA Annotation",
     // What the acronym stands for. Shown once, under the home page headline:
     // a name nobody can expand is just a word.
     expansion: "Integrated Specimen Labels: Annotation, Network, Discovery",
@@ -485,8 +487,8 @@ const en = {
 
 const zh: typeof en = {
   app: {
-    title: "ISLAND 島 · TBIA 自然史標本標註平台",
-    short: "ISLAND",
+    title: "ISLAND · TBIA 自然史標本標註平台",
+    short: "TBIA 自然史標本標註平台",
     expansion: "整合標本標籤：標註、連結、探索",
   },
   nav: { home: "首頁", browse: "瀏覽", explore: "探索", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
