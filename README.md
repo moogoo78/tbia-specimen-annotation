@@ -1,4 +1,4 @@
-# TBIA Specimen Annotation & Feedback Platform
+# ISLAND — Integrated Specimen Labels: Annotation, Network, Discovery
 
 A collaborative annotation platform for natural-history collection data from the
 **Taiwan Biodiversity Information Alliance (TBIA)**. It serves ~2.08 million occurrence

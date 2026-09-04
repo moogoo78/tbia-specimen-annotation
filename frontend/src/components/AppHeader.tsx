@@ -62,7 +62,7 @@ export function AppHeader() {
         <div style={{
           width: 18, height: 18, background: t.fg, color: t.bg, display: "flex",
           alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: t.mono, fontWeight: 700,
-        }}>T</div>
+        }}>I</div>
         <span style={{ fontSize: 12, fontWeight: 600 }}>{tr("app.short")}</span>
       </Link>
 

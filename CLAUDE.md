@@ -4,8 +4,9 @@ Guidance for working in this repo. Pairs with `README.md` (user-facing setup).
 
 ## What this is
 
-A collaborative annotation platform for TBIA natural-history specimen data (TDWG 2026
-abstract: *Closing Gaps in Specimen Metadata*). Users find records with metadata **gaps**
+**ISLAND** — *Integrated Specimen Labels: Annotation, Network, Discovery* — a collaborative
+annotation platform for TBIA natural-history specimen data (TDWG 2026 abstract: *Closing
+Gaps in Specimen Metadata*). Users find records with metadata **gaps**
 (missing identification / coordinates / date), fill them manually or with AI-assisted label
 transcription, and reviewed enrichments are exported back to data providers.
 

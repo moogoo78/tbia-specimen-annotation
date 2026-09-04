@@ -18,8 +18,8 @@
     {
       "path": "/",
       "title": {
-        "en": "TBIA Specimen Exploration & Annotation Platform",
-        "zh": "TBIA自然史標本探索與標註平台"
+        "en": "ISLAND — TBIA Specimen Label Annotation Platform",
+        "zh": "ISLAND 島 · TBIA 自然史標本標註平台"
       },
       "description": {
         "en": "A collaborative platform for enriching TBIA natural-history specimen records. Find occurrences missing identification, coordinates or dates, fill them by hand or with AI-assisted label transcription, and return reviewed enrichments to data providers.",
@@ -28,7 +28,8 @@
       "card": { "title": "填補標本後設資料的缺口" },
       "schema": {
         "@type": "Dataset",
-        "name": "TBIA 自然史標本探索與標註平台",
+        "name": "ISLAND 島 · TBIA 自然史標本標註平台",
+        "alternateName": "Integrated Specimen Labels: Annotation, Network, Discovery",
         "description": "台灣生物多樣性資訊聯盟（TBIA）自然史標本紀錄的協作補遺平台，涵蓋 945 個資料集、約 208 萬筆標本紀錄。",
         "inLanguage": ["zh-Hant", "en"],
         "isBasedOn": "https://tbiadata.tw/",

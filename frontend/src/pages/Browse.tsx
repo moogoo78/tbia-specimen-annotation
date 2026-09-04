@@ -63,7 +63,9 @@ export function Browse() {
           <div style={{ fontFamily: t.mono, fontSize: 11, color: t.fgSubtle, letterSpacing: 0.4, textTransform: "uppercase", marginBottom: 10 }}>
             TBIA · {tr("home.tagline")}
           </div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 12px", lineHeight: 1.25 }}>{tr("app.title")}</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 8px", lineHeight: 1.25 }}>{tr("app.title")}</h1>
+          {/* The one place the acronym is spelled out. */}
+          <div style={{ fontFamily: t.mono, fontSize: 11.5, color: t.fgSubtle, letterSpacing: 0.3, margin: "0 0 14px" }}>{tr("app.expansion")}</div>
           <p style={{ fontSize: 14, color: t.fgMuted, lineHeight: 1.7, margin: "0 0 20px", maxWidth: 680 }}>{tr("home.blurb")}</p>
           <button onClick={() => nav("/explore")} style={{
             display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px",

@@ -2,7 +2,13 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
 const en = {
-  app: { title: "TBIA Specimen Exploration & Annotation Platform", short: "TBIA Explorer" },
+  app: {
+    title: "ISLAND — TBIA Specimen Label Annotation Platform",
+    short: "ISLAND",
+    // What the acronym stands for. Shown once, under the home page headline:
+    // a name nobody can expand is just a word.
+    expansion: "Integrated Specimen Labels: Annotation, Network, Discovery",
+  },
   nav: { home: "Home", browse: "Browse", explore: "Explore", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", dashboard: "Dashboard", guide: "Guide", login: "Sign in", logout: "Sign out" },
   story: {
     title: "Data stories",
@@ -478,7 +484,11 @@ const en = {
 };
 
 const zh: typeof en = {
-  app: { title: "TBIA自然史標本探索與標註平台", short: "TBIA自然史標本探索與標註平台" },
+  app: {
+    title: "ISLAND 島 · TBIA 自然史標本標註平台",
+    short: "ISLAND",
+    expansion: "整合標本標籤：標註、連結、探索",
+  },
   nav: { home: "首頁", browse: "瀏覽", explore: "探索", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者排行", dashboard: "貢獻儀表板", guide: "使用說明", login: "登入", logout: "登出" },
   story: {
     title: "資料說故事",
