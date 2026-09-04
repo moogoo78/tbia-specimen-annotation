@@ -46,6 +46,15 @@ secrets*
 docs/drafts/post.md
 docs/drafts/promo-posts.zh-TW.md
 
+# --- Conference material (local working drafts) ---
+# The TDWG 2026 submission and the talk built from it. Kept out for the same
+# reason as the promo copy above: they are one author's working copy, they carry
+# unpublished author/affiliation details and ‹fill› placeholders, and the talk's
+# figures go stale with the next export. Neither is needed to run or serve
+# anything, and the abstract is the conference's record, not this repo's.
+docs/tdwg-2026-abstract.md
+docs/drafts/tdwg-2026-talk.md
+
 # --- Agent / editor local state ---
 .claude/
 .DS_Store
