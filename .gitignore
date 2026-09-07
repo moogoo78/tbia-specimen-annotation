@@ -55,6 +55,15 @@ docs/drafts/promo-posts.zh-TW.md
 docs/tdwg-2026-abstract.md
 docs/drafts/tdwg-2026-talk.md
 
+# --- Deploy automation (box-local) ---
+# The timer-driven deploy and its systemd units: how *this* box happens to
+# update itself, which is an operations detail of one deployment rather than
+# something a clone needs — and it encodes paths, a service user and a unit
+# name that would be wrong anywhere else. Note this is deliberately two rules
+# and not `scripts/`: extract_recorded_by_people.py lives there and is tracked.
+scripts/deploy.sh
+scripts/systemd/
+
 # --- Agent / editor local state ---
 .claude/
 .DS_Store
