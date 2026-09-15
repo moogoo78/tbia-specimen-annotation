@@ -136,6 +136,28 @@ async function main() {
       check("total back to the default", shown === api, `page ${shown} vs api ${api}`);
     });
 
+    // The one filter that starts on, and so the one whose *off* state has to be
+    // representable. It used to serialise to nothing at all, which `parseExplore`
+    // reads back as the landing defaults — the box re-ticked itself.
+    await test("the has_media default can be unchecked", async () => {
+      await page.clickFacet("具有影像");
+      const url = await page.url();
+      const shown = await page.total();
+      // Unchecking widens to every record, so the relation is against the API
+      // with the flag absent — not against the count the row printed, which is
+      // the has_media subset it was offering to narrow to.
+      const api = await fetch(`${WEB}/api/occurrences?limit=1`)
+        .then((r) => r.json()).then((d) => d.total);
+      check("URL says has_media=false rather than going empty",
+        /^\/explore\?has_media=false$/.test(url), url);
+      check("total is every record, not just the ones with images",
+        shown === api, `page ${shown} vs api ${api}`);
+      // ... and back on, so the toggle is not one-way either.
+      await page.clickFacet("具有影像");
+      const back = await page.url();
+      check("re-checking restores has_media=true", /has_media=true/.test(back), back);
+    });
+
     // The other direction: a link in, parsed from the URL alone.
     await test("an inbound link's filters are read from the URL", async () => {
       await page.goto("/explore?scientific_name=Trema%20orientalis");

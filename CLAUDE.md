@@ -424,9 +424,16 @@ hand. Nothing about the filters lives in component state any more; the setters i
 - **"No parameters at all" is not "this parameter is absent."** `emptyFilters()` starts
   `has_media` **true** while the API convention reads an absent boolean as false, so
   `parseExplore` treats a bare `/explore` as the landing defaults and anything else as
-  literal. Every link in goes through **`exploreUrl()`**, which starts from
-  `emptyFilters()` — so an unmentioned flag keeps its landing default, and a link that
-  wants every record still has to say `flags: { has_media: false }` explicitly.
+  literal. That only holds because **`exploreParams` writes `has_media` out both ways
+  round** — `has_media=false` explicitly, which `filtersToParams` (the API's own
+  serialiser, where absent already means false) does not do. Without it, unchecking
+  the box on the landing view serialised to *nothing*, `parseExplore` read the empty
+  query back as the defaults, and it was the one filter that could not be turned off.
+  `has_media=false` is what the API reads as false too, so the URL still means the
+  same thing pasted onto `/api/occurrences`. Every link in goes through
+  **`exploreUrl()`**, which starts from `emptyFilters()` — so an unmentioned flag keeps
+  its landing default, and a link that wants every record still has to say
+  `flags: { has_media: false }` explicitly.
 - Edits **replace** rather than push, so the back button leaves the page instead of
   stepping through every checkbox.
 - `source` and `collector_id` are serialised, not the `tbia_dataset_id` they expand into —
