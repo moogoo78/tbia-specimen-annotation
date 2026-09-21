@@ -8,6 +8,7 @@ import { useAuth } from "../auth";
 import { Spinner, StatusPill } from "../components/ui";
 import { ContributionList, Pager } from "../components/Contributions";
 import { AdminSection, DefaultLicense, RankingOptIn } from "../components/ContributorSettings";
+import { SHOW_LICENSE_UI } from "../licenses";
 
 const PAGE = 50;
 // Draft last: it is the one status that is not a contribution yet.
@@ -85,7 +86,7 @@ export function MyContributions() {
       {/* The standing choices about how your work is published. They live with
           your work rather than in a settings page nobody opens. */}
       <RankingOptIn />
-      <DefaultLicense />
+      {SHOW_LICENSE_UI && <DefaultLicense />}
 
       {/* Counts over everything of yours, not over this page. */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>

@@ -8,7 +8,7 @@ import { api } from "../api/client";
 import type { ExtractedField, MediaSize, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
-import { LICENSES, LICENSE_LABELS, LICENSE_URIS, asLicense, licenseLabel } from "../licenses";
+import { LICENSES, LICENSE_LABELS, LICENSE_URIS, SHOW_LICENSE_UI, asLicense, licenseLabel } from "../licenses";
 import type { License } from "../licenses";
 import { contributorLabel, isAnonymous } from "../contributors";
 
@@ -848,6 +848,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
               than among the fields: it is a property of the contribution, not
               of any one value, and it is the last thing to confirm before the
               work leaves the contributor's hands. */}
+          {SHOW_LICENSE_UI && (
           <div style={{ marginTop: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: t.fgMuted }}>{tr("annotate.license")}</span>
@@ -865,6 +866,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
               {tr("annotate.licenseHint")}
             </div>
           </div>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
             <Button primary small disabled={filled.length === 0 || createMut.isPending} onClick={() => createMut.mutate("submitted")}>{tr("annotate.submit")}</Button>
@@ -1274,7 +1276,7 @@ function History({ annotations, isReviewer, onReview, userId, onRelicense }: {
               {contributorLabel(tr, a.contributor_name, a.contributor_id)}
             </Link>
             <span style={{ fontSize: 10, color: t.fgSubtle }}>·</span>
-            {userId === a.contributor_id && onRelicense ? (
+            {SHOW_LICENSE_UI && userId === a.contributor_id && onRelicense ? (
               <select value={asLicense(a.license)} title={tr("annotate.licenseChange")}
                 onChange={(e) => onRelicense(a.id, e.target.value as License)}
                 style={{

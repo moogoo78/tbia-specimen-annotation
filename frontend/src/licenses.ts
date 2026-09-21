@@ -34,3 +34,13 @@ export function licenseLabel(id: string): string {
 export function asLicense(id: string | null | undefined): License {
   return (LICENSES as readonly string[]).includes(id ?? "") ? (id as License) : DEFAULT_LICENSE;
 }
+
+// Hidden for now, not removed: the three licence *inputs* (the annotation
+// form's per-submission picker, the relicense control on a record's history,
+// and the standing default on /me) render only when this is true. Nothing
+// underneath changes — a submission still carries a licence, resolved from
+// `user.default_license` and falling back to DEFAULT_LICENSE, and the value is
+// still shown wherever it was shown read-only. This is a deliberate pause on
+// asking contributors the question, pending a decision on what to ask instead;
+// flip it back to re-expose all three at once.
+export const SHOW_LICENSE_UI = false;
