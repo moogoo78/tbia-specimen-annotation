@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
-import { type Filters } from "../api/types";
+import { NONE_VALUE, type Filters } from "../api/types";
 import {
   emptyExplore, exploreParams, parseExplore, type ExploreState, type View,
 } from "./exploreUrl";
@@ -255,8 +255,11 @@ export function Explore() {
     }));
     (["missing_identification", "missing_coordinates", "missing_date", "has_media"] as FlagKey[])
       .forEach((f) => filters[f] && out.push({ label: tr(`facet.${f}`), onRemove: () => toggleFlag(f) }));
-    (["bio_group", "kingdom_c", "county", "taxon_rank", "type_status", "dataset_name"] as ArrayKey[])
-      .forEach((k) => filters[k].forEach((v) => out.push({ label: v, onRemove: () => toggle(k, v) })));
+    (["bio_group", "kingdom_c", "county", "taxon_rank", "basis_of_record", "type_status", "dataset_name"] as ArrayKey[])
+      .forEach((k) => filters[k].forEach((v) => out.push({
+        label: v === NONE_VALUE ? `${tr(`facet.${k}`)}: ${tr("facet.none")}` : v,
+        onRemove: () => toggle(k, v),
+      })));
     return out;
   }, [filters, sources, collectors, registry.data]);
 
