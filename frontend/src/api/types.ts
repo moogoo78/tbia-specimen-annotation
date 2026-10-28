@@ -463,6 +463,9 @@ export interface Filters {
   bbox?: string;
 }
 
+// A facet value meaning "the column is empty" — search.py's NONE_VALUE.
+export const NONE_VALUE = "__none__";
+
 export const emptyFilters = (): Filters => ({
   bio_group: [], kingdom_c: [], county: [], taxon_rank: [], scientific_name: [],
   basis_of_record: [], type_status: [], dataset_name: [], tbia_dataset_id: [],

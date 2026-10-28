@@ -109,6 +109,19 @@ def test_facet_bio_group_counts(client):
     assert counts["魚類"] == 2 and counts["維管束植物"] == 4 and counts["昆蟲"] == 1
 
 
+def test_basis_of_record_not_recorded(client):
+    # NULL and '' both count as "not recorded", and filtering on it returns them.
+    f = client.get("/api/occurrences/facets").json()
+    counts = {x["value"]: x["count"] for x in f["basis_of_record"]}
+    total = f["completeness"]["total"]
+    assert counts["__none__"] == 2 and counts["PreservedSpecimen"] == total - 2
+    res = client.get("/api/occurrences", params={"basis_of_record": "__none__"}).json()
+    assert {r["id"] for r in res["items"]} == {"r2", "r3"}
+    both = client.get("/api/occurrences",
+                      params={"basis_of_record": ["__none__", "PreservedSpecimen"]}).json()
+    assert both["total"] == total
+
+
 def test_detail_and_media_parse(client):
     r = client.get("/api/occurrences/r1").json()
     assert r["scientific_name"] == "Pocillopora damicornis"

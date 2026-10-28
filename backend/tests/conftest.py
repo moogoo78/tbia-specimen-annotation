@@ -78,6 +78,9 @@ def _build_duckdb() -> None:
     con.execute(
         "UPDATE occurrence SET recorded_by = 'Tian-Chuan Hsu (許天銓), Someone Else' WHERE id='r4'"
     )
+    # Two records with no basis of record, for the facet's "not recorded" value.
+    con.execute("UPDATE occurrence SET basis_of_record = NULL WHERE id = 'r2'")
+    con.execute("UPDATE occurrence SET basis_of_record = '' WHERE id = 'r3'")
     # record_number values for the numeric range filter (r4 non-numeric -> excluded)
     for rid, rn in [("r1", "100"), ("r2", "150"), ("r3", "200"), ("r4", "TAI-9"), ("r5", "250")]:
         con.execute("UPDATE occurrence SET record_number = ? WHERE id = ?", [rn, rid])

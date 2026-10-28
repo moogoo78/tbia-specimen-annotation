@@ -49,6 +49,13 @@ FACET_COLUMNS = {
     "dataset_name": "dataset_name",
 }
 
+# A facet value meaning "the column is empty" (NULL or ''). It travels as an
+# ordinary value — through the URL, the API and back — so the panel can offer
+# it as one more checkbox. Only the facets listed here emit it; the filter
+# understands it on any column.
+NONE_VALUE = "__none__"
+NONE_FACETS = {"basis_of_record"}
+
 SORTABLE = {
     "completeness_score": "completeness_score",
     "standard_date": "standard_date",
@@ -90,10 +97,16 @@ class Filters:
 
 
 def _in_clause(col: str, values: list[Any], where: list[str], params: list[Any]) -> None:
-    if values:
-        placeholders = ", ".join(["?"] * len(values))
-        where.append(f"{col} IN ({placeholders})")
-        params.extend(values)
+    if not values:
+        return
+    real = [v for v in values if v != NONE_VALUE]
+    terms = []
+    if real:
+        terms.append(f"{col} IN ({', '.join(['?'] * len(real))})")
+        params.extend(real)
+    if len(real) < len(values):
+        terms.append(f"({col} IS NULL OR {col} = '')")
+    where.append(terms[0] if len(terms) == 1 else f"({' OR '.join(terms)})")
 
 
 def _collector_aliases(collector_ids: list[int]) -> list[str]:
@@ -269,12 +282,21 @@ async def facets(f: Filters, *, top: int = 20) -> dict:
     for name, col in FACET_COLUMNS.items():
         limit = 50 if name in ("dataset_name", "county") else top
         joiner = " AND " if where else " WHERE "
-        rows = await duck.query(
-            f"SELECT {col} AS value, count(*) AS count FROM {TABLE}{where}"
-            f"{joiner}{col} IS NOT NULL AND {col} <> '' "
-            f"GROUP BY {col} ORDER BY count DESC LIMIT {limit}",
-            params,
-        )
+        if name in NONE_FACETS:
+            # Empties fold into one NONE_VALUE row instead of being dropped.
+            rows = await duck.query(
+                f"SELECT coalesce(nullif({col}, ''), '{NONE_VALUE}') AS value,"
+                f" count(*) AS count FROM {TABLE}{where}"
+                f" GROUP BY 1 ORDER BY count DESC LIMIT {limit}",
+                params,
+            )
+        else:
+            rows = await duck.query(
+                f"SELECT {col} AS value, count(*) AS count FROM {TABLE}{where}"
+                f"{joiner}{col} IS NOT NULL AND {col} <> '' "
+                f"GROUP BY {col} ORDER BY count DESC LIMIT {limit}",
+                params,
+            )
         out[name] = rows
 
     gaps = await duck.query_one(

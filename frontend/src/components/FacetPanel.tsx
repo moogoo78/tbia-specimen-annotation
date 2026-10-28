@@ -3,14 +3,14 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { CollectorSelect, type CollectorRef } from "./CollectorSelect";
-import type { FacetResult, Filters, Registry, SourceKind } from "../api/types";
+import { NONE_VALUE, type FacetResult, type Filters, type Registry, type SourceKind } from "../api/types";
 
 type ArrayKey = "bio_group" | "kingdom_c" | "county" | "taxon_rank"
   | "basis_of_record" | "type_status" | "dataset_name";
 type FlagKey = "missing_coordinates" | "missing_date" | "missing_identification" | "has_media";
 
 const SECTIONS: ArrayKey[] = [
-  "bio_group", "kingdom_c", "county", "taxon_rank", "type_status", "dataset_name",
+  "bio_group", "kingdom_c", "county", "taxon_rank", "basis_of_record", "type_status", "dataset_name",
 ];
 const FLAGS: FlagKey[] = ["missing_identification", "missing_coordinates", "missing_date", "has_media"];
 
@@ -34,7 +34,7 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   const { t: tr } = useTranslation();
   const [open, setOpen] = useState<Record<string, boolean>>({
     source: true, collector: false, record_number: false, completeness: true, bio_group: true,
-    county: true, taxon_rank: false, kingdom_c: false, type_status: false, dataset_name: false,
+    county: true, taxon_rank: false, basis_of_record: false, kingdom_c: false, type_status: false, dataset_name: false,
   });
   const [srcOpen, setSrcOpen] = useState<Record<string, boolean>>({});
 
@@ -224,6 +224,8 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
                 {values.length === 0 && <div style={{ padding: "2px 6px", color: t.fgSubtle, fontSize: 10 }}>—</div>}
                 {values.map((o) => {
                   const active = filters[key].includes(o.value);
+                  const none = o.value === NONE_VALUE;
+                  const label = none ? tr("facet.none") : o.value;
                   return (
                     <label key={o.value} onClick={() => onToggle(key, o.value)} style={{
                       display: "flex", alignItems: "center", gap: 6, padding: "2px 4px",
@@ -233,7 +235,8 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
                       <span style={{
                         flex: 1, fontSize: 11, color: active ? t.fg : t.fgMuted,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }} title={o.value}>{o.value}</span>
+                        fontStyle: none ? "italic" : undefined,
+                      }} title={label}>{label}</span>
                       <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>{o.count.toLocaleString()}</span>
                     </label>
                   );
