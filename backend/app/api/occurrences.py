@@ -49,6 +49,10 @@ async def _datasets_from_db(known: set[str]) -> dict[str, dict]:
 
 @router.get("/registry")
 async def registry():
+    return await load_registry()
+
+
+async def load_registry() -> dict:
     """Institution / aggregator → dataset registry.
 
     registry.json is hand-curated and lists only the *stable* institution

@@ -5,9 +5,10 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
-import type { ExtractedField, MediaSize, OccurrenceDetail } from "../api/types";
+import type { ExtractedField, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
-import { Button, CompletenessDots, GroupTag, Spinner, StatusPill } from "../components/ui";
+import { Button, CompletenessDots, GroupTag, SourceTag, Spinner, StatusPill } from "../components/ui";
+import { MediaGallery } from "../components/MediaGallery";
 import { LICENSES, LICENSE_LABELS, LICENSE_URIS, SHOW_LICENSE_UI, asLicense, licenseLabel } from "../licenses";
 import type { License } from "../licenses";
 import { contributorLabel, isAnonymous } from "../contributors";
@@ -412,57 +413,6 @@ function Enriched({ a, original, mono }: { a: Enrichment; original?: unknown; mo
         </Link>
       </span>
     </span>
-  );
-}
-
-// Remembered across records: someone reading labels wants the big one every
-// time, and re-picking it on each record is the annoyance the setting removes.
-const MEDIA_SIZE_KEY = "tbia.mediaSize";
-
-function MediaGallery({ urls, sizes, references }: { urls: string[]; sizes?: MediaSize[]; references?: string }) {
-  const { t: tr } = useTranslation();
-  // What a click opens. The thumbnails always stay on the URL the export
-  // shipped — the point of the picker is reading a label full-screen, and
-  // rendering 4096px into a 120px tile would cost 750KB an image for nothing.
-  const ladder = sizes ?? [];
-  const [pick, setPick] = useState<string | null>(() => localStorage.getItem(MEDIA_SIZE_KEY));
-  const chosen = ladder.find((s) => s.size === pick) ?? ladder.find((s) => s.canonical) ?? null;
-  const openUrls = chosen ? chosen.urls : urls;
-  const choose = (size: string) => { setPick(size); localStorage.setItem(MEDIA_SIZE_KEY, size); };
-
-  if (urls.length === 0) {
-    return (
-      <div style={{ fontSize: 11, color: t.fgSubtle }}>
-        {tr("detail.noMedia")}
-        {references && <div style={{ marginTop: 6 }}><a href={references} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 11 }}>references ↗</a></div>}
-      </div>
-    );
-  }
-  return (
-    <>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-        {urls.slice(0, 6).map((u, i) => (
-          <a key={i} href={openUrls[i] ?? u} target="_blank" rel="noreferrer" style={{ aspectRatio: "1", border: `1px solid ${t.border}`, overflow: "hidden", background: t.panelAlt }}>
-            <img src={u} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-          </a>
-        ))}
-      </div>
-      {/* Absent entirely for sources that publish one rendition — most of them. */}
-      {ladder.length > 1 && (
-        <div style={{ marginTop: 6 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10, color: t.fgMuted }}>{tr("detail.openAt")}</span>
-            {ladder.map((s) => (
-              <Button key={s.size} small primary={chosen?.size === s.size} onClick={() => choose(s.size)}>
-                {s.long_edge}px
-              </Button>
-            ))}
-          </div>
-          <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 3 }}>{tr("detail.openAtHint")}</div>
-        </div>
-      )}
-    </>
   );
 }
 
@@ -1213,25 +1163,6 @@ function QueueStatus({ q }: { q: NonNullable<OccurrenceDetail["transcribe"]> }) 
   );
 }
 
-// Value provenance: ai (kept verbatim) · mixed (AI, then human-edited) ·
-// manual (typed). Legacy rows may be blank → treated as manual (no tag).
-function SourceTag({ source, confidence }: { source: string; confidence?: number | null }) {
-  const { t: tr } = useTranslation();
-  if (source !== "ai" && source !== "mixed") return null;
-  const tone = source === "ai" ? t.accent : t.warn;
-  return (
-    <span title={tr(`annotate.src_${source}`)} style={{
-      display: "inline-flex", alignItems: "center", gap: 2, fontSize: 9,
-      fontFamily: t.mono, color: tone, border: `1px solid ${tone}`, padding: "0 3px",
-    }}>
-      <Icon name="spark" size={8} />{tr(`annotate.src_${source}`)}
-      {/* How sure the model was about the value now sitting in the widget —
-          the one number that says which proposals to read twice. */}
-      {confidence != null && <span title={tr("annotate.confidence")}>{Math.round(confidence * 100)}%</span>}
-    </span>
-  );
-}
-
 function History({ annotations, isReviewer, onReview, userId, onRelicense }: {
   annotations: OccurrenceDetail["annotations"]; isReviewer: boolean;
   onReview: (annId: number, status: string) => void;
@@ -1288,7 +1219,7 @@ function History({ annotations, isReviewer, onReview, userId, onRelicense }: {
             ) : (
               <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>{licenseLabel(a.license)}</span>
             )}
-            {isReviewer && (a.status === "submitted" || a.status === "draft") && (
+            {isReviewer && a.status === "submitted" && (
               <span style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
                 <Button small onClick={() => onReview(a.id, "accepted")}>{tr("annotate.accept")}</Button>
                 <Button small danger onClick={() => onReview(a.id, "rejected")}>{tr("annotate.reject")}</Button>

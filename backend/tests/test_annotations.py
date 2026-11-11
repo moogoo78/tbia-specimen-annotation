@@ -212,6 +212,13 @@ def test_license_defaults_to_cc_by_nc(client):
     assert res.json()["license"] == "CC-BY-NC-4.0"
 
 
+def _own(client, headers, ann_id):
+    """A row as its contributor sees it. Drafts are not in the public record
+    detail, so reading one back goes through the owner's own list."""
+    items = client.get("/api/annotations?mine=true&limit=500", headers=headers).json()["items"]
+    return next(a for a in items if a["id"] == ann_id)
+
+
 def test_absent_license_follows_the_users_default(client):
     """The user's default is what an unstated licence means — not the platform
     fallback. Changing the default is prospective: the annotation written before
@@ -231,8 +238,7 @@ def test_absent_license_follows_the_users_default(client):
     }).json()
     assert after["license"] == "CC-BY-4.0"
 
-    detail = client.get("/api/occurrences/r2").json()
-    kept = next(a for a in detail["annotations"] if a["id"] == before["id"])
+    kept = _own(client, cur, before["id"])
     assert kept["license"] == "CC-BY-NC-4.0", "changing the default relicensed past work"
 
     # leave the shared session DB as the other tests expect it
@@ -268,8 +274,7 @@ def test_license_is_stored_as_chosen(client):
     assert res.status_code == 200, res.text
     assert res.json()["license"] == "CC0-1.0"
 
-    detail = client.get("/api/occurrences/r2").json()
-    stored = next(a for a in detail["annotations"] if a["id"] == res.json()["id"])
+    stored = _own(client, cur, res.json()["id"])
     assert stored["license"] == "CC0-1.0"
 
 
@@ -366,3 +371,35 @@ def test_export_carries_license_and_uri(client):
     assert csv_res.status_code == 200
     header = csv_res.text.splitlines()[0]
     assert "license" in header and "license_uri" in header
+
+
+def test_record_detail_never_ships_a_draft(client):
+    """`GET /api/occurrences/{id}` is unauthenticated and edge-cached, so a
+    draft in its payload is published however the page renders it. Drafts
+    belong on their owner's /me only; the submitted row beside it still ships."""
+    from app.db import SessionLocal
+    from app.models import Annotation
+
+    cur = auth_header(client, "curator@tbia.test")
+    made = []
+    try:
+        for status, value in (("draft", "Private Draft Place"), ("submitted", "Public Place")):
+            res = client.post("/api/occurrences/r7/annotations", headers=cur, json={
+                "field": "locality", "proposed_value": value, "status": status,
+            })
+            assert res.status_code == 200, res.text
+            made.append(res.json()["id"])
+
+        for headers in ({}, cur):  # not even to the draft's own author
+            anns = client.get("/api/occurrences/r7", headers=headers).json()["annotations"]
+            assert all(a["status"] != "draft" for a in anns)
+            assert made[1] in {a["id"] for a in anns}
+            assert made[0] not in {a["id"] for a in anns}
+
+        # Still the owner's: listed among their own work.
+        mine = client.get("/api/annotations?mine=true&status=draft", headers=cur).json()["items"]
+        assert made[0] in {a["id"] for a in mine}
+    finally:
+        with SessionLocal() as db:
+            db.query(Annotation).filter(Annotation.id.in_(made)).delete()
+            db.commit()

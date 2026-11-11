@@ -16,7 +16,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (token) headers["Authorization"] = `Bearer ${token}`;
   if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(`/api${path}`, { ...options, headers });
+  // Signed in, skip the browser's HTTP cache. The server answers every
+  // authenticated request `private, no-store` already, but a public read made
+  // *before* signing in sits in that cache for `max-age` (keyed on the URL, not
+  // the Authorization header), so a reviewer's refetch right after an accept
+  // would be handed the pre-review copy and the change would look lost.
+  const cache: RequestCache | undefined = token ? "no-store" : options.cache;
+  const res = await fetch(`/api${path}`, { ...options, headers, cache });
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -179,6 +185,19 @@ export const api = {
   detail: (id: string) => request<import("./types").OccurrenceDetail>(`/occurrences/${id}`),
   datasets: (limit = 200) => request<import("./types").Dataset[]>(`/datasets?limit=${limit}`),
   registry: () => request<import("./types").Registry>(`/registry`),
+
+  // The per-institution annotation report — public, never drafts. A record's
+  // own detail (images + history) is `detail()`, not a report endpoint.
+  reportIndex: () =>
+    request<{ items: import("./types").ReportIndexRow[] }>(`/reports/institutions`),
+  institutionReport: (code: string) =>
+    request<import("./types").InstitutionReport>(`/reports/institutions/${encodeURIComponent(code)}`),
+  reportRecords: (code: string, f: import("./types").ReportFilters, limit = 50, offset = 0) => {
+    const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    for (const k of ["status", "field", "tbia_dataset_id"] as const) if (f[k]) p.set(k, f[k]!);
+    return request<{ total: number; items: import("./types").ReportRecord[]; limit: number; offset: number }>(
+      `/reports/institutions/${encodeURIComponent(code)}/records?${p}`);
+  },
 
   // The taxonomic index — one row per distinct scientific_name in the store.
   species: (opts: {

@@ -110,3 +110,22 @@ export function Spinner({ label }: { label?: string }) {
     </div>
   );
 }
+
+// Value provenance: ai (kept verbatim) · mixed (AI, then human-edited) ·
+// manual (typed). Legacy rows may be blank → treated as manual (no tag).
+export function SourceTag({ source, confidence }: { source: string; confidence?: number | null }) {
+  const { t: tr } = useTranslation();
+  if (source !== "ai" && source !== "mixed") return null;
+  const tone = source === "ai" ? t.accent : t.warn;
+  return (
+    <span title={tr(`annotate.src_${source}`)} style={{
+      display: "inline-flex", alignItems: "center", gap: 2, fontSize: 9,
+      fontFamily: t.mono, color: tone, border: `1px solid ${tone}`, padding: "0 3px",
+    }}>
+      <Icon name="spark" size={8} />{tr(`annotate.src_${source}`)}
+      {/* How sure the model was about the value now sitting in the widget —
+          the one number that says which proposals to read twice. */}
+      {confidence != null && <span title={tr("annotate.confidence")}>{Math.round(confidence * 100)}%</span>}
+    </span>
+  );
+}

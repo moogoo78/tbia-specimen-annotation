@@ -83,6 +83,7 @@ test-web:
 	node frontend/tests/explore-url.mjs
 	node frontend/tests/nav-menu.mjs
 	node frontend/tests/contributions.mjs
+	node frontend/tests/institution-report.mjs
 
 build:
 	cd frontend && npm run build
