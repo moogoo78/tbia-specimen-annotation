@@ -1,4 +1,4 @@
-.PHONY: install backend-install frontend-install prepare inspect build-db seed seed-collectors sync-collectors seed-sampling-events api web test build clean
+.PHONY: install backend-install frontend-install prepare inspect build-db seed seed-collectors sync-collectors seed-sampling-events api web test build dump-annotations clean
 
 PY := backend/.venv/bin/python
 PIP := backend/.venv/bin/pip
@@ -87,6 +87,12 @@ test-web:
 
 build:
 	cd frontend && npm run build
+
+# Pull a consistent snapshot of PRODUCTION's annotations.sqlite (users +
+# annotations — the only irreplaceable store) to data/backups/prod/.
+#   make dump-annotations HOST=ubuntu@<host> [OUT=path]
+dump-annotations:
+	scripts/dump-annotations.sh $(HOST) $(OUT)
 
 clean:
 	rm -f data/*.duckdb data/*.sqlite

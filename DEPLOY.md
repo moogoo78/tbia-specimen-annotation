@@ -388,6 +388,7 @@ path to confirm it reports as blocked by robots.txt.
 | Update code | `git pull && docker compose -f docker-compose.prod.yml up -d --build` |
 | Stop | `docker compose -f docker-compose.prod.yml down` |
 | Backup state | `sqlite3 data/annotations.sqlite "VACUUM INTO 'data/annotations.$(date +%F).sqlite'"` (the only irreplaceable store) |
+| Pull a backup to your laptop | `make dump-annotations HOST=ubuntu@<elastic-ip>` → `data/backups/prod/annotations.prod.<ts>.sqlite` |
 | Reseed curated data | `exec backend python -m app.seed_sampling_events` (see *Updating the curated data*) |
 
 `restart: always` brings the stack back up after a reboot (Docker starts on
