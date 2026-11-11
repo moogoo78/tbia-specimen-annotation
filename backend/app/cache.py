@@ -72,6 +72,11 @@ LIVE_ROUTES = frozenset({
     "/api/contributors/{user_id}/annotations",
     # The public activity feed on /contributors.
     "/api/contributions",
+    # The per-institution annotation report (api/reports.py). Public, no drafts,
+    # and it moves as reviewers work through it.
+    "/api/reports/institutions",
+    "/api/reports/institutions/{code}",
+    "/api/reports/institutions/{code}/records",
 })
 
 # Everything unlisted -- /api/health, all of /api/auth, the annotation writes and

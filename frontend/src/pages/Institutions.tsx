@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
-import type { Dataset, RegistryEntry, SourceKind } from "../api/types";
+import type { Dataset, RegistryEntry, ReportIndexRow, SourceKind } from "../api/types";
 import { Spinner } from "../components/ui";
 import { exploreUrl } from "./exploreUrl";
 
@@ -20,6 +20,14 @@ export function Institutions() {
   const { t: tr } = useTranslation();
   const registry = useQuery({ queryKey: ["registry"], queryFn: () => api.registry(), staleTime: Infinity });
   const datasets = useQuery({ queryKey: ["datasets", 1000], queryFn: () => api.datasets(1000) });
+  // Which sources have annotations to report. Optional: the cards render
+  // without it, they just carry no report link.
+  const reports = useQuery({ queryKey: ["reportIndex"], queryFn: () => api.reportIndex() });
+  const reportFor = useMemo(() => {
+    const m = new Map<string, ReportIndexRow>();
+    for (const r of reports.data?.items ?? []) m.set(`${r.kind}:${r.code}`, r);
+    return m;
+  }, [reports.data]);
 
   // tbia_dataset_id -> stats
   const statsById = useMemo(() => {
@@ -45,7 +53,8 @@ export function Institutions() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))", gap: 10 }}>
               {entries.map(([code, ent]) => (
                 <OrgCard key={code} kind={kind} code={code} ent={ent}
-                  statsById={statsById} defaultOpen={kind === "institutions"} />
+                  statsById={statsById} defaultOpen={kind === "institutions"}
+                  report={reportFor.get(`${kind}:${code}`)} />
               ))}
             </div>
           </div>
@@ -63,9 +72,9 @@ function Bar({ pct, width = "100%" }: { pct: number; width?: number | string }) 
   );
 }
 
-function OrgCard({ kind, code, ent, statsById, defaultOpen }: {
+function OrgCard({ kind, code, ent, statsById, defaultOpen, report }: {
   kind: SourceKind; code: string; ent: RegistryEntry;
-  statsById: Map<string, Dataset>; defaultOpen: boolean;
+  statsById: Map<string, Dataset>; defaultOpen: boolean; report?: ReportIndexRow;
 }) {
   const { t: tr } = useTranslation();
   const nav = useNavigate();
@@ -93,6 +102,18 @@ function OrgCard({ kind, code, ent, statsById, defaultOpen }: {
         <Icon name={open ? "caretD" : "caretR"} size={11} />
         <span style={{ fontFamily: t.mono, fontSize: 11, color: t.fgSubtle, flexShrink: 0 }}>{code}</span>
         <span style={{ flex: 1, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={ent.name}>{ent.name}</span>
+        {report && (
+          // A bare code is ambiguous when the same one is both curated and
+          // discovered, so the link is kind-qualified.
+          <Link to={`/institutions/${encodeURIComponent(`${kind}:${code}`)}/report`}
+            onClick={(e) => e.stopPropagation()} title={tr("report.title")}
+            style={{ fontSize: 10, color: t.accent, textDecoration: "none", flexShrink: 0, fontFamily: t.mono }}>
+            {tr("inst.annotations", { n: report.n_annotations })}
+            {report.by_status.submitted > 0 && (
+              <span style={{ color: t.warn }}> · {tr("inst.toReview", { n: report.by_status.submitted })}</span>
+            )} →
+          </Link>
+        )}
         <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>{ids.length} {tr("inst.datasets")}</span>
       </div>
 

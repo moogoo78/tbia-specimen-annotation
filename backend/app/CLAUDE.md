@@ -205,7 +205,11 @@ neither question had a page that answered it. `/dashboard` is now only a redirec
 appear on `/me` and nowhere else — not on the feed, not on a contributor's public
 page, not in the ranking, and not as an overlay on a record. `api/contributions.py`
 enforces this per route (`status=draft` is a 400 on the public ones), and
-`OVERLAY_SKIP` in `RecordDetail.tsx` enforces it on the record.
+`annotations_store.list_for_occurrence` enforces it on the record: drafts are left
+out of `GET /api/occurrences/{id}` entirely, not just hidden by the page. That
+payload is unauthenticated and edge-cached, so a draft in it was published to
+every visitor whatever the UI did. Not even its author gets it there; their
+drafts come back through `/api/annotations?mine=true`.
 
 Three shared pieces stop the surfaces from drifting:
 
@@ -259,3 +263,26 @@ Correct a transcription and the next request serves it — no `make` step. The s
 the chronology holds: **a count is not provenance.** Records are matched by collector and
 date window, so a specimen counted under a trip is one that person collected those days, not
 one the trip is claimed to have produced.
+
+## Institution annotation report (`/institutions/:code/report`)
+
+What a data provider reads to check what has been done to its records, and where a
+reviewer works through them. `api/reports.py` serves three public reads: the index
+behind the link on `/institutions`, an institution's summary (per status, field ×
+status, per dataset, contributors), and its annotated records, one row per record.
+The page's right-hand pane is **not** a report endpoint. It reads
+`GET /api/occurrences/{id}`, so the image and the history are exactly what the
+record page shows. Review is the existing `PATCH /api/annotations/{id}`.
+
+- **An institution is a registry code, and annotations do not know it.** They carry
+  `occurrence_id` + `dataset_name`; the code → `tbia_dataset_id`s mapping is
+  `occurrences.load_registry()` (the same resolution `/api/registry` serves). The
+  grouping therefore joins through `occurrence.tbia_dataset_id`: federated when
+  `annotations_attached()`, else SQLite rows plus one bounded `occurrence` lookup.
+  Both produce the same flat rows and everything else is computed once from them,
+  which `test_reports.py` holds them to.
+- **Public, so it publishes nothing a record page would not.** Drafts are excluded
+  server-side and names go through `public_name`. It is in `cache.LIVE_ROUTES`.
+- `make test-web` covers it (`frontend/tests/institution-report.mjs`). Its reviewer
+  step accepts a real annotation, so it only runs with `REPORT_REVIEW=1`. Point that
+  at a throwaway `NDB_SQLITE_PATH`, never the store you back up.

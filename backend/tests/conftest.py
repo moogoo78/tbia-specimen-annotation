@@ -56,7 +56,9 @@ def _build_duckdb() -> None:
             institution_code VARCHAR, institution_name VARCHAR,
             basis_of_record VARCHAR, rights_holder VARCHAR, resource_contacts VARCHAR,
             associated_media VARCHAR, verbatim_latitude VARCHAR, verbatim_longitude VARCHAR,
-            source_scientific_name VARCHAR
+            source_scientific_name VARCHAR,
+            -- The provider's DwC occurrenceID, not ours (that is `id`).
+            occurrence_id VARCHAR
         )"""
     )
     for (rid, cat, sci, rank, grp, county, loc, lat, lon, date, ds, media) in ROWS:
@@ -71,6 +73,7 @@ def _build_duckdb() -> None:
     con.execute(
         "UPDATE occurrence SET institution_code = 'TEST', institution_name = 'Test Institution'"
     )
+    con.execute("UPDATE occurrence SET occurrence_id = 'urn:test:' || id WHERE id <> 'r6'")
     # recorded_by values exercising the collector parser/seeder.
     con.execute("UPDATE occurrence SET recorded_by = 'Pi-Fong Lu (呂碧鳳)' WHERE id='r1'")
     con.execute("UPDATE occurrence SET recorded_by = '呂碧鳳' WHERE id='r2'")  # same person

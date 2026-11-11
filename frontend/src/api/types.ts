@@ -473,3 +473,44 @@ export const emptyFilters = (): Filters => ({
   missing_coordinates: false, missing_date: false,
   missing_identification: false, has_media: true,
 });
+
+// ── Institution annotation report (api/reports.py) ────────────────────────
+/** Per-status counts. `draft` is never present: the report is public. */
+export interface ReportStatusCounts {
+  submitted: number; accepted: number; rejected: number; merged: number; total: number;
+}
+
+export interface ReportIndexRow {
+  kind: SourceKind; code: string; name: string;
+  n_annotations: number; n_records: number; by_status: ReportStatusCounts;
+}
+
+export interface InstitutionReport {
+  kind: SourceKind; code: string; name: string;
+  n_datasets: number;
+  /** Distinct annotated records, and how many still hold a submitted row. */
+  n_records: number; n_records_pending: number;
+  by_status: ReportStatusCounts;
+  by_field: (ReportStatusCounts & { field: string })[];
+  by_dataset: (ReportStatusCounts & { tbia_dataset_id: string; dataset_name: string | null; n_records: number })[];
+  /** `contributor_name` null = not opted in to being named (models.public_name). */
+  contributors: { contributor_id: number; contributor_name: string | null; n_annotations: number }[];
+  last_activity: string | null;
+}
+
+export interface ReportRecord {
+  occurrence_id: string;
+  catalog_number: string | null;
+  scientific_name: string | null;
+  dataset_name: string | null;
+  tbia_dataset_id: string | null;
+  thumbnail: string | null;
+  n_media: number;
+  n_annotations: number;
+  /** Counts only the annotations matching the list's filters. */
+  by_status: ReportStatusCounts;
+  fields: string[];
+  last_modified: string | null;
+}
+
+export interface ReportFilters { status?: string; field?: string; tbia_dataset_id?: string }

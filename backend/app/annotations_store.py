@@ -43,11 +43,18 @@ def _serialize(a: Annotation, name: str | None) -> dict[str, Any]:
 
 
 def list_for_occurrence(occ_id: str) -> list[dict[str, Any]]:
+    """A record's published annotation history — never its drafts.
+
+    This feeds `GET /api/occurrences/{id}`, which is unauthenticated and
+    edge-cached, so whatever is in it is published however the page renders it.
+    Drafts are private working state (their owner's `/me` and nowhere else);
+    hiding them only in the UI still shipped them to every visitor and cache.
+    """
     with SessionLocal() as db:
         rows = db.execute(
             select(Annotation, User)
             .join(User, Annotation.contributor_id == User.id)
-            .where(Annotation.occurrence_id == occ_id)
+            .where(Annotation.occurrence_id == occ_id, Annotation.status != "draft")
             .order_by(Annotation.created.desc())
         ).all()
         return [_serialize(a, public_name(u)) for a, u in rows]

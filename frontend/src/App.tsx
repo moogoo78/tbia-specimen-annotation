@@ -9,6 +9,7 @@ import { Browse } from "./pages/Browse";
 import { Explore } from "./pages/Explore";
 import { Species } from "./pages/Species";
 import { Institutions } from "./pages/Institutions";
+import { InstitutionReport } from "./pages/InstitutionReport";
 import { Volunteers } from "./pages/Volunteers";
 import { Contributor } from "./pages/Contributor";
 import { MyContributions } from "./pages/MyContributions";
@@ -42,6 +43,10 @@ export default function App() {
         <Route path="/explore" element={<Explore />} />
         <Route path="/species" element={<Species />} />
         <Route path="/institutions" element={<Institutions />} />
+        {/* What has been annotated on one institution's records, for the
+            provider to check and a reviewer to work through. `code` is a
+            registry code, optionally kind-qualified (`aggregators:XX`). */}
+        <Route path="/institutions/:code/report" element={<InstitutionReport />} />
         <Route path="/contributors" element={<Volunteers />} />
         {/* One contributor's work in public — where a record's byline and a
             board row lead. `/me` is the same shape for your own, plus drafts. */}
