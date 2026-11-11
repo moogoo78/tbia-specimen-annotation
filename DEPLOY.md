@@ -177,11 +177,16 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f
 ```
 
-Health check (from the box):
+Health check (from the box). With `SITE_ADDRESS` set to a domain, Caddy answers
+plain HTTP with a redirect, so ask the domain itself, pinned to loopback (`-k`
+because a Cloudflare Origin certificate is not publicly trusted):
 
 ```bash
-curl -s http://127.0.0.1/api/health
+curl -s -k --resolve your-domain.org:443:127.0.0.1 https://your-domain.org/api/health
+curl -s http://127.0.0.1/api/health          # only when SITE_ADDRESS is unset / :80
 ```
+
+`scripts/deploy.sh` makes the same choice from `SITE_ADDRESS` on its own.
 
 > **Google Analytics** is off unless `VITE_GA_MEASUREMENT_ID` is set. Vite
 > inlines it into the JS bundle at build time, so it is passed as a *build arg*
