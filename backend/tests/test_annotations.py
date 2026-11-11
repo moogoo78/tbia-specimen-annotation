@@ -1,3 +1,4 @@
+from app import duck
 from tests.conftest import auth_header
 
 CURATOR = "curator@tbia.test"
@@ -371,6 +372,32 @@ def test_export_carries_license_and_uri(client):
     assert csv_res.status_code == 200
     header = csv_res.text.splitlines()[0]
     assert "license" in header and "license_uri" in header
+
+
+def test_provider_export_keeps_our_id_and_theirs_apart(client, monkeypatch):
+    """`tbia_id` is ours, `occurrenceID` the provider's DwC id. The first used to
+    ship as `occurrence_id`, which a provider reads as the second."""
+    rev = auth_header(client, REVIEWER)
+
+    def rows():
+        return client.get("/api/export/provider?dataset_name=DS-A", headers=rev).json()["deltas"]
+
+    federated = rows()
+    assert federated
+    for row in federated:
+        assert "occurrence_id" not in row
+        assert "catalog_number" not in row and "catalogNumber" in row
+        assert row["occurrenceID"] == f"urn:test:{row['tbia_id']}", row
+    monkeypatch.setattr(duck, "annotations_attached", lambda: False)
+    fallback = rows()
+    key = lambda r: r["annotation_id"]
+    assert [(r["tbia_id"], r["occurrenceID"]) for r in sorted(fallback, key=key)] == \
+           [(r["tbia_id"], r["occurrenceID"]) for r in sorted(federated, key=key)]
+
+    header = client.get("/api/export/provider?dataset_name=DS-A&format=csv",
+                        headers=rev).text.splitlines()[0].split(",")
+    # The same id headers as the institution CSV (api/reports.py).
+    assert header[:4] == ["annotation_id", "tbia_id", "occurrenceID", "catalogNumber"]
 
 
 def test_record_detail_never_ships_a_draft(client):

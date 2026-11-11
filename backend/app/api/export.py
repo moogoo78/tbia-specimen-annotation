@@ -31,7 +31,11 @@ from ..models import LICENSE_URIS, Annotation, User
 router = APIRouter(prefix="/api/export", tags=["export"])
 
 EXPORT_COLUMNS = [
-    "annotation_id", "occurrence_id", "catalog_number", "scientific_name",
+    # `tbia_id` is ours (`occurrence.id`); `occurrenceID` is the provider's own
+    # DwC id, the one their system can match on — empty when they publish none.
+    # The first used to ship as `occurrence_id`, which a provider would read as
+    # the second and match nothing, or the wrong records, with.
+    "annotation_id", "tbia_id", "occurrenceID", "catalogNumber", "scientific_name",
     "field", "original_value", "proposed_value", "status", "contributor", "reviewed_at",
     # The terms each delta is released under. Both forms: the SPDX id the
     # platform stores, and the deed URI DwC's `license` wants. A provider
@@ -54,7 +58,8 @@ EXPORT_COLUMNS = [
 async def _rows_federated(dataset_name: str, statuses: list[str]) -> list[dict]:
     placeholders = ", ".join(["?"] * len(statuses))
     sql = f"""
-        SELECT a.id AS annotation_id, a.occurrence_id, o.catalog_number,
+        SELECT a.id AS annotation_id, a.occurrence_id AS tbia_id,
+               o.occurrence_id AS "occurrenceID", o.catalog_number AS "catalogNumber",
                o.scientific_name, a.field, a.original_value, a.proposed_value,
                a.status, u.display_name AS contributor, a.reviewed_at, a.license
         FROM ann.annotations a
@@ -77,14 +82,15 @@ def _rows_python(db: Session, dataset_name: str, statuses: list[str]) -> list[di
     for a in anns:
         occ = None
         # one-by-one detail lookups are fine here (export is low-volume)
-        rec = duck._run("SELECT catalog_number, scientific_name FROM occurrence WHERE id = ?",
-                        [a.occurrence_id])
+        rec = duck._run("SELECT catalog_number, scientific_name, occurrence_id "
+                        "FROM occurrence WHERE id = ?", [a.occurrence_id])
         occ = rec[0] if rec else {}
         u = db.get(User, a.contributor_id)
         out.append({
             "annotation_id": a.id,
-            "occurrence_id": a.occurrence_id,
-            "catalog_number": occ.get("catalog_number"),
+            "tbia_id": a.occurrence_id,
+            "occurrenceID": occ.get("occurrence_id"),
+            "catalogNumber": occ.get("catalog_number"),
             "scientific_name": occ.get("scientific_name"),
             "field": a.field,
             "original_value": a.original_value,
