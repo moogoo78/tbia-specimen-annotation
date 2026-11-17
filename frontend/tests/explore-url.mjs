@@ -49,6 +49,28 @@ class ExplorePage extends Page {
     for (let i = 0; i < 20 && n !== want; i++) { await sleep(300); n = await this.total(); }
     return n;
   }
+  /** Open a taxon tree node (its caret). */
+  async expandTaxon(key) {
+    await this.eval(`document.querySelector('[data-taxon=${JSON.stringify(key)}] [data-expand]').click()`);
+    await this.settle(700);
+  }
+  /** The taxon tree's rows in order: [key, printed count]. */
+  async taxonRows() {
+    return this.eval(`[...document.querySelectorAll('[data-taxon]')].map((r) =>
+      [r.dataset.taxon, Number((r.querySelector('label').innerText.match(/([\\d,]+)\\s*$/) || [])[1]?.replace(/,/g, ""))])`);
+  }
+  async clickTaxon(key) {
+    await this.eval(`document.querySelector('[data-taxon=${JSON.stringify(key)}] label').click()`);
+    await this.settle();
+  }
+  async searchTaxon(text) {
+    await this.eval(`(() => {
+      const el = document.querySelector('[data-taxon-list]').parentElement.querySelector('input');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(text)});
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    await this.settle(900);
+  }
   /** Click the sidebar row whose text contains `text`; returns the count it printed. */
   async clickFacet(text) {
     const n = await this.eval(`(() => {
@@ -204,6 +226,36 @@ async function main() {
       await page.clickButton("/清除|Clear/");
       const box = await page.eval(`document.querySelector('textarea[aria-label]').value`);
       check("Clear empties the box", box === "", JSON.stringify(box));
+    });
+
+    // The tree prints a count per node; selecting the node must reproduce it.
+    await test("a taxon picked from the tree filters to its count", async () => {
+      await page.goto("/explore");
+      await page.expandTaxon("Plantae");
+      const rows = await page.taxonRows();
+      const [key, printed] = rows.find(([k]) => k !== "Plantae" && k.startsWith("Plantae/"));
+      await page.clickTaxon(key);
+      const url = await page.url();
+      const shown = await page.totalReaching(printed);
+      check("URL carries the kingdom-qualified taxon",
+        new URLSearchParams(url.split("?")[1]).get("taxon") === key, url);
+      check("total becomes the count the node printed", shown === printed, `page ${shown} vs node ${printed}`);
+      await page.clickTaxon(key);
+      check("clicking again removes it", (await page.url()) === "/explore", await page.url());
+    });
+
+    // Search across ranks: Arenaria is a plant genus and a bird genus, and the
+    // two must stay two choices with their own counts.
+    await test("taxon search keeps same-named genera apart", async () => {
+      await page.searchTaxon("Arenaria");
+      const rows = (await page.taxonRows()).filter(([k]) => k.endsWith("/genus/Arenaria"));
+      check("two Arenaria genera, one per kingdom", rows.length === 2, JSON.stringify(rows));
+      const [key, printed] = rows[1];
+      await page.clickTaxon(key);
+      const shown = await page.totalReaching(printed);
+      check("total is that genus alone", shown === printed, `page ${shown} vs row ${printed}`);
+      await page.clickTaxon(key);
+      await page.searchTaxon("");
     });
 
     // The other direction: a link in, parsed from the URL alone.

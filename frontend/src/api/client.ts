@@ -45,7 +45,7 @@ export function filtersToParams(f: Filters): URLSearchParams {
   const p = new URLSearchParams();
   if (f.q) p.set("q", f.q);
   for (const key of ["bio_group", "kingdom_c", "county", "taxon_rank", "scientific_name",
-    "basis_of_record", "type_status", "dataset_name", "tbia_dataset_id"] as const) {
+    "basis_of_record", "type_status", "dataset_name", "tbia_dataset_id", "taxon"] as const) {
     for (const v of f[key]) p.append(key, v);
   }
   for (const id of f.collector_id) p.append("collector_id", String(id));
@@ -78,7 +78,7 @@ export function paramsToFilters(p: URLSearchParams): Filters {
   const f = emptyFilters();
   f.q = p.get("q") || undefined;
   for (const key of ["bio_group", "kingdom_c", "county", "taxon_rank", "scientific_name",
-    "basis_of_record", "type_status", "dataset_name", "tbia_dataset_id"] as const) {
+    "basis_of_record", "type_status", "dataset_name", "tbia_dataset_id", "taxon"] as const) {
     f[key] = p.getAll(key);
   }
   f.collector_id = p.getAll("collector_id").map(Number).filter(Number.isFinite);
@@ -220,6 +220,12 @@ export const api = {
     return request<import("./types").SpeciesList>(`/species?${p}`);
   },
 
+  taxonChildren: (key?: string) =>
+    request<{ items: import("./types").TaxonNode[]; n_unplaced: number }>(
+      `/taxa/children${key ? `?${new URLSearchParams({ key })}` : ""}`),
+  taxonSearch: (q: string, limit = 20) =>
+    request<import("./types").TaxonNode[]>(
+      `/taxa/search?${new URLSearchParams({ q, limit: String(limit) })}`),
   collectors: (q = "", limit = 25) => {
     const p = new URLSearchParams({ limit: String(limit) });
     if (q) p.set("q", q);

@@ -56,6 +56,12 @@ export class Page {
       { width, height, deviceScaleFactor: 1, mobile: false });
     await sleep(150);
   }
+  /** PNG of the viewport, for looking at a layout while writing a test. */
+  async screenshot(file) {
+    const r = await this.#send("Page.captureScreenshot", { format: "png" });
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(file, Buffer.from(r.result.data, "base64"));
+  }
   async goto(path) {
     await this.eval(`location.href = ${JSON.stringify(WEB + path)}`);
     await this.settle();

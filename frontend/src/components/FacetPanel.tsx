@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { CollectorSelect, type CollectorRef } from "./CollectorSelect";
+import { TaxonSelect } from "./TaxonSelect";
 import { NONE_VALUE, type FacetResult, type Filters, type Registry, type SourceKind } from "../api/types";
 
 type ArrayKey = "bio_group" | "kingdom_c" | "county" | "taxon_rank"
@@ -18,7 +19,7 @@ const FLAGS: FlagKey[] = ["missing_identification", "missing_coordinates", "miss
 
 export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   registry, selectedSources, onToggleSource,
-  selectedCollectors, onToggleCollector, onRecordRange, onRecordText, onCatalog, width = 232 }: {
+  selectedCollectors, onToggleCollector, onRecordRange, onRecordText, onCatalog, onToggleTaxon, width = 232 }: {
   facets?: FacetResult;
   filters: Filters;
   onToggle: (key: ArrayKey, value: string) => void;
@@ -32,11 +33,12 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   onRecordRange: (from?: number, to?: number) => void;
   onRecordText: (value?: string) => void;
   onCatalog: (value?: string) => void;
+  onToggleTaxon: (key: string) => void;
   width?: number;
 }) {
   const { t: tr } = useTranslation();
   const [open, setOpen] = useState<Record<string, boolean>>({
-    source: true, catalog: true, collector: false, record_number: false, completeness: true, bio_group: true,
+    source: true, taxon: true, catalog: true, collector: false, record_number: false, completeness: true, bio_group: true,
     county: true, taxon_rank: false, basis_of_record: false, kingdom_c: false, type_status: false, dataset_name: false,
   });
   const [srcOpen, setSrcOpen] = useState<Record<string, boolean>>({});
@@ -48,6 +50,7 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
     selectedCollectors.length +
     (recordActive ? 1 : 0) +
     (filters.catalog ? 1 : 0) +
+    filters.taxon.length +
     FLAGS.filter((f) => filters[f]).length +
     SECTIONS.reduce((n, s) => n + filters[s].length, 0);
 
@@ -175,6 +178,12 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
             })}
           </div>
         )}
+      </div>
+
+      {/* Taxon — search any rank, or browse the tree */}
+      <div style={{ borderBottom: `1px solid ${t.borderSoft}` }}>
+        {sectionHead("taxon", tr("facet.taxon"), filters.taxon.length)}
+        {open.taxon && <TaxonSelect selected={filters.taxon} onToggle={onToggleTaxon} />}
       </div>
 
       {/* Catalog number — exact specimen lookup, with or without the institution code */}

@@ -10,6 +10,7 @@ import {
   emptyExplore, exploreParams, parseExplore, type ExploreState, type View,
 } from "./exploreUrl";
 import { FacetPanel } from "../components/FacetPanel";
+import { taxonLabel } from "../components/TaxonSelect";
 import type { CollectorRef } from "../components/CollectorSelect";
 import { TableView, GridView, SplitList } from "../components/Results";
 import { MapView } from "../components/MapView";
@@ -166,6 +167,10 @@ export function Explore() {
   };
   const setRecordRange = (from?: number, to?: number) =>
     setFilters((f) => ({ ...f, record_number_from: from, record_number_to: to }));
+  const toggleTaxon = (key: string) =>
+    setFilters((f) => ({
+      ...f, taxon: f.taxon.includes(key) ? f.taxon.filter((x) => x !== key) : [...f.taxon, key],
+    }));
   const setCatalog = (value?: string) =>
     setFilters((f) => ({ ...f, catalog: value }));
   const setRecordText = (value?: string) =>
@@ -244,6 +249,10 @@ export function Explore() {
         onRemove: () => setRecordRange(undefined, undefined),
       });
     }
+    filters.taxon.forEach((key) => {
+      const { rank, name } = taxonLabel(key);
+      out.push({ label: `${tr(`taxon.rank.${rank}`)} ${name}`, onRemove: () => toggleTaxon(key) });
+    });
     if (filters.catalog) {
       out.push({ label: `${tr("facet.catalog")} ${filters.catalog}`, onRemove: () => setCatalog(undefined) });
     }
@@ -327,7 +336,7 @@ export function Explore() {
             registry={registry.data} selectedSources={sources} onToggleSource={toggleSource}
             selectedCollectors={collectors} onToggleCollector={toggleCollector}
             onRecordRange={setRecordRange} onRecordText={setRecordText}
-            onCatalog={setCatalog} />
+            onCatalog={setCatalog} onToggleTaxon={toggleTaxon} />
         )}
 
         {view === "split" ? (

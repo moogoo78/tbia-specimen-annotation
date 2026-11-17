@@ -219,7 +219,7 @@ const en = {
     completeness: "Data completeness", bio_group: "Biological group", kingdom_c: "Kingdom",
     county: "County", taxon_rank: "Taxon rank", basis_of_record: "Basis of record",
     type_status: "Type status", dataset_name: "Holding institution", collector: "Collector",
-    record_number: "Record number", none: "Not recorded",
+    record_number: "Record number", none: "Not recorded", taxon: "Taxon",
     catalog: "Catalog number", catalog_placeholder: "HAST 334, or paste a list: BM [001015554]; K [000644915]",
     catalog_hint: "Institution or collection code plus catalog number, or the number alone. Paste several separated by ; , or new lines — type labels like \"isotype:\" are ignored. Exact match; leading zeros ignored.",
     catalog_notFound: "Not in the TBIA records held here",
@@ -228,6 +228,14 @@ const en = {
     record_number_textHint: "Matches any part of the record number — use for numbers that aren't numeric",
     missing_coordinates: "Missing coordinates", missing_date: "Missing date",
     missing_identification: "Missing identification", has_media: "Has images",
+  },
+  taxon: {
+    search: "Search taxon — Latin or Chinese…", none: "No matching taxa",
+    unplaced: "not placed further", unplacedHint: "Records under this taxon with nothing at the next rank — identified only this far, or with that rank left blank",
+    rank: {
+      kingdom: "Kingdom", phylum: "Phylum", class: "Class", order: "Order",
+      family: "Family", genus: "Genus", species: "Species",
+    },
   },
   collector: {
     search: "Search collector…", none: "No matching collectors",
@@ -793,7 +801,7 @@ const zh: typeof en = {
     completeness: "資料完整度", bio_group: "生物分類群", kingdom_c: "界",
     county: "縣市", taxon_rank: "分類階層", basis_of_record: "紀錄類型",
     type_status: "模式標本", dataset_name: "資料集", collector: "採集者",
-    record_number: "採集號", none: "未記錄",
+    record_number: "採集號", none: "未記錄", taxon: "分類群",
     catalog: "館號", catalog_placeholder: "HAST 334，或貼上多筆：BM [001015554]; K [000644915]",
     catalog_hint: "機構或典藏代碼加館號，或只輸入館號。可貼上多筆，以 ; , 或換行分隔，「isotype:」等模式標籤會略過。完全比對，忽略前導零。",
     catalog_notFound: "本站收錄的 TBIA 資料中沒有這筆",
@@ -802,6 +810,14 @@ const zh: typeof en = {
     record_number_textHint: "比對採集號的任一部分，適用於非數字的採集號",
     missing_coordinates: "缺少座標", missing_date: "缺少日期",
     missing_identification: "缺少鑑定", has_media: "具有影像",
+  },
+  taxon: {
+    search: "搜尋分類群（學名或中文名）…", none: "查無符合的分類群",
+    unplaced: "未再細分", unplacedHint: "此分類群下、下一階層空白的紀錄——只鑑定到這一階，或該階層未填",
+    rank: {
+      kingdom: "界", phylum: "門", class: "綱", order: "目",
+      family: "科", genus: "屬", species: "種",
+    },
   },
   collector: {
     search: "搜尋採集者…", none: "查無符合的採集者",

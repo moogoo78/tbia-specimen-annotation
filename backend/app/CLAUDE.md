@@ -179,9 +179,26 @@ grouping, so paging in SQL would pay the full scan per request. Nothing is persi
 `scientific_name` is an **exact, multi-valued filter** on the occurrence search
 (`search.py` `Filters` + `build_where`, so list/count/facet all get it) and is deliberately
 **not** in `FACET_COLUMNS` — 44,874 values is not a facet list, and the species page is the
-picker. A row links into Explore through `exploreUrl()` (see `frontend/CLAUDE.md`) and must
-clear `has_media`, which `emptyFilters()` defaults to `true`; without that the landing page
-would report fewer records than the row it was opened from.
+picker. A row links into Explore through `exploreUrl()` (see `frontend/CLAUDE.md`).
+
+## The taxon tree (Explore's 分類群 section)
+
+`app/taxa.py` + `api/taxa.py`: a tree (kingdom → phylum → class → order → family → genus →
+species) and a search box over every rank, both selecting into the `taxon` filter. Same
+shape as the species index — **one grouped scan (~0.7s, ~35k paths) cached on a TTL**, so
+expanding a node or typing a query costs no scan (search answers in ~6ms). Counts are
+store-wide, not narrowed by Explore's other filters.
+
+- **A taxon is `Kingdom/rank/Name`, never a bare name.** ~30 genus names collide across
+  kingdoms (*Arenaria* sandwort/turnstone, *Chloris* grass/finch), so `genus = 'Arenaria'`
+  would mix them. The kingdom travels with every filter value and every tree key.
+- **The species step is the binomial**, not the stored `scientific_name`: picking *Rosa
+  canina* includes its varieties (`scientific_name = ? OR starts_with(…, ? || ' ')`).
+  Subgenus and hybrid sign stay part of it (`taxa.BINOMIAL`).
+- A record with nothing at the next rank (a family-level identification, a blank order) is
+  counted on its parent as `n_unplaced`, not drawn as a node.
+- `test_taxa.py` walks the whole fixture tree asserting each node's count equals what its
+  filter returns — the property the UI relies on.
 
 ## Contributions: public vs personal
 

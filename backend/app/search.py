@@ -82,6 +82,9 @@ class Filters:
     dataset_name: list[str] = field(default_factory=list)
     tbia_dataset_id: list[str] = field(default_factory=list)
     collector_id: list[int] = field(default_factory=list)
+    # "Kingdom/rank/Name" — see app/taxa.py. ORed: picking Rosaceae and
+    # Fagaceae means records in either.
+    taxon: list[str] = field(default_factory=list)
     record_number_from: int | None = None
     record_number_to: int | None = None
     record_number: str | None = None  # substring match, for non-numeric numbers
@@ -278,6 +281,21 @@ async def catalog_matches(text: str | None) -> list[dict]:
     ]
 
 
+def _taxon_clause(values: list[str], where: list[str], params: list[Any]) -> None:
+    from .taxa import MAX_TAXA, taxon_condition
+
+    if not values:
+        return
+    conds = []
+    for v in values[:MAX_TAXA]:
+        c = taxon_condition(v)
+        if c:
+            conds.append(c[0])
+            params.extend(c[1])
+    # Asked for taxa and none parsed: match nothing rather than everything.
+    where.append(f"({' OR '.join(conds)})" if conds else "FALSE")
+
+
 def build_where(f: Filters) -> tuple[str, list[Any]]:
     where: list[str] = []
     params: list[Any] = []
@@ -292,6 +310,7 @@ def build_where(f: Filters) -> tuple[str, list[Any]]:
     _in_clause("dataset_name", f.dataset_name, where, params)
     _in_clause("tbia_dataset_id", f.tbia_dataset_id, where, params)
     _collector_clause(f.collector_id, where, params)
+    _taxon_clause(f.taxon, where, params)
 
     # Numeric record-number range. record_number is varchar, so cast (non-numeric
     # values become NULL and fall outside any range).

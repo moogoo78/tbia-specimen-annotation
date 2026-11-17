@@ -57,6 +57,9 @@ def _build_duckdb() -> None:
             -- The collection's own acronym (HAST, TAI, TNM) — what a catalog
             -- lookup like "HAST 334" names.
             dataset_code VARCHAR,
+            -- The rest of the hierarchy, for the taxon tree (app/taxa.py).
+            kingdom VARCHAR, phylum VARCHAR, "class" VARCHAR, "order" VARCHAR,
+            phylum_c VARCHAR, class_c VARCHAR, order_c VARCHAR, family_c VARCHAR, genus_c VARCHAR,
             basis_of_record VARCHAR, rights_holder VARCHAR, resource_contacts VARCHAR,
             associated_media VARCHAR, verbatim_latitude VARCHAR, verbatim_longitude VARCHAR,
             source_scientific_name VARCHAR,
@@ -96,6 +99,22 @@ def _build_duckdb() -> None:
     con.execute("UPDATE occurrence SET catalog_number = 'A:0023434' WHERE id = 'r5'")
     con.execute("UPDATE occurrence SET catalog_number = '334', dataset_code = 'HAST' WHERE id = 'r6'")
     con.execute("UPDATE occurrence SET catalog_number = '000334' WHERE id = 'r7'")
+    # The taxon tree: two plant families under one order's sibling orders, a coral,
+    # and r5 placed only as far as its kingdom.
+    tax = {
+        "r1": ("Animalia", "Cnidaria", "Anthozoa", "Scleractinia", "Pocilloporidae", "Pocillopora"),
+        "r3": ("Plantae", "Tracheophyta", "Magnoliopsida", "Asterales", "Asteraceae", "Helianthus"),
+        "r7": ("Plantae", "Tracheophyta", "Magnoliopsida", "Asterales", "Asteraceae", "Helianthus"),
+        "r4": ("Plantae", "Tracheophyta", "Magnoliopsida", "Rosales", "Rosaceae", "Rosa"),
+        "r6": ("Plantae", "Tracheophyta", "Magnoliopsida", "Cucurbitales", "Begoniaceae", "Begonia"),
+        "r5": ("Animalia", None, None, None, None, None),
+    }
+    for rid, (k, p, c, o, f, g) in tax.items():
+        con.execute(
+            'UPDATE occurrence SET kingdom=?, phylum=?, "class"=?, "order"=?, family=?, genus=? WHERE id=?',
+            [k, p, c, o, f, g, rid])
+    con.execute("UPDATE occurrence SET family_c = '薔薇科', genus_c = '薔薇屬' WHERE id = 'r4'")
+    con.execute("UPDATE occurrence SET common_name_c = '向日葵' WHERE id = 'r3'")
     # The ETL's per-dataset table. Neither test dataset is in registry.json, so
     # both reach /api/registry through the DB-discovery path.
     con.execute(

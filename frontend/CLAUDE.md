@@ -26,6 +26,9 @@ hand. Nothing about the filters lives in component state any more; the setters i
   server-side by `search.parse_catalog_refs` — the panel only passes the text through.
   `GET /api/occurrences/catalog-matches` returns per-reference counts from the same
   parser, which is how the box shows which references found nothing.
+- **`taxon`** (repeatable, ORed) is `Kingdom/rank/Name`, picked in `components/TaxonSelect.tsx`
+  from the tree or the search box. The value names itself, so chips need no lookup — unlike
+  `collector_id`. Why the kingdom is in it: `backend/app/CLAUDE.md`, *The taxon tree*.
 - Edits **replace** rather than push, so the back button leaves the page instead of
   stepping through every checkbox.
 - `source` and `collector_id` are serialised, not the `tbia_dataset_id` they expand into —

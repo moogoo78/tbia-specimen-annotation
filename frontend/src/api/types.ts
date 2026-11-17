@@ -449,6 +449,8 @@ export interface Filters {
   dataset_name: string[];
   tbia_dataset_id: string[];
   collector_id: number[];
+  /** "Kingdom/rank/Name", ORed — backend app/taxa.py. */
+  taxon: string[];
   record_number_from?: number;
   record_number_to?: number;
   record_number?: string;
@@ -465,13 +467,26 @@ export interface Filters {
   bbox?: string;
 }
 
+/** A node of the taxon tree (`/api/taxa/children`, `/api/taxa/search`). */
+export interface TaxonNode {
+  key: string;
+  kingdom: string;
+  rank: "kingdom" | "phylum" | "class" | "order" | "family" | "genus" | "species";
+  name: string;
+  name_c: string | null;
+  n: number;
+  has_children: boolean;
+  /** Search results only: ancestors, nearest first. */
+  lineage?: string[];
+}
+
 // A facet value meaning "the column is empty" — search.py's NONE_VALUE.
 export const NONE_VALUE = "__none__";
 
 export const emptyFilters = (): Filters => ({
   bio_group: [], kingdom_c: [], county: [], taxon_rank: [], scientific_name: [],
   basis_of_record: [], type_status: [], dataset_name: [], tbia_dataset_id: [],
-  collector_id: [],
+  collector_id: [], taxon: [],
   missing_coordinates: false, missing_date: false,
   missing_identification: false, has_media: false,
 });
