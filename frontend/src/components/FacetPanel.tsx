@@ -19,7 +19,7 @@ const FLAGS: FlagKey[] = ["missing_identification", "missing_coordinates", "miss
 
 export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   registry, selectedSources, onToggleSource,
-  selectedCollectors, onToggleCollector, onRecordRange, onRecordText, onCatalog, onToggleTaxon, width = 232 }: {
+  selectedCollectors, onToggleCollector, onRecordRange, onRecordText, onCatalog, onToggleTaxon, width = 300 }: {
   facets?: FacetResult;
   filters: Filters;
   onToggle: (key: ArrayKey, value: string) => void;
