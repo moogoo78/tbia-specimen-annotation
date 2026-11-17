@@ -85,8 +85,8 @@ class Filters:
     record_number_from: int | None = None
     record_number_to: int | None = None
     record_number: str | None = None  # substring match, for non-numeric numbers
-    # Specimen lookup: "HAST 334", "A:0023434", "TAIF:101308", or a bare number.
-    # See `_catalog_clause`.
+    # Specimen lookup: "HAST 334", "A:0023434", a bare number, or a pasted list
+    # ("BM [001015554]; isotype: A [00038750]"). See `parse_catalog_refs`.
     catalog: str | None = None
     missing_coordinates: bool = False
     missing_date: bool = False
@@ -154,6 +154,17 @@ def _collector_clause(ids: list[int], where: list[str], params: list[Any]) -> No
 # "CODE<sep>NUMBER": a herbarium/museum code, then ':' / whitespace / '-', then
 # the rest. The code must start with a letter so "000062-00018" stays one number.
 _CATALOG_RE = re.compile(r"^\s*([A-Za-z][A-Za-z0-9]*)\s*[:\s-]\s*(\S.*?)\s*$")
+# "BM [001015554]" — how JSTOR Global Plants and protologues cite a sheet.
+_BRACKET_RE = re.compile(r"([A-Za-z][A-Za-z0-9]*)\s*\[\s*([^\]]+?)\s*\]")
+# A type-status label in front of a reference ("isotype:", "Holotype -"), which
+# names what the sheet is, not where it is. Only words ending in "type", so a
+# real code followed by a colon ("HAST: 334") is never mistaken for one.
+_LABEL_RE = re.compile(r"^\s*[A-Za-z]*types?\s*[:\-]\s*", re.IGNORECASE)
+# References between these. Never ':' or whitespace — those separate a code
+# from its number.
+_SPLIT_RE = re.compile(r"[;,\n\r]+")
+# A pasted list is a lookup, not a bulk export: bound what one request scans for.
+MAX_CATALOG_REFS = 50
 
 
 def _norm(s: str) -> str:
@@ -162,14 +173,42 @@ def _norm(s: str) -> str:
 
 
 def parse_catalog(term: str) -> tuple[str | None, str]:
-    """Split a specimen reference into (institution code, catalog number).
+    """Split one specimen reference into (institution code, catalog number).
 
     "HAST 334" -> ("HAST", "334"); "A:0023434" -> ("A", "0023434");
-    "0023434" -> (None, "0023434")."""
-    m = _CATALOG_RE.match(term)
+    "BM [001015554]" -> ("BM", "001015554"); "0023434" -> (None, "0023434")."""
+    m = _BRACKET_RE.fullmatch(term.strip()) or _CATALOG_RE.match(term)
     if m:
-        return m.group(1).upper(), m.group(2)
+        return m.group(1).upper(), m.group(2).strip()
     return None, term.strip()
+
+
+def parse_catalog_refs(text: str | None) -> list[tuple[str | None, str]]:
+    """Every specimen reference in a pasted citation, in order, deduplicated.
+
+    "BM [001015554]; isotype: A [00038750], K [000644915]" ->
+    [("BM", "001015554"), ("A", "00038750"), ("K", "000644915")].
+    Bracketed references are taken wherever they sit, so the prose around them
+    ("isotype:") falls away; whatever is left is split on ; , and newlines."""
+    if not text:
+        return []
+    refs = [(m.group(1).upper(), m.group(2).strip()) for m in _BRACKET_RE.finditer(text)]
+    for seg in _SPLIT_RE.split(_BRACKET_RE.sub(";", text)):
+        seg = _LABEL_RE.sub("", seg).strip()
+        if _norm(seg):
+            refs.append(parse_catalog(seg))
+    seen: set[tuple[str | None, str]] = set()
+    out = []
+    for code, num in refs:
+        key = (code, _norm(num).lstrip("0") or _norm(num))
+        if key not in seen and _norm(num):
+            seen.add(key)
+            out.append((code, num))
+    return out[:MAX_CATALOG_REFS]
+
+
+def format_ref(code: str | None, num: str) -> str:
+    return f"{code} {num}" if code else num
 
 
 # catalog_number with everything but letters/digits dropped, upper-cased, so
@@ -177,25 +216,20 @@ def parse_catalog(term: str) -> tuple[str | None, str]:
 _NORM = "upper(regexp_replace(coalesce(catalog_number, ''), '[^A-Za-z0-9]', '', 'g'))"
 
 
-def _catalog_clause(term: str | None, where: list[str], params: list[Any]) -> None:
-    """Exact specimen lookup by institution code + catalog number.
+def _ref_condition(code: str | None, num: str) -> tuple[str, list[Any]]:
+    """SQL matching one reference.
 
     The code people cite lives in three places in this export, so all three are
     tried: TBIA's partner code (`institution_code`: TAIF, NMNS), the collection
     code (`dataset_code`: HAST, TAI, TNM — the herbarium acronym), or embedded
-    in the catalog number itself (GBIF rows: "A:TAI-4114", "USNM 123").
+    in the catalog number itself (GBIF rows: "BM001015554", "A:TAI-4114").
     Numbers compare with leading zeros stripped, so "HAST 0000334" finds 334.
     Exact rather than substring: this is a lookup, and free-text `q` already
     does substring over catalog_number."""
-    if not term or not term.strip():
-        return
-    code, num = parse_catalog(term)
     num_key = _norm(num).lstrip("0")
-    if not num_key and not _norm(num):
-        return
-    # Whole term against the stored value ("A:0023434" stored literally).
+    # Code and number as one stored value ("A:0023434" stored literally).
     terms = [f"{_NORM} = ?"]
-    params.append(_norm(term))
+    params: list[Any] = [_norm((code or "") + num)]
     if code:
         terms.append(
             "((upper(institution_code) = ? OR upper(dataset_code) = ?)"
@@ -204,14 +238,44 @@ def _catalog_clause(term: str | None, where: list[str], params: list[Any]) -> No
         params.extend([code, code, num_key])
         # Code embedded in the number, leading zeros after it ignored:
         # "A:23434" finds a stored "A:0023434".
-        terms.append(
-            f"(starts_with({_NORM}, ?) AND ltrim(substr({_NORM}, ?), '0') = ?)"
-        )
+        terms.append(f"(starts_with({_NORM}, ?) AND ltrim(substr({_NORM}, ?), '0') = ?)")
         params.extend([code, len(code) + 1, num_key])
     else:
         terms.append(f"ltrim({_NORM}, '0') = ?")
         params.append(num_key)
-    where.append(f"({' OR '.join(terms)})")
+    return f"({' OR '.join(terms)})", params
+
+
+def _catalog_clause(text: str | None, where: list[str], params: list[Any]) -> None:
+    """Records matching any reference in `text` (see `parse_catalog_refs`)."""
+    refs = parse_catalog_refs(text)
+    if not refs:
+        return
+    conds = []
+    for code, num in refs:
+        sql, p = _ref_condition(code, num)
+        conds.append(sql)
+        params.extend(p)
+    where.append(conds[0] if len(conds) == 1 else f"({' OR '.join(conds)})")
+
+
+async def catalog_matches(text: str | None) -> list[dict]:
+    """Per-reference hit counts for a pasted list, in one scan — so the page can
+    say which references found nothing, rather than leave someone who pasted
+    four and got two working out which two."""
+    refs = parse_catalog_refs(text)
+    if not refs:
+        return []
+    cols, params = [], []
+    for i, (code, num) in enumerate(refs):
+        sql, p = _ref_condition(code, num)
+        cols.append(f"count(*) FILTER (WHERE {sql}) AS n{i}")
+        params.extend(p)
+    row = await duck.query_one(f"SELECT {', '.join(cols)} FROM {TABLE}", params)
+    return [
+        {"ref": format_ref(code, num), "n": row[f"n{i}"]}
+        for i, (code, num) in enumerate(refs)
+    ]
 
 
 def build_where(f: Filters) -> tuple[str, list[Any]]:

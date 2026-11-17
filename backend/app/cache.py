@@ -46,6 +46,7 @@ STATIC_ROUTES = frozenset({
     "/api/datasets",
     "/api/occurrences",
     "/api/occurrences/facets",
+    "/api/occurrences/catalog-matches",
     "/api/occurrences/{occ_id}",
     "/api/species",
     "/api/collectors",

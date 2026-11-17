@@ -136,6 +136,12 @@ async def occurrence_facets(f: Filters = Depends(filters_dep)):
     return await search.facets(f)
 
 
+@router.get("/occurrences/catalog-matches")
+async def catalog_matches(catalog: str | None = None):
+    """How many records each reference in a pasted catalog list matched."""
+    return await search.catalog_matches(catalog)
+
+
 @router.get("/occurrences/queue")
 async def occurrence_queue(
     f: Filters = Depends(filters_dep),

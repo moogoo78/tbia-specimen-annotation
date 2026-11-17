@@ -210,6 +210,7 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
           <div style={{ fontSize: 12, color: t.fgMuted }}>
             {r.common_name_c ? r.common_name_c + " · " : ""}<span style={{ fontFamily: t.mono }}>{r.dataset_name}</span>
           </div>
+          <SourceLinks id={String(r.id)} references={r["references"] as string | null} />
         </div>
       </div>
 
@@ -248,11 +249,41 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
         {/* right column: media + annotation */}
         <div style={{ width: annotW, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, paddingLeft: 12 }}>
           <Section title={`${tr("detail.media")} · ${r.media.length}`}>
-            <MediaGallery urls={r.media} sizes={r.media_sizes} references={r["references"] as string} />
+            {/* No `references` here: the header's SourceLinks already links out. */}
+            <MediaGallery urls={r.media} sizes={r.media_sizes} />
           </Section>
           <AnnotationPanel record={r} />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The record's page on TBIA, and on the provider's own system (`references`).
+ *  Our `id` is TBIA's record id. Both are canonical for the occurrence data; this
+ *  page is an annotation layer over a copy. */
+function SourceLinks({ id, references }: { id: string; references?: string | null }) {
+  const { t: tr, i18n } = useTranslation();
+  const tbia = `https://tbiadata.tw/${i18n.language === "en" ? "en-us" : "zh-hant"}/occurrence/${encodeURIComponent(id)}/`;
+  // Provider data: only an http(s) URL becomes a link, and it is labelled with
+  // its host so it is plain where the click goes.
+  let ref: URL | null = null;
+  try {
+    const u = references ? new URL(references.trim()) : null;
+    if (u && (u.protocol === "https:" || u.protocol === "http:")) ref = u;
+  } catch { /* not a URL — show nothing */ }
+  const a: React.CSSProperties = { color: t.accent, textDecoration: "none", whiteSpace: "nowrap" };
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", marginTop: 4, fontSize: 11 }}>
+      <a href={tbia} target="_blank" rel="noreferrer noopener" title={tr("detail.viewOnTbia")} style={a}>
+        TBIA ↗
+      </a>
+      {ref && (
+        <a href={ref.href} target="_blank" rel="noreferrer noopener" title={tr("detail.viewAtSource")}
+          style={a}>
+          {ref.hostname.replace(/^www\./, "")} ↗
+        </a>
+      )}
     </div>
   );
 }

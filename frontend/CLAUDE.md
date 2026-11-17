@@ -21,8 +21,11 @@ hand. Nothing about the filters lives in component state any more; the setters i
   it serialised to nothing, read back as the default, and the box re-ticked itself).
   A new default-on filter would bring all of that back. Every link in goes through
   **`exploreUrl()`**, which starts from `emptyFilters()`.
-- **`catalog`** is an exact specimen lookup (`HAST 334`, `A:0023434`, or a bare number),
-  parsed server-side by `search._catalog_clause` — the panel only passes the text through.
+- **`catalog`** is an exact specimen lookup (`HAST 334`, `A:0023434`, a bare number, or a
+  pasted citation listing several: `BM [001015554]; isotype: A [00038750]`), parsed
+  server-side by `search.parse_catalog_refs` — the panel only passes the text through.
+  `GET /api/occurrences/catalog-matches` returns per-reference counts from the same
+  parser, which is how the box shows which references found nothing.
 - Edits **replace** rather than push, so the back button leaves the page instead of
   stepping through every checkbox.
 - `source` and `collector_id` are serialised, not the `tbia_dataset_id` they expand into —

@@ -173,6 +173,10 @@ export const api = {
     p.set("limit", String(limit)); p.set("offset", String(offset));
     return request<import("./types").SearchResult>(`/occurrences?${p}`);
   },
+  /** Per-reference hit counts for a pasted catalog list (search.py's `catalog_matches`). */
+  catalogMatches: (catalog: string) =>
+    request<{ ref: string; n: number }[]>(
+      `/occurrences/catalog-matches?${new URLSearchParams({ catalog })}`),
   facets: (f: Filters) =>
     request<import("./types").FacetResult>(`/occurrences/facets?${filtersToParams(f)}`),
   /** A random draw from the rows matching `f`. Uncached on the server by

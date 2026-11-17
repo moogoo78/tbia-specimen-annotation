@@ -41,6 +41,14 @@ class ExplorePage extends Page {
     })()`);
     return raw ? Number(raw.replace(/,/g, "")) : null;
   }
+  /** The total once it reaches `want`, or whatever it shows after ~6s. For the
+   *  catalog lookups: an uncached one can outlast a fixed settle, and the
+   *  previous results stay on screen meanwhile — a fixed wait reads those. */
+  async totalReaching(want) {
+    let n = await this.total();
+    for (let i = 0; i < 20 && n !== want; i++) { await sleep(300); n = await this.total(); }
+    return n;
+  }
   /** Click the sidebar row whose text contains `text`; returns the count it printed. */
   async clickFacet(text) {
     const n = await this.eval(`(() => {
@@ -65,9 +73,9 @@ class ExplorePage extends Page {
    *  a value set through the native setter followed by an input event. */
   async typeCatalog(text) {
     await this.eval(`(() => {
-      const el = document.querySelector('input[type="search"][aria-label]');
+      const el = document.querySelector('textarea[aria-label]');
       if (!el) throw new Error("no catalog input");
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set
         .call(el, ${JSON.stringify(text)});
       el.dispatchEvent(new Event("input", { bubbles: true }));
     })()`);
@@ -160,17 +168,42 @@ async function main() {
 
     // Institution code + catalog number, typed into the panel's own box.
     await test("a catalog lookup is written to the URL and applied", async () => {
+      // The URL holds the trimmed text; echoing it back into the box once ate
+      // the space after "HAST " mid-typing, so the person ended up at "HAST334".
+      await page.typeCatalog("HAST ");
+      const kept = await page.eval(`document.querySelector('textarea[aria-label]').value`);
+      check("a pause does not trim what is being typed", kept === "HAST ", JSON.stringify(kept));
+
       const term = "HAST 334";
       await page.typeCatalog(term);
       const url = await page.url();
-      const shown = await page.total();
       const api = await fetch(`${WEB}/api/occurrences?catalog=${encodeURIComponent(term)}&limit=1`)
         .then((r) => r.json()).then((d) => d.total);
+      const shown = await page.totalReaching(api);
       check("URL carries catalog", new URLSearchParams(url.split("?")[1]).get("catalog") === term, url);
       check("total matches the API's lookup", shown === api, `page ${shown} vs api ${api}`);
       await page.typeCatalog("");
       const back = await page.url();
       check("clearing the box drops the param", !back.includes("catalog="), back);
+
+      // A pasted citation: every reference is looked up, and the box says which
+      // matched. Relational again — the API's own per-reference counts.
+      const paste = "BM [001015554]; isotype: A [00038750], K [000644915]";
+      await page.typeCatalog(paste);
+      const per = await fetch(`${WEB}/api/occurrences/catalog-matches?catalog=${encodeURIComponent(paste)}`)
+        .then((r) => r.json());
+      const many = await page.totalReaching(per.reduce((n, m) => n + m.n, 0));
+      check("one lookup per reference", per.length === 3, JSON.stringify(per));
+      check("total is the sum of the per-reference hits",
+        many === per.reduce((n, m) => n + m.n, 0), `page ${many} vs ${JSON.stringify(per)}`);
+      const listed = await page.eval(`document.body.innerText.includes(${JSON.stringify(per[1].ref)})`);
+      check("the box lists each reference", listed === true, per[1].ref);
+
+      // ... and an outside change still reaches the box.
+      await page.typeCatalog(term);
+      await page.clickButton("/清除|Clear/");
+      const box = await page.eval(`document.querySelector('textarea[aria-label]').value`);
+      check("Clear empties the box", box === "", JSON.stringify(box));
     });
 
     // The other direction: a link in, parsed from the URL alone.

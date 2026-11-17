@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api/client";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
@@ -260,31 +262,67 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
 
 // Record number: a numeric range (from – to) plus a free-text box, because many
 // record numbers aren't numbers ("TAI-9", "陳-123") and can never match a range.
-// Institution code + catalog number ("HAST 334", "A:0023434"), or the number
-// alone. Debounced like RecordRange; the parsing is the server's.
+// Institution code + catalog number ("HAST 334", "A:0023434"), the number alone,
+// or a pasted citation listing several ("BM [001015554]; isotype: A [00038750]").
+// Debounced like RecordRange; the parsing is the server's, including the list
+// of which references matched that appears under the box.
 function CatalogInput({ value, onChange }: {
   value?: string;
   onChange: (value?: string) => void;
 }) {
   const { t: tr } = useTranslation();
   const [txt, setTxt] = useState(value ?? "");
-  useEffect(() => { setTxt(value ?? ""); }, [value]);
+  // Reflect an outside change (Clear, a removed chip) — but not our own echo:
+  // the URL holds the trimmed text, and copying it back would eat the space
+  // after "HAST " mid-typing, leaving "HAST334".
   useEffect(() => {
-    const h = setTimeout(() => {
-      const v = txt.trim() || undefined;
-      if (v !== value) onChange(v);
-    }, 400);
+    setTxt((cur) => ((cur.trim() || undefined) === value ? cur : value ?? ""));
+  }, [value]);
+  const apply = () => {
+    const v = txt.trim() || undefined;
+    if (v !== value) onChange(v);
+  };
+  useEffect(() => {
+    const h = setTimeout(apply, 400);
     return () => clearTimeout(h);
   }, [txt]);
+  const matches = useQuery({
+    queryKey: ["catalog-matches", value],
+    queryFn: () => api.catalogMatches(value!),
+    enabled: !!value,
+    staleTime: 5 * 60_000,
+  });
+  const refs = value ? matches.data ?? [] : [];
+  // One reference that matched needs no report — the results say it. Several,
+  // or any miss, do: four pasted and two found should say which two.
+  const showRefs = refs.length > 1 || refs.some((m) => m.n === 0);
   return (
     <div style={{ padding: "2px 10px 8px" }}>
-      <input type="search" value={txt} placeholder={tr("facet.catalog_placeholder")}
+      <textarea value={txt} rows={2} placeholder={tr("facet.catalog_placeholder")}
         title={tr("facet.catalog_hint")} aria-label={tr("facet.catalog")}
         onChange={(e) => setTxt(e.target.value)}
+        // Enter searches now; Shift+Enter is a new line for a hand-typed list.
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); apply(); } }}
         style={{
           width: "100%", boxSizing: "border-box", padding: "3px 5px", fontFamily: t.mono,
           fontSize: 11, border: `1px solid ${t.border}`, background: t.panelAlt, outline: "none",
+          resize: "vertical", minHeight: 34, display: "block",
         }} />
+      {showRefs && (
+        <div style={{ marginTop: 4, fontFamily: t.mono, fontSize: 10, lineHeight: 1.6 }}>
+          {refs.map((m) => (
+            <div key={m.ref} style={{ display: "flex", gap: 6, color: m.n ? t.fgMuted : t.danger }}
+              title={m.n ? undefined : tr("facet.catalog_notFound")}>
+              <span>{m.n ? "✓" : "✗"}</span>
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.ref}</span>
+              {m.n > 1 && <span style={{ color: t.fgSubtle }}>{m.n}</span>}
+            </div>
+          ))}
+          <div style={{ color: t.fgSubtle }}>
+            {tr("facet.catalog_found", { n: refs.filter((m) => m.n).length, total: refs.length })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -303,7 +341,10 @@ function RecordRange({ from, to, text, onChange, onText }: {
   // reflect external changes (e.g. Clear) into the inputs
   useEffect(() => { setLo(from?.toString() ?? ""); }, [from]);
   useEffect(() => { setHi(to?.toString() ?? ""); }, [to]);
-  useEffect(() => { setTxt(text ?? ""); }, [text]);
+  // Same echo guard as CatalogInput: don't trim what is still being typed.
+  useEffect(() => {
+    setTxt((cur) => ((cur.trim() || undefined) === text ? cur : text ?? ""));
+  }, [text]);
   useEffect(() => {
     const h = setTimeout(() => {
       const num = (s: string) => {

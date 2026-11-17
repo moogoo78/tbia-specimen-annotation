@@ -195,3 +195,39 @@ def test_catalog_bare_number(client):
     assert _catalog(client, "C-003") == {"r3"}
     blank = client.get("/api/occurrences", params={"catalog": "  "}).json()
     assert blank["total"] == client.get("/api/occurrences").json()["total"]
+
+
+def test_parse_catalog_refs():
+    from app.search import MAX_CATALOG_REFS, parse_catalog_refs
+
+    # A protologue/JSTOR-style citation: bracketed numbers, a type label between.
+    assert parse_catalog_refs(
+        "BM [001015554]; isotype: A [00038750], K [000644915], US [00956032]"
+    ) == [("BM", "001015554"), ("A", "00038750"), ("K", "000644915"), ("US", "00956032")]
+    # Plain references, any of ; , or newline between them
+    assert parse_catalog_refs("HAST 334; TAIF 101308\nTNM S092141") == [
+        ("HAST", "334"), ("TAIF", "101308"), ("TNM", "S092141")]
+    # A type label is dropped; a real code before a colon is not taken for one
+    assert parse_catalog_refs("Holotype: HAST 334") == [("HAST", "334")]
+    assert parse_catalog_refs("HAST: 334") == [("HAST", "334")]
+    # The same reference twice — written differently — is asked for once
+    assert parse_catalog_refs("BM [1015554], BM 001015554") == [("BM", "1015554")]
+    # One reference behaves exactly as before
+    assert parse_catalog_refs("A:0023434") == [("A", "0023434")]
+    assert parse_catalog_refs(" ; , ") == []
+    many = "; ".join(f"HAST {i}" for i in range(1, 200))
+    assert len(parse_catalog_refs(many)) == MAX_CATALOG_REFS
+
+
+def test_catalog_pasted_list(client):
+    # r5 is A:0023434, r6 is HAST 334; the X reference matches nothing.
+    paste = "isotype: A [0023434]; HAST [334], X [999]"
+    assert _catalog(client, paste) == {"r5", "r6"}
+
+
+def test_catalog_matches_counts_each_reference(client):
+    res = client.get("/api/occurrences/catalog-matches",
+                     params={"catalog": "A [0023434]; X [999]; 334"}).json()
+    # bare 334 is r6 and r7 (000334)
+    assert res == [{"ref": "A 0023434", "n": 1}, {"ref": "X 999", "n": 0}, {"ref": "334", "n": 2}]
+    assert client.get("/api/occurrences/catalog-matches").json() == []
