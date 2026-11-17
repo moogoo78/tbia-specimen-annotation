@@ -152,3 +152,46 @@ def test_registry_merges_datasets_from_the_db(client):
     assert ent["datasets"]["DS-A"]["gbif"] == "src-DS-A"
     # curated institutions still come from the file
     assert reg["institutions"]
+
+
+def _catalog(client, term):
+    res = client.get("/api/occurrences", params={"catalog": term}).json()
+    return {r["id"] for r in res["items"]}
+
+
+def test_parse_catalog():
+    from app.search import parse_catalog
+
+    assert parse_catalog("HAST 334") == ("HAST", "334")
+    assert parse_catalog("A:0023434") == ("A", "0023434")
+    assert parse_catalog(" taif:101308 ") == ("TAIF", "101308")
+    assert parse_catalog("NMMB-P042102") == ("NMMB", "P042102")
+    # A leading digit means it is all number, hyphen or not.
+    assert parse_catalog("000062-00018") == (None, "000062-00018")
+    assert parse_catalog("0023434") == (None, "0023434")
+
+
+def test_catalog_code_embedded_in_number(client):
+    """GBIF rows store the code inside catalog_number ("A:0023434")."""
+    for term in ("A:0023434", "A 0023434", "a-0023434", "A:23434"):
+        assert _catalog(client, term) == {"r5"}, term
+
+
+def test_catalog_collection_code(client):
+    """r6 is 334 in collection HAST; r7 is 000334 in no collection HAST."""
+    for term in ("HAST 334", "HAST:334", "hast 0000334"):
+        assert _catalog(client, term) == {"r6"}, term
+    # institution_code (TBIA's partner code) is tried as well as dataset_code
+    assert _catalog(client, "TEST 334") == {"r6", "r7"}
+    # an unknown code does not fall back to the bare number
+    assert _catalog(client, "XYZ 334") == set()
+
+
+def test_catalog_bare_number(client):
+    # leading zeros either side are ignored, and it is exact, not substring
+    assert _catalog(client, "334") == {"r6", "r7"}
+    assert _catalog(client, "00334") == {"r6", "r7"}
+    assert _catalog(client, "33") == set()
+    assert _catalog(client, "C-003") == {"r3"}
+    blank = client.get("/api/occurrences", params={"catalog": "  "}).json()
+    assert blank["total"] == client.get("/api/occurrences").json()["total"]

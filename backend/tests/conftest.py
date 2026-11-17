@@ -54,6 +54,9 @@ def _build_duckdb() -> None:
             -- Added to `occurrence` by ingest/build.py from registry.json, not by the
             -- export; the dataset table below carries the same pair.
             institution_code VARCHAR, institution_name VARCHAR,
+            -- The collection's own acronym (HAST, TAI, TNM) — what a catalog
+            -- lookup like "HAST 334" names.
+            dataset_code VARCHAR,
             basis_of_record VARCHAR, rights_holder VARCHAR, resource_contacts VARCHAR,
             associated_media VARCHAR, verbatim_latitude VARCHAR, verbatim_longitude VARCHAR,
             source_scientific_name VARCHAR,
@@ -87,6 +90,12 @@ def _build_duckdb() -> None:
     # record_number values for the numeric range filter (r4 non-numeric -> excluded)
     for rid, rn in [("r1", "100"), ("r2", "150"), ("r3", "200"), ("r4", "TAI-9"), ("r5", "250")]:
         con.execute("UPDATE occurrence SET record_number = ? WHERE id = ?", [rn, rid])
+    # Catalog lookup (`search._catalog_clause`): a GBIF-style number with the
+    # herbarium code embedded (r5), the same digits under a collection code (r6),
+    # and with leading zeros under no code at all (r7).
+    con.execute("UPDATE occurrence SET catalog_number = 'A:0023434' WHERE id = 'r5'")
+    con.execute("UPDATE occurrence SET catalog_number = '334', dataset_code = 'HAST' WHERE id = 'r6'")
+    con.execute("UPDATE occurrence SET catalog_number = '000334' WHERE id = 'r7'")
     # The ETL's per-dataset table. Neither test dataset is in registry.json, so
     # both reach /api/registry through the DB-discovery path.
     con.execute(

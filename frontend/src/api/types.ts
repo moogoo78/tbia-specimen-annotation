@@ -452,6 +452,8 @@ export interface Filters {
   record_number_from?: number;
   record_number_to?: number;
   record_number?: string;
+  /** Specimen lookup — "HAST 334", "A:0023434", or a bare number. search.py's `_catalog_clause`. */
+  catalog?: string;
   missing_coordinates: boolean;
   missing_date: boolean;
   missing_identification: boolean;
@@ -471,7 +473,7 @@ export const emptyFilters = (): Filters => ({
   basis_of_record: [], type_status: [], dataset_name: [], tbia_dataset_id: [],
   collector_id: [],
   missing_coordinates: false, missing_date: false,
-  missing_identification: false, has_media: true,
+  missing_identification: false, has_media: false,
 });
 
 // ── Institution annotation report (api/reports.py) ────────────────────────

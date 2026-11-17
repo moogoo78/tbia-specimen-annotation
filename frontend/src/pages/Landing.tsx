@@ -180,19 +180,17 @@ function Intro() {
   // The same query Browse runs, deliberately under the same key so moving
   // between / and /browse pays for this rollup once. It scans ~2M rows, but the
   // route is in cache.STATIC_ROUTES and edge-cached for an hour.
-  const base = useMemo(() => ({ ...emptyFilters(), has_media: false }), []);
+  const base = useMemo(() => emptyFilters(), []);
   const facets = useQuery({ queryKey: ["home-facets"], queryFn: () => api.facets(base) });
   const c = facets.data?.completeness;
 
-  // Every figure links to the records behind it. `has_media: false` is stated on
-  // each one because exploreUrl() starts from emptyFilters(), whose has_media is
-  // true — without it the landing page would quote a number Explore then fails
-  // to reproduce.
+  // Every figure links to the records behind it, with the same filters, so
+  // Explore reproduces the number quoted here.
   const stats: { n?: number; label: string; to: string }[] = [
-    { n: c?.total, label: "statRecords", to: exploreUrl({ flags: { has_media: false } }) },
-    { n: c?.missing_identification, label: "statNoId", to: exploreUrl({ flags: { missing_identification: true, has_media: false } }) },
-    { n: c?.missing_coordinates, label: "statNoGeo", to: exploreUrl({ flags: { missing_coordinates: true, has_media: false } }) },
-    { n: c?.missing_date, label: "statNoDate", to: exploreUrl({ flags: { missing_date: true, has_media: false } }) },
+    { n: c?.total, label: "statRecords", to: exploreUrl({}) },
+    { n: c?.missing_identification, label: "statNoId", to: exploreUrl({ flags: { missing_identification: true } }) },
+    { n: c?.missing_coordinates, label: "statNoGeo", to: exploreUrl({ flags: { missing_coordinates: true } }) },
+    { n: c?.missing_date, label: "statNoDate", to: exploreUrl({ flags: { missing_date: true } }) },
   ];
 
   return (

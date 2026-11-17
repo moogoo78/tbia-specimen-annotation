@@ -7,6 +7,7 @@ same filter consistently.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -84,6 +85,9 @@ class Filters:
     record_number_from: int | None = None
     record_number_to: int | None = None
     record_number: str | None = None  # substring match, for non-numeric numbers
+    # Specimen lookup: "HAST 334", "A:0023434", "TAIF:101308", or a bare number.
+    # See `_catalog_clause`.
+    catalog: str | None = None
     missing_coordinates: bool = False
     missing_date: bool = False
     missing_identification: bool = False
@@ -147,6 +151,69 @@ def _collector_clause(ids: list[int], where: list[str], params: list[Any]) -> No
             where.append("FALSE")  # selected collector has no mapped values
 
 
+# "CODE<sep>NUMBER": a herbarium/museum code, then ':' / whitespace / '-', then
+# the rest. The code must start with a letter so "000062-00018" stays one number.
+_CATALOG_RE = re.compile(r"^\s*([A-Za-z][A-Za-z0-9]*)\s*[:\s-]\s*(\S.*?)\s*$")
+
+
+def _norm(s: str) -> str:
+    """Upper-case, punctuation and whitespace removed — the SQL `_NORM` in Python."""
+    return re.sub(r"[^A-Za-z0-9]", "", s).upper()
+
+
+def parse_catalog(term: str) -> tuple[str | None, str]:
+    """Split a specimen reference into (institution code, catalog number).
+
+    "HAST 334" -> ("HAST", "334"); "A:0023434" -> ("A", "0023434");
+    "0023434" -> (None, "0023434")."""
+    m = _CATALOG_RE.match(term)
+    if m:
+        return m.group(1).upper(), m.group(2)
+    return None, term.strip()
+
+
+# catalog_number with everything but letters/digits dropped, upper-cased, so
+# "A:0023434", "A 0023434" and "a-0023434" are one key.
+_NORM = "upper(regexp_replace(coalesce(catalog_number, ''), '[^A-Za-z0-9]', '', 'g'))"
+
+
+def _catalog_clause(term: str | None, where: list[str], params: list[Any]) -> None:
+    """Exact specimen lookup by institution code + catalog number.
+
+    The code people cite lives in three places in this export, so all three are
+    tried: TBIA's partner code (`institution_code`: TAIF, NMNS), the collection
+    code (`dataset_code`: HAST, TAI, TNM — the herbarium acronym), or embedded
+    in the catalog number itself (GBIF rows: "A:TAI-4114", "USNM 123").
+    Numbers compare with leading zeros stripped, so "HAST 0000334" finds 334.
+    Exact rather than substring: this is a lookup, and free-text `q` already
+    does substring over catalog_number."""
+    if not term or not term.strip():
+        return
+    code, num = parse_catalog(term)
+    num_key = _norm(num).lstrip("0")
+    if not num_key and not _norm(num):
+        return
+    # Whole term against the stored value ("A:0023434" stored literally).
+    terms = [f"{_NORM} = ?"]
+    params.append(_norm(term))
+    if code:
+        terms.append(
+            "((upper(institution_code) = ? OR upper(dataset_code) = ?)"
+            f" AND ltrim({_NORM}, '0') = ?)"
+        )
+        params.extend([code, code, num_key])
+        # Code embedded in the number, leading zeros after it ignored:
+        # "A:23434" finds a stored "A:0023434".
+        terms.append(
+            f"(starts_with({_NORM}, ?) AND ltrim(substr({_NORM}, ?), '0') = ?)"
+        )
+        params.extend([code, len(code) + 1, num_key])
+    else:
+        terms.append(f"ltrim({_NORM}, '0') = ?")
+        params.append(num_key)
+    where.append(f"({' OR '.join(terms)})")
+
+
 def build_where(f: Filters) -> tuple[str, list[Any]]:
     where: list[str] = []
     params: list[Any] = []
@@ -182,6 +249,8 @@ def build_where(f: Filters) -> tuple[str, list[Any]]:
     if f.record_number and f.record_number.strip():
         where.append("record_number ILIKE ?")
         params.append(f"%{f.record_number.strip()}%")
+
+    _catalog_clause(f.catalog, where, params)
 
     if f.missing_coordinates:
         where.append("has_coordinates = FALSE")

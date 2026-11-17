@@ -16,7 +16,7 @@ const FLAGS: FlagKey[] = ["missing_identification", "missing_coordinates", "miss
 
 export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   registry, selectedSources, onToggleSource,
-  selectedCollectors, onToggleCollector, onRecordRange, onRecordText, width = 232 }: {
+  selectedCollectors, onToggleCollector, onRecordRange, onRecordText, onCatalog, width = 232 }: {
   facets?: FacetResult;
   filters: Filters;
   onToggle: (key: ArrayKey, value: string) => void;
@@ -29,11 +29,12 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   onToggleCollector: (c: CollectorRef) => void;
   onRecordRange: (from?: number, to?: number) => void;
   onRecordText: (value?: string) => void;
+  onCatalog: (value?: string) => void;
   width?: number;
 }) {
   const { t: tr } = useTranslation();
   const [open, setOpen] = useState<Record<string, boolean>>({
-    source: true, collector: false, record_number: false, completeness: true, bio_group: true,
+    source: true, catalog: true, collector: false, record_number: false, completeness: true, bio_group: true,
     county: true, taxon_rank: false, basis_of_record: false, kingdom_c: false, type_status: false, dataset_name: false,
   });
   const [srcOpen, setSrcOpen] = useState<Record<string, boolean>>({});
@@ -44,6 +45,7 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
     selectedSources.length +
     selectedCollectors.length +
     (recordActive ? 1 : 0) +
+    (filters.catalog ? 1 : 0) +
     FLAGS.filter((f) => filters[f]).length +
     SECTIONS.reduce((n, s) => n + filters[s].length, 0);
 
@@ -173,6 +175,12 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
         )}
       </div>
 
+      {/* Catalog number — exact specimen lookup, with or without the institution code */}
+      <div style={{ borderBottom: `1px solid ${t.borderSoft}` }}>
+        {sectionHead("catalog", tr("facet.catalog"), filters.catalog ? 1 : 0)}
+        {open.catalog && <CatalogInput value={filters.catalog} onChange={onCatalog} />}
+      </div>
+
       {/* Collector — searchable typeahead over /api/collectors */}
       <div style={{ borderBottom: `1px solid ${t.borderSoft}` }}>
         {sectionHead("collector", tr("facet.collector"), selectedCollectors.length)}
@@ -252,6 +260,35 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
 
 // Record number: a numeric range (from – to) plus a free-text box, because many
 // record numbers aren't numbers ("TAI-9", "陳-123") and can never match a range.
+// Institution code + catalog number ("HAST 334", "A:0023434"), or the number
+// alone. Debounced like RecordRange; the parsing is the server's.
+function CatalogInput({ value, onChange }: {
+  value?: string;
+  onChange: (value?: string) => void;
+}) {
+  const { t: tr } = useTranslation();
+  const [txt, setTxt] = useState(value ?? "");
+  useEffect(() => { setTxt(value ?? ""); }, [value]);
+  useEffect(() => {
+    const h = setTimeout(() => {
+      const v = txt.trim() || undefined;
+      if (v !== value) onChange(v);
+    }, 400);
+    return () => clearTimeout(h);
+  }, [txt]);
+  return (
+    <div style={{ padding: "2px 10px 8px" }}>
+      <input type="search" value={txt} placeholder={tr("facet.catalog_placeholder")}
+        title={tr("facet.catalog_hint")} aria-label={tr("facet.catalog")}
+        onChange={(e) => setTxt(e.target.value)}
+        style={{
+          width: "100%", boxSizing: "border-box", padding: "3px 5px", fontFamily: t.mono,
+          fontSize: 11, border: `1px solid ${t.border}`, background: t.panelAlt, outline: "none",
+        }} />
+    </div>
+  );
+}
+
 // Both are debounced so typing doesn't fire a request per keystroke.
 // Empty/invalid -> undefined (open-ended / unset).
 function RecordRange({ from, to, text, onChange, onText }: {

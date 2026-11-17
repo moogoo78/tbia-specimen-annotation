@@ -14,19 +14,15 @@ hand. Nothing about the filters lives in component state any more; the setters i
   `client.ts`'s `filtersToParams` and its inverse `paramsToFilters` (kept beside it so the
   two cannot drift), so `/explore?q=x` and `/api/occurrences?q=x` mean the same thing and a
   page's query pasted onto the API returns the rows on screen.
-- **"No parameters at all" is not "this parameter is absent."** `emptyFilters()` starts
-  `has_media` **true** while the API convention reads an absent boolean as false, so
-  `parseExplore` treats a bare `/explore` as the landing defaults and anything else as
-  literal. That only holds because **`exploreParams` writes `has_media` out both ways
-  round** — `has_media=false` explicitly, which `filtersToParams` (the API's own
-  serialiser, where absent already means false) does not do. Without it, unchecking
-  the box on the landing view serialised to *nothing*, `parseExplore` read the empty
-  query back as the defaults, and it was the one filter that could not be turned off.
-  `has_media=false` is what the API reads as false too, so the URL still means the
-  same thing pasted onto `/api/occurrences`. Every link in goes through
-  **`exploreUrl()`**, which starts from `emptyFilters()` — so an unmentioned flag keeps
-  its landing default, and a link that wants every record still has to say
-  `flags: { has_media: false }` explicitly.
+- **Every filter defaults off, and absent means off** — the API's own convention — so a
+  bare `/explore` is just the empty filter and needs no special case. Keep it that way:
+  `has_media` used to default *on*, which forced `parseExplore` to special-case the bare
+  URL and `exploreParams` to write `has_media=false` explicitly (without that, unchecking
+  it serialised to nothing, read back as the default, and the box re-ticked itself).
+  A new default-on filter would bring all of that back. Every link in goes through
+  **`exploreUrl()`**, which starts from `emptyFilters()`.
+- **`catalog`** is an exact specimen lookup (`HAST 334`, `A:0023434`, or a bare number),
+  parsed server-side by `search._catalog_clause` — the panel only passes the text through.
 - Edits **replace** rather than push, so the back button leaves the page instead of
   stepping through every checkbox.
 - `source` and `collector_id` are serialised, not the `tbia_dataset_id` they expand into —

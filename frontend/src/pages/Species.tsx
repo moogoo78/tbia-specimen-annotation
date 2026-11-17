@@ -156,11 +156,9 @@ function Row({ s, rank, header }: { s?: SpeciesRow; rank?: number; header?: bool
   }
   if (!s) return null;
   return (
-    // Explore is handed the exact name, and `has_media` is cleared explicitly:
-    // emptyFilters() defaults it to true, so without this the landing page would
-    // report a smaller number than the row it was opened from.
+    // Explore is handed the exact name, so it reports the same count as the row.
     <Link
-      to={exploreUrl({ scientific_name: [s.name], flags: { has_media: false } })}
+      to={exploreUrl({ scientific_name: [s.name] })}
       title={tr("sp.openHint", { name: s.name, n: s.n_records.toLocaleString() })}
       style={{ ...base, textDecoration: "none", color: t.fg }}
     >

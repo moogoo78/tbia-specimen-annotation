@@ -60,6 +60,7 @@ export function filtersToParams(f: Filters): URLSearchParams {
   if (f.record_number_from != null) p.set("record_number_from", String(f.record_number_from));
   if (f.record_number_to != null) p.set("record_number_to", String(f.record_number_to));
   if (f.record_number) p.set("record_number", f.record_number);
+  if (f.catalog) p.set("catalog", f.catalog);
   if (f.bbox) p.set("bbox", f.bbox);
   return p;
 }
@@ -71,10 +72,8 @@ export function filtersToParams(f: Filters): URLSearchParams {
  *  and `/api/occurrences?q=x` mean the same thing, and a page URL's query can be
  *  pasted onto the API to get exactly the rows the page is showing.
  *
- *  Absent boolean = false, matching what `filtersToParams` writes. That differs
- *  from `emptyFilters()`, whose `has_media` starts true — so a bare `/explore`
- *  with no params at all is the caller's cue to use the defaults instead of
- *  this. See `parseExplore` in pages/exploreUrl.ts. */
+ *  Absent boolean = false, matching both what `filtersToParams` writes and
+ *  `emptyFilters()` — so a bare `/explore` parses to the landing defaults. */
 export function paramsToFilters(p: URLSearchParams): Filters {
   const f = emptyFilters();
   f.q = p.get("q") || undefined;
@@ -100,6 +99,7 @@ export function paramsToFilters(p: URLSearchParams): Filters {
   f.record_number_from = num("record_number_from");
   f.record_number_to = num("record_number_to");
   f.record_number = p.get("record_number") || undefined;
+  f.catalog = p.get("catalog") || undefined;
   f.bbox = p.get("bbox") || undefined;
   return f;
 }

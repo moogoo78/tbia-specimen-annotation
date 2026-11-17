@@ -79,19 +79,19 @@ function Summary({ story }: { story: Story }) {
     {
       label: tr("storyDetail.tripRecordsTile"),
       value: totals.trip_records.toLocaleString(),
-      to: c ? { collectors: [{ id: c.id, label: c.label }], flags: { has_media: false } } : undefined,
+      to: c ? { collectors: [{ id: c.id, label: c.label }] } : undefined,
     },
     {
       label: tr("storyDetail.focusTile", { genus }),
       value: focus.records.toLocaleString(),
-      to: c ? { collectors: [{ id: c.id, label: c.label }], q: genus, flags: { has_media: false } } : undefined,
+      to: c ? { collectors: [{ id: c.id, label: c.label }], q: genus } : undefined,
     },
     {
       label: tr("storyDetail.genusOnlyTile", { genus }),
       value: focus.genus_only.toLocaleString(),
       to: c ? {
         collectors: [{ id: c.id, label: c.label }], q: genus,
-        flags: { missing_identification: true, has_media: false },
+        flags: { missing_identification: true },
       } : undefined,
     },
     { label: tr("storyDetail.speciesTile"), value: `${totals.species_present} / ${totals.species}` },
@@ -165,7 +165,6 @@ function Trip({ trip, story }: { trip: StoryTrip; story: Story }) {
             to={exploreUrl({
               collectors: [{ id: c.id, label: c.label }],
               dates: { from: trip.date_start, to: trip.date_end },
-              flags: { has_media: false },
             })}
             title={tr("storyDetail.tripHint", { who: c.label, from: trip.date_start, to: trip.date_end })}
             style={{ display: "inline-block", marginTop: 5, fontSize: 11, color: t.accent, textDecoration: "none" }}
@@ -254,7 +253,7 @@ function Species({ sp, n }: { sp: StorySpecies; n: number }) {
     return <span style={{ ...style, color: t.fgMuted }} title={tr("storyDetail.speciesAbsent")}>{label}</span>;
   }
   return (
-    <Link to={exploreUrl({ q: sp.name, flags: { has_media: false } })}
+    <Link to={exploreUrl({ q: sp.name })}
       style={{ ...style, color: t.fg, textDecoration: "none" }}>
       {label}
       <span style={{ color: t.accent, marginLeft: 6 }}>{sp.n_records} →</span>

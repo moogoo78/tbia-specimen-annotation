@@ -12,13 +12,11 @@ import type { CollectorRef } from "../components/CollectorSelect";
  * `filtersToParams` sends to the API — so a page URL's query can be pasted onto
  * `/api/occurrences` and return exactly the rows on screen.
  *
- * `has_media` is the trap this has to get right. `emptyFilters()` starts it
- * **true**, while the API convention (and `paramsToFilters`) reads an absent
- * boolean as false. So a URL carrying no parameters at all means "the defaults",
- * not "everything off" — `parseExplore` distinguishes the two, which only works
- * because `exploreParams` writes `has_media` out **both** ways round: a URL is
- * never silent about it, so no reachable state serialises to nothing and gets
- * read back as the defaults.
+ * Every filter defaults off, and an absent parameter means off — the same
+ * convention the API uses — so a bare `/explore` is simply the empty filter.
+ * (`has_media` used to default *on*, which needed a bare URL to be special-cased
+ * and the flag written out both ways round. Old links carrying
+ * `has_media=false` still parse correctly.)
  */
 
 export type View = "table" | "grid" | "map" | "split";
@@ -52,10 +50,6 @@ export function emptyExplore(): ExploreState {
 const VIEWS: View[] = ["table", "grid", "map", "split"];
 
 export function parseExplore(sp: URLSearchParams): ExploreState {
-  // No parameters at all -> the landing state, whose has_media is true. Reading
-  // it through paramsToFilters instead would silently turn that default off.
-  if ([...sp.keys()].length === 0) return emptyExplore();
-
   const offset = Number(sp.get("offset"));
   const view = sp.get("view") as View | null;
   return {
@@ -73,15 +67,6 @@ export function exploreParams(s: ExploreState): URLSearchParams {
   // from `sources`/`collectorIds`, so they are never serialised from here —
   // that would write each selection twice and let the two copies disagree.
   const p = filtersToParams({ ...s.filters, tbia_dataset_id: [], collector_id: [] });
-  // has_media **off** is written out explicitly, which `filtersToParams` does not
-  // do: the API reads an absent boolean as false, so it omits one. Here the
-  // omission was unrepresentable state — unchecking has_media on the landing
-  // view left no parameters at all, and `parseExplore` reads an empty query as
-  // the landing defaults, whose has_media is true. The box snapped straight back
-  // on, and it was the only filter that could not be turned off. `has_media=false`
-  // is also what the API reads as false, so the URL keeps meaning the same thing
-  // pasted onto /api/occurrences.
-  if (!s.filters.has_media) p.set("has_media", "false");
   for (const src of s.sources) p.append("source", src);
   for (const id of s.collectorIds) p.append("collector_id", String(id));
   if (s.sort !== DEFAULT_SORT) p.set("sort", s.sort);
@@ -110,14 +95,8 @@ export interface ExploreLink {
 /**
  * The `/explore?…` URL for a link handing over filters.
  *
- * Built on `emptyFilters()` so an unmentioned flag keeps its landing default —
- * which is how the router-`state` handoff behaved, since it applied onto state
- * that already held those defaults. A link that wants every record must
- * therefore say `flags: { has_media: false }` explicitly, exactly as before;
- * without it the destination reports fewer records than the row it was opened
- * from. Such a link serialises the flag as `has_media=false` rather than
- * dropping it — see `exploreParams` — so it survives even when it is the only
- * thing the link carries.
+ * Built on `emptyFilters()`, so an unmentioned flag is off and the
+ * destination counts every record the link's own filters allow.
  */
 export function exploreUrl(link: ExploreLink): string {
   const s = emptyExplore();

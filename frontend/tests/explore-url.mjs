@@ -61,6 +61,18 @@ class ExplorePage extends Page {
     })()`);
     await this.settle();
   }
+  /** Type into the catalog-number box the way a person would: React only sees
+   *  a value set through the native setter followed by an input event. */
+  async typeCatalog(text) {
+    await this.eval(`(() => {
+      const el = document.querySelector('input[type="search"][aria-label]');
+      if (!el) throw new Error("no catalog input");
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set
+        .call(el, ${JSON.stringify(text)});
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    await this.settle(1400); // 400ms debounce + the search
+  }
   /** Next page: the button immediately after the disabled "previous". */
   async clickNextPage() {
     await this.eval(`(() => {
@@ -80,16 +92,15 @@ async function main() {
   const page = await ExplorePage.open(`${WEB}/explore`);
   await sleep(2500); // first paint + the initial search
   try {
-    // The landing default. `emptyFilters()` starts has_media true while the API
-    // reads an absent boolean as false, so a bare URL must not be parsed
-    // literally — this is the trap the whole scheme is built around.
-    await test("bare /explore keeps the has_media default", async () => {
+    // The landing state is the empty filter: every flag off, matching the API's
+    // reading of an absent boolean, so the bare URL means what it says.
+    await test("bare /explore shows every record", async () => {
       const url = await page.url();
       const shown = await page.total();
-      const api = await fetch(`${WEB}/api/occurrences?has_media=true&limit=1`)
+      const api = await fetch(`${WEB}/api/occurrences?limit=1`)
         .then((r) => r.json()).then((d) => d.total);
       check("URL has no query", url === "/explore", url);
-      check("total equals the API's has_media=true total", shown === api, `page ${shown} vs api ${api}`);
+      check("total equals the API's unfiltered total", shown === api, `page ${shown} vs api ${api}`);
     });
 
     // The regression: two setters in one handler, the second discarding the first.
@@ -130,32 +141,36 @@ async function main() {
       await page.clickButton("/清除|Clear/");
       const url = await page.url();
       const shown = await page.total();
-      const api = await fetch(`${WEB}/api/occurrences?has_media=true&limit=1`)
-        .then((r) => r.json()).then((d) => d.total);
-      check("only has_media left", /^\/explore\?has_media=true$/.test(url), url);
-      check("total back to the default", shown === api, `page ${shown} vs api ${api}`);
-    });
-
-    // The one filter that starts on, and so the one whose *off* state has to be
-    // representable. It used to serialise to nothing at all, which `parseExplore`
-    // reads back as the landing defaults — the box re-ticked itself.
-    await test("the has_media default can be unchecked", async () => {
-      await page.clickFacet("具有影像");
-      const url = await page.url();
-      const shown = await page.total();
-      // Unchecking widens to every record, so the relation is against the API
-      // with the flag absent — not against the count the row printed, which is
-      // the has_media subset it was offering to narrow to.
       const api = await fetch(`${WEB}/api/occurrences?limit=1`)
         .then((r) => r.json()).then((d) => d.total);
-      check("URL says has_media=false rather than going empty",
-        /^\/explore\?has_media=false$/.test(url), url);
-      check("total is every record, not just the ones with images",
-        shown === api, `page ${shown} vs api ${api}`);
-      // ... and back on, so the toggle is not one-way either.
+      check("URL back to bare /explore", url === "/explore", url);
+      check("total back to every record", shown === api, `page ${shown} vs api ${api}`);
+    });
+
+    await test("has_media toggles on and off", async () => {
+      const printed = await page.clickFacet("具有影像");
+      const url = await page.url();
+      const shown = await page.total();
+      check("URL gains has_media=true", /^\/explore\?has_media=true$/.test(url), url);
+      check("total becomes the count the row printed", shown === printed, `page ${shown} vs row ${printed}`);
       await page.clickFacet("具有影像");
       const back = await page.url();
-      check("re-checking restores has_media=true", /has_media=true/.test(back), back);
+      check("unchecking returns to bare /explore", back === "/explore", back);
+    });
+
+    // Institution code + catalog number, typed into the panel's own box.
+    await test("a catalog lookup is written to the URL and applied", async () => {
+      const term = "HAST 334";
+      await page.typeCatalog(term);
+      const url = await page.url();
+      const shown = await page.total();
+      const api = await fetch(`${WEB}/api/occurrences?catalog=${encodeURIComponent(term)}&limit=1`)
+        .then((r) => r.json()).then((d) => d.total);
+      check("URL carries catalog", new URLSearchParams(url.split("?")[1]).get("catalog") === term, url);
+      check("total matches the API's lookup", shown === api, `page ${shown} vs api ${api}`);
+      await page.typeCatalog("");
+      const back = await page.url();
+      check("clearing the box drops the param", !back.includes("catalog="), back);
     });
 
     // The other direction: a link in, parsed from the URL alone.

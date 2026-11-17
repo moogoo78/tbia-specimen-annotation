@@ -22,8 +22,8 @@ export function Browse() {
   const { t: tr } = useTranslation();
   const nav = useNavigate();
 
-  // Unfiltered counts for the cards (has_media off so totals reflect everything).
-  const base = useMemo(() => ({ ...emptyFilters(), has_media: false }), []);
+  // Unfiltered counts for the cards.
+  const base = useMemo(() => emptyFilters(), []);
   const facets = useQuery({ queryKey: ["home-facets"], queryFn: () => api.facets(base) });
   const registry = useQuery({ queryKey: ["registry"], queryFn: () => api.registry(), staleTime: Infinity });
   const datasets = useQuery({ queryKey: ["datasets", 1000], queryFn: () => api.datasets(1000) });

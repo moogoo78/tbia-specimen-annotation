@@ -166,6 +166,8 @@ export function Explore() {
   };
   const setRecordRange = (from?: number, to?: number) =>
     setFilters((f) => ({ ...f, record_number_from: from, record_number_to: to }));
+  const setCatalog = (value?: string) =>
+    setFilters((f) => ({ ...f, catalog: value }));
   const setRecordText = (value?: string) =>
     setFilters((f) => ({ ...f, record_number: value }));
   const toggleCollector = (c: CollectorRef) => {
@@ -241,6 +243,9 @@ export function Explore() {
         label: `# ${filters.record_number_from ?? ""}–${filters.record_number_to ?? ""}`,
         onRemove: () => setRecordRange(undefined, undefined),
       });
+    }
+    if (filters.catalog) {
+      out.push({ label: `${tr("facet.catalog")} ${filters.catalog}`, onRemove: () => setCatalog(undefined) });
     }
     if (filters.record_number) {
       out.push({ label: `# ${filters.record_number}`, onRemove: () => setRecordText(undefined) });
@@ -321,7 +326,8 @@ export function Explore() {
           <FacetPanel facets={facets.data} filters={filters} onToggle={toggle} onToggleFlag={toggleFlag} onClear={clear}
             registry={registry.data} selectedSources={sources} onToggleSource={toggleSource}
             selectedCollectors={collectors} onToggleCollector={toggleCollector}
-            onRecordRange={setRecordRange} onRecordText={setRecordText} />
+            onRecordRange={setRecordRange} onRecordText={setRecordText}
+            onCatalog={setCatalog} />
         )}
 
         {view === "split" ? (

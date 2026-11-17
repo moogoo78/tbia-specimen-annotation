@@ -180,9 +180,6 @@ function Specimens({ ev, n }: { ev: SamplingEvent; n?: number }) {
           label: a.collector_label || a.recorded_by,
         })),
         years: { from: ev.year_start, to: ev.year_end },
-        // The count is unfiltered by media, so the landing page must be too —
-        // Explore otherwise defaults to records that carry an image.
-        flags: { has_media: false },
       })}
       title={tr("hist.specimensHint", { who, from: ev.year_start, to: ev.year_end })}
       style={{ fontSize: 11, color: t.accent, textDecoration: "none", whiteSpace: "nowrap" }}
