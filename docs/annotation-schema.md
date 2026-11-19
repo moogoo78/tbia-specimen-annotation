@@ -200,9 +200,31 @@ AI path into it.
 | `date_identified` | `dateIdentified` | ISO 8601: `YYYY`, `YYYY-MM`, `YYYY-MM-DD`, or an interval `a/b`; anything else is a 400 |
 | `identification_references` | `identificationReferences` | `\|`-separated |
 | `identification_remarks` | `identificationRemarks` | |
+| `scientific_name_id` | `scientificNameID` | TaiCOL name URI `https://taicol.tw/name/{name_id}`; only when picked |
+| `name_according_to` | `nameAccordingTo` | `TaiCOL (Catalogue of Life in Taiwan), https://taicol.tw/taxon/{taxon_id}, version {updated_at}`; only with an id |
 
 `isAcceptedIdentification` and `identificationVerificationStatus` are deliberately not
 stored; a reviewer's verdict is the row's `status`.
+
+**The name field is a TaiCOL combobox** (`components/TaicolCombobox.tsx` → `app/taicol.py`,
+proxied as `GET /api/taicol/suggest?q=` and `GET /api/taicol/taxon/{taxon_id}`, both in
+`cache.STATIC_ROUTES`). It is still a text field: a hand-typed name saves with no id.
+Picking a suggestion fills the name and rank and attaches `scientific_name_id` +
+`name_according_to`; editing the name afterwards drops them, in the form and on
+`PATCH` (a new name without a new id clears both). The server accepts only a TaiCOL
+name URI as `scientific_name_id`, and drops `name_according_to` sent without one.
+
+- **Suggestions use an undocumented endpoint.** TaiCOL's documented API
+  (`api.taicol.tw/v2`) matches exact names only, so type-ahead uses the one the
+  TaiCOL catalogue page itself calls (`/get_autocomplete_taxon_by_solr`). If it moves or
+  fails, the route answers 502 and the form says "type the name by hand" — the
+  identification still saves, without an id. The picked record is then read from the
+  documented `GET /v2/taxon?taxon_id=`.
+- **"Version" is the record's `updated_at`.** TaiCOL publishes no release number (no
+  version endpoint, none on its download page); the date TaiCOL last changed the taxon is
+  the version of the name the identification was made against.
+- Suggestion labels arrive as HTML (`<i>…</i>`) and are parsed server-side into
+  italic/roman runs plus common names; nothing from TaiCOL is rendered as markup.
 
 - **Same workflow, one definition.** Status lifecycle, who may edit, relicense and review
   are `backend/app/workflow.py`, called by both `PATCH /annotations/{id}` and

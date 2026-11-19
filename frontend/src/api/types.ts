@@ -546,6 +546,34 @@ export interface IdentificationTerms {
   date_identified: string | null;
   identification_references: string | null;
   identification_remarks: string | null;
+  /** Set only when the name was picked from TaiCOL. */
+  scientific_name_id: string | null;
+  name_according_to: string | null;
+}
+
+/** A TaiCOL name suggestion (backend/app/taicol.py). The label arrives as
+ *  italic/roman runs, never as HTML. */
+export interface TaicolSuggestion {
+  taxon_id: string;
+  name: string;
+  name_parts: { text: string; italic: boolean }[];
+  common_names: string[];
+}
+
+/** The TaiCOL taxon a person picked, with the two DwC terms already built. */
+export interface TaicolTaxon {
+  taxon_id: string;
+  name_id: number | null;
+  scientific_name: string;
+  name_author: string;
+  taxon_rank: string | null;
+  kingdom: string | null;
+  common_name_c: string | null;
+  taxon_status: string | null;
+  version: string;
+  scientific_name_id: string | null;
+  name_according_to: string;
+  taxon_uri: string;
 }
 
 export interface Identification extends IdentificationTerms {

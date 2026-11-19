@@ -200,3 +200,86 @@ def test_export_is_reviewer_only_and_dwc_shaped(client, made):
         "identification_id", "tbia_id", "occurrenceID", "catalogNumber", "scientificName",
     ]
     assert any(r["identification_id"] == str(iid) for r in reader)
+
+
+# ── TaiCOL-picked names ────────────────────────────────────────────────────
+TAICOL_ID = "https://taicol.tw/name/26079"
+ACCORDING = "TaiCOL (Catalogue of Life in Taiwan), https://taicol.tw/taxon/t0040360, version 2026-09-23"
+
+
+def test_picked_name_keeps_its_taicol_id(client, made):
+    cur = auth_header(client, CURATOR)
+    rev = auth_header(client, REVIEWER)
+    res = _create(client, cur, made, scientific_name="Begonia formosana",
+                  scientific_name_id=TAICOL_ID, name_according_to=ACCORDING)
+    assert res.status_code == 200, res.text
+    iid = res.json()["id"]
+    assert res.json()["scientific_name_id"] == TAICOL_ID
+    assert res.json()["name_according_to"] == ACCORDING
+
+    client.patch(f"/api/identifications/{iid}", headers=rev, json={"status": "accepted"})
+    rows = client.get("/api/export/identifications?dataset_name=DS-A", headers=rev).json()["identifications"]
+    row = next(r for r in rows if r["identification_id"] == iid)
+    assert row["scientificNameID"] == TAICOL_ID and row["nameAccordingTo"] == ACCORDING
+
+
+def test_only_taicol_ids_are_accepted(client, made):
+    cur = auth_header(client, CURATOR)
+    res = _create(client, cur, made, scientific_name_id="https://example.org/name/1")
+    assert res.status_code == 400
+
+
+def test_provenance_without_an_id_is_dropped(client, made):
+    cur = auth_header(client, CURATOR)
+    res = _create(client, cur, made, name_according_to=ACCORDING)
+    assert res.status_code == 200
+    assert res.json()["name_according_to"] is None
+
+
+def test_retyping_the_name_clears_the_taicol_id(client, made):
+    cur = auth_header(client, CURATOR)
+    iid = _create(client, cur, made, scientific_name="Begonia formosana",
+                  scientific_name_id=TAICOL_ID, name_according_to=ACCORDING).json()["id"]
+    # Same name again: untouched.
+    res = client.patch(f"/api/identifications/{iid}", headers=cur, json={"scientific_name": "Begonia formosana"})
+    assert res.json()["scientific_name_id"] == TAICOL_ID
+    # A different name typed by hand: the id described the old one.
+    res = client.patch(f"/api/identifications/{iid}", headers=cur, json={"scientific_name": "Begonia sp."})
+    assert res.json()["scientific_name_id"] is None and res.json()["name_according_to"] is None
+
+
+def test_taicol_routes(client, monkeypatch):
+    from app import taicol
+
+    async def fake_suggest(q, lang="zh-hant"):
+        return [{"taxon_id": "t0040360", "name": "Begonia formosana",
+                 "name_parts": [{"text": "Begonia formosana", "italic": True}],
+                 "common_names": ["白斑水鴨腳"]}]
+
+    async def fake_taxon(tid):
+        return None if tid != "t0040360" else {"taxon_id": tid, "scientific_name_id": TAICOL_ID,
+                                                "name_according_to": ACCORDING}
+
+    monkeypatch.setattr(taicol, "suggest", fake_suggest)
+    monkeypatch.setattr(taicol, "taxon", fake_taxon)
+    res = client.get("/api/taicol/suggest?q=Begonia")
+    assert res.status_code == 200 and res.json()[0]["taxon_id"] == "t0040360"
+    assert "public" in res.headers["cache-control"]
+    assert client.get("/api/taicol/taxon/t0040360").json()["scientific_name_id"] == TAICOL_ID
+    assert client.get("/api/taicol/taxon/t9999999").status_code == 404
+
+    async def down(*a, **k):
+        raise taicol.TaicolUnavailable("TaiCOL: ConnectError")
+    monkeypatch.setattr(taicol, "suggest", down)
+    res = client.get("/api/taicol/suggest?q=Begonia")
+    assert res.status_code == 502
+    assert "public" not in res.headers.get("cache-control", "")
+
+
+def test_parse_label_never_keeps_markup():
+    from app.taicol import parse_label
+    out = parse_label("<i>Begonia formosana</i> fo. <i>albomaculata</i> 白斑水鴨腳,水鴨腳")
+    assert out["name"] == "Begonia formosana fo. albomaculata"
+    assert out["common_names"] == ["白斑水鴨腳", "水鴨腳"]
+    assert [p["italic"] for p in out["name_parts"]] == [True, False, True]
+    assert all("<" not in p["text"] for p in out["name_parts"])

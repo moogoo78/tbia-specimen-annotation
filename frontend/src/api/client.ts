@@ -286,6 +286,11 @@ export const api = {
     request<import("./types").Annotation>(`/annotations/${annId}`, {
       method: "PATCH", body: JSON.stringify(body),
     }),
+  taicolSuggest: (q: string, lang: "zh-hant" | "en-us") =>
+    request<import("./types").TaicolSuggestion[]>(
+      `/taicol/suggest?${new URLSearchParams({ q, lang })}`),
+  taicolTaxon: (taxonId: string) =>
+    request<import("./types").TaicolTaxon>(`/taicol/taxon/${encodeURIComponent(taxonId)}`),
   createIdentification: (id: string, body: Record<string, unknown>) =>
     request<import("./types").Identification>(`/occurrences/${id}/identifications`, {
       method: "POST", body: JSON.stringify(body),

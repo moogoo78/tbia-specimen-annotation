@@ -18,6 +18,8 @@ import { Button, StatusPill, WorkPanel, fieldGrid } from "./ui";
 import { LICENSES, LICENSE_LABELS, LICENSE_URIS, SHOW_LICENSE_UI, asLicense, licenseLabel } from "../licenses";
 import type { License } from "../licenses";
 import { contributorLabel, isAnonymous } from "../contributors";
+import { TaicolCombobox } from "./TaicolCombobox";
+import type { TaicolTaxon } from "../api/types";
 
 export const TAXON_RANK_OPTIONS = [
   "kingdom", "phylum", "class", "order", "family",
@@ -38,6 +40,7 @@ function emptyDraft(name: string, orcid: string | null | undefined): Draft {
     identified_by: name, identified_by_id: orcid ? `https://orcid.org/${orcid}` : "",
     y: String(now.getFullYear()), mo: String(now.getMonth() + 1), d: String(now.getDate()),
     identification_references: "", identification_remarks: "",
+    scientific_name_id: null, name_according_to: null,
   };
 }
 
@@ -102,18 +105,37 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["detail", record.id] });
   const set = (k: keyof Draft, v: string) => { setReceipt(null); setDraft((s) => ({ ...s, [k]: v })); };
+  // The TaiCOL record behind the name, when it was picked rather than typed.
+  // Its two DwC terms ride in the draft; the rest is only shown under the field.
+  const [picked, setPicked] = useState<TaicolTaxon | null>(null);
+  const pick = (tx: TaicolTaxon | null) => {
+    setPicked(tx);
+    setDraft((s) => ({
+      ...s,
+      scientific_name: tx ? tx.scientific_name : s.scientific_name,
+      taxon_rank: tx?.taxon_rank ?? s.taxon_rank,
+      scientific_name_id: tx?.scientific_name_id ?? null,
+      name_according_to: tx?.scientific_name_id ? tx.name_according_to : null,
+    }));
+  };
+  const reset = () => { setPicked(null); setDraft(emptyDraft(user?.display_name ?? "", user?.orcid)); };
 
   const createMut = useMutation({
     mutationFn: (status: "draft" | "submitted") => {
-      const { y, mo, d, ...terms } = draft;
+      const { y, mo, d, identified_by_id: _ignored, ...terms } = draft;
+      // identifiedByID is not asked for: it is the signed-in contributor's
+      // ORCID iD, sent only while "Identified by" still names them. Recording
+      // someone else's determination must not carry *our* iD as theirs.
+      const mine = user && (terms.identified_by ?? "").trim() === user.display_name.trim();
       return api.createIdentification(String(record.id), {
         ...terms, date_identified: isoDate(y, mo, d), status,
+        identified_by_id: mine && user.orcid ? `https://orcid.org/${user.orcid}` : null,
         ...(SHOW_LICENSE_UI ? { license } : {}),
       });
     },
     onSuccess: (_res, status) => {
       setReceipt(status);
-      setDraft(emptyDraft(user?.display_name ?? "", user?.orcid));
+      reset();
       refresh();
       qc.invalidateQueries({ queryKey: ["myIdentifications"] });
     },
@@ -155,8 +177,8 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
             )}
             <div style={fieldGrid}>
             <Row label={tr("ident.scientificName")} term="scientificName" required style={{ gridColumn: "1 / -1" }}>
-              <input value={draft.scientific_name} onChange={(e) => set("scientific_name", e.target.value)}
-                placeholder="Genus species" style={{ ...inputStyle, fontStyle: "italic" }} />
+              <TaicolCombobox value={draft.scientific_name} onText={(v) => set("scientific_name", v)}
+                picked={picked} onPick={pick} inputStyle={inputStyle} />
             </Row>
             <div style={{ display: "flex", gap: 6, minWidth: 0 }}>
               <Row label={tr("ident.qualifier")} term="identificationQualifier" style={{ width: 96, flexShrink: 0, minWidth: 0 }}>
@@ -167,7 +189,8 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
               <Row label={tr("ident.taxonRank")} term="taxonRank" style={{ flex: 1, minWidth: 0 }}>
                 <select value={draft.taxon_rank ?? ""} onChange={(e) => set("taxon_rank", e.target.value)} style={inputStyle}>
                   <option value="">—</option>
-                  {TAXON_RANK_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  {[...TAXON_RANK_OPTIONS, ...(draft.taxon_rank && !TAXON_RANK_OPTIONS.includes(draft.taxon_rank) ? [draft.taxon_rank] : [])]
+                    .map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </Row>
             </div>
@@ -177,10 +200,6 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
             </Row>
             <Row label={tr("ident.identifiedBy")} term="identifiedBy">
               <input value={draft.identified_by ?? ""} onChange={(e) => set("identified_by", e.target.value)} style={inputStyle} />
-            </Row>
-            <Row label={tr("ident.identifiedById")} term="identifiedByID">
-              <input value={draft.identified_by_id ?? ""} onChange={(e) => set("identified_by_id", e.target.value)}
-                placeholder="https://orcid.org/…" style={{ ...inputStyle, fontFamily: t.mono, fontSize: 11 }} />
             </Row>
             <Row label={tr("ident.dateIdentified")} term="dateIdentified">
               <div style={{ display: "flex", gap: 4 }}>
@@ -220,7 +239,7 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
               <div style={{ flex: 1 }} />
               {/* Always-open form, so nothing to close: this resets it to the
                   prefilled "me, today" state instead. */}
-              <Button small onClick={() => { setReceipt(null); setDraft(emptyDraft(user?.display_name ?? "", user?.orcid)); }}>{tr("ident.clear")}</Button>
+              <Button small onClick={() => { setReceipt(null); reset(); }}>{tr("ident.clear")}</Button>
             </div>
           </div>
         )}
@@ -259,6 +278,12 @@ export function IdentificationCard({ i, isReviewer, userId, onUpdate }: {
           det. {i.identified_by_id && /^https?:\/\//.test(i.identified_by_id)
             ? <a href={i.identified_by_id} target="_blank" rel="noreferrer noopener" style={{ color: t.fgMuted }}>{det}</a>
             : det}
+        </div>
+      )}
+      {i.scientific_name_id && (
+        <div style={{ color: t.fgSubtle, fontSize: 10 }}>
+          <a href={i.scientific_name_id} target="_blank" rel="noreferrer noopener" style={{ color: t.accent }}>TaiCOL ↗</a>
+          {i.name_according_to && <span title="nameAccordingTo"> · {i.name_according_to.replace(/^TaiCOL \(Catalogue of Life in Taiwan\), /, "")}</span>}
         </div>
       )}
       {i.verbatim_identification && (

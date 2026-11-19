@@ -155,6 +155,7 @@ IDENT_EXPORT_COLUMNS = [
     "scientificName", "taxonRank", "identificationQualifier", "verbatimIdentification",
     "identifiedBy", "identifiedByID", "dateIdentified",
     "identificationReferences", "identificationRemarks",
+    "scientificNameID", "nameAccordingTo",
     "status", "contributor", "reviewed_at", "license", "license_uri",
 ]
 
@@ -169,6 +170,8 @@ _IDENT_DWC = {
     "date_identified": "dateIdentified",
     "identification_references": "identificationReferences",
     "identification_remarks": "identificationRemarks",
+    "scientific_name_id": "scientificNameID",
+    "name_according_to": "nameAccordingTo",
 }
 
 

@@ -61,6 +61,10 @@ STATIC_ROUTES = frozenset({
     "/api/sampling-events/{event_id}",
     "/api/stories",
     "/api/stories/{key}",
+    # TaiCOL name lookups (app/taicol.py): a third party's reference data, the
+    # same for every caller, and it changes on TaiCOL's schedule, not ours.
+    "/api/taicol/suggest",
+    "/api/taicol/taxon/{taxon_id}",
 })
 
 # Cacheable briefly: correct now, but moves as people annotate. A minute of

@@ -216,6 +216,11 @@ class Identification(Base):
     date_identified: Mapped[str | None] = mapped_column(String(32))  # ISO 8601, partial ok
     identification_references: Mapped[str | None] = mapped_column(Text)
     identification_remarks: Mapped[str | None] = mapped_column(Text)
+    # Set only when the name was picked from TaiCOL (app/taicol.py): the name's
+    # TaiCOL URI, and which TaiCOL record — and its version — it was taken from.
+    # Typing a name by hand leaves both null; editing a picked name clears them.
+    scientific_name_id: Mapped[str | None] = mapped_column(Text)
+    name_according_to: Mapped[str | None] = mapped_column(Text)
 
     status: Mapped[str] = mapped_column(String(16), default="submitted", index=True)
     license: Mapped[str] = mapped_column(String(32), default=DEFAULT_LICENSE)

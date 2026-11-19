@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .. import auth, duck, workflow
+from .. import auth, duck, taicol, workflow
 from ..db import get_session
 from ..identifications_store import IDENT_FIELDS, serialize
 from ..models import Identification, User, public_name
@@ -39,6 +39,10 @@ def _clean(name: str, value: str | None) -> str | None:
         raise HTTPException(status_code=400, detail=f"{name} is too long")
     if not value:
         return None
+    if name == "scientific_name_id" and not value.startswith(taicol.NAME_URI_PREFIX):
+        # The only source of one is the TaiCOL picker; anything else is not an
+        # identifier we can stand behind in a provider export.
+        raise HTTPException(status_code=400, detail="scientific_name_id must be a TaiCOL name URI")
     if name == "date_identified" and not DATE_RE.match(value):
         raise HTTPException(
             status_code=400,
@@ -67,6 +71,8 @@ async def create_identification(
     values = {f: _clean(f, getattr(body, f)) for f in IDENT_FIELDS}
     if not values["scientific_name"]:
         raise HTTPException(status_code=400, detail="scientific_name is required")
+    if not values["scientific_name_id"]:
+        values["name_according_to"] = None  # provenance only travels with an id
 
     ident = Identification(
         occurrence_id=occ_id,
@@ -95,6 +101,12 @@ def update_identification(
 
     # Absent = untouched; "" = clear (except the name, which a determination needs).
     sent = {f: getattr(body, f) for f in IDENT_FIELDS if getattr(body, f) is not None}
+    # A new name without a new id is a hand-typed name: the old TaiCOL id and
+    # its provenance described the previous name, so they go with it.
+    if ("scientific_name" in sent and "scientific_name_id" not in sent
+            and (sent["scientific_name"] or "").strip() != (ident.scientific_name or "")):
+        sent["scientific_name_id"] = ""
+        sent["name_according_to"] = ""
     if sent:
         workflow.check_content_edit(ident, user)
         for f, v in sent.items():

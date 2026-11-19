@@ -122,6 +122,8 @@ class IdentificationFields(BaseModel):
     date_identified: str | None = None
     identification_references: str | None = None
     identification_remarks: str | None = None
+    scientific_name_id: str | None = None   # TaiCOL name URI, when picked
+    name_according_to: str | None = None
 
 
 class IdentificationCreate(IdentificationFields):

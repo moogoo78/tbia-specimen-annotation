@@ -111,6 +111,9 @@ ADDED_COLUMNS = {
     # existing row: those runs wrote `ai` annotations instead, which are left
     # exactly as they are.
     "transcribe_requests": [("result_json", "TEXT")],
+    # TaiCOL provenance of a picked name (models.Identification). Null on rows
+    # written before the name picker, which were all typed by hand.
+    "identifications": [("scientific_name_id", "TEXT"), ("name_according_to", "TEXT")],
 }
 
 

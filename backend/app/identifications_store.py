@@ -17,6 +17,7 @@ IDENT_FIELDS = (
     "scientific_name", "taxon_rank", "identification_qualifier",
     "verbatim_identification", "identified_by", "identified_by_id",
     "date_identified", "identification_references", "identification_remarks",
+    "scientific_name_id", "name_according_to",
 )
 
 
