@@ -20,9 +20,11 @@ Occurrence data is **read-only**; enrichment lives only as annotations. Hence tw
   fast facets/completeness aggregation; queries run in a threadpool (`app/duck.py`).
   `build.py` loads the export's own columns; `make prepare` adds the derived ones.
 - **SQLite ×2** (`app/db.py`), split by **what it costs to lose the file**:
-  - `data/annotations.sqlite` — `users`, `annotations`, `transcribe_requests`, `app_settings`
-    (`Base` / `SessionLocal`). Irreplaceable; this is the one to back up, and it stays
-    small (tens of KB until annotations accumulate).
+  - `data/annotations.sqlite` — `users`, `annotations`, `identifications`, `transcribe_requests`,
+    `app_settings` (`Base` / `SessionLocal`). Irreplaceable; this is the one to back up,
+    and it stays small (tens of KB until annotations accumulate). `identifications` is one
+    row per DwC determination (not per field); its workflow rules are shared with
+    annotations through `app/workflow.py` — see *Identifications* in `docs/annotation-schema.md`.
   - `data/reference.sqlite` — `collectors`, `collector_alias`, `sampling_event`,
     `sampling_event_actor` (`RefBase` / `RefSessionLocal`). ~2.5 MB, and every row is
     rebuilt by `make seed-collectors` / `make seed-sampling-events`, so the file is
@@ -236,7 +238,9 @@ after an ETL refresh or a re-seed the edge must be purged — see DEPLOY.md step
 - **`tsc` and `vite build` say nothing about whether the UI works.** Both stayed green
   through a bug that broke every facet checkbox. For anything interactive, drive the real
   page: `make test-web` runs `frontend/tests/explore-url.mjs` (Explore's URL) and
-  `nav-menu.mjs` (the header's dropdown groups, and that the row stays 38px down to 1024).
+  `nav-menu.mjs` (the header's dropdown groups, and that the row stays 38px down to 1024),
+  plus `identification.mjs` (the record's Identification panel; writes data, so it runs only
+  with `IDENT_WRITE=1` against a throwaway store).
   Both are thin: `tests/cdp.mjs` holds the browser — a CDP client over Node's own
   WebSocket, `launchChrome`, and the `check`/`test`/`report` harness — so a new test is a
   `Page` subclass with the reads its own page needs, and there is one definition of how we

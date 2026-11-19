@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { api } from "../api/client";
@@ -9,6 +9,7 @@ import { Spinner, StatusPill } from "../components/ui";
 import { ContributionList, Pager } from "../components/Contributions";
 import { AdminSection, DefaultLicense, RankingOptIn } from "../components/ContributorSettings";
 import { SHOW_LICENSE_UI } from "../licenses";
+import { IdentificationCard } from "../components/IdentificationPanel";
 
 const PAGE = 50;
 // Draft last: it is the one status that is not a contribution yet.
@@ -106,10 +107,49 @@ export function MyContributions() {
         <Pager total={page.data?.total ?? 0} limit={PAGE} offset={offset} onOffset={setOffset} />
       </div>
 
+      <MyIdentifications userId={user.id} />
+
       {/* Neither personal nor public: a role's controls. Absent for everyone
           who does not hold the role. */}
       <div style={{ maxWidth: 720 }}>
         <AdminSection role={user.role} />
+      </div>
+    </div>
+  );
+}
+
+// Your determinations (DwC Identification), drafts included — this is the only
+// place a draft identification is ever listed, and where it gets submitted.
+function MyIdentifications({ userId }: { userId: number }) {
+  const { t: tr } = useTranslation();
+  const qc = useQueryClient();
+  const list = useQuery({
+    queryKey: ["myIdentifications"],
+    queryFn: () => api.myIdentifications({ limit: 200 }),
+  });
+  const update = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: Record<string, unknown> }) =>
+      api.updateIdentification(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["myIdentifications"] }),
+  });
+  const items = list.data?.items ?? [];
+  if (!list.isLoading && items.length === 0) return null;
+  return (
+    <div style={{ maxWidth: 720, marginTop: 18 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 8px" }}>
+        {tr("ident.mine")} <span style={{ fontFamily: t.mono, fontWeight: 400, color: t.fgMuted }}>· {list.data?.total ?? 0}</span>
+      </h3>
+      <div style={{ background: t.panel, border: `1px solid ${t.border}`, padding: "4px 12px" }}>
+        {list.isLoading ? <Spinner /> : items.map((i) => (
+          <div key={i.id}>
+            <Link to={`/record/${encodeURIComponent(i.occurrence_id)}`}
+              style={{ display: "block", fontSize: 10, fontFamily: t.mono, color: t.accent, textDecoration: "none", marginTop: 6 }}>
+              {i.occurrence_id}{i.dataset_name ? ` · ${i.dataset_name}` : ""}
+            </Link>
+            <IdentificationCard i={i} userId={userId}
+              onUpdate={(body) => update.mutate({ id: i.id, body })} />
+          </div>
+        ))}
       </div>
     </div>
   );

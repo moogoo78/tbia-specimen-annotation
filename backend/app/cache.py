@@ -70,7 +70,8 @@ LIVE_ROUTES = frozenset({
     "/api/volunteers",
     # A contributor's public page. Same tier as the board it is opened from:
     # it changes as they work, and a minute behind is invisible. The private
-    # "/api/annotations/mine" is deliberately in neither set.
+    # "/api/annotations/mine" is deliberately in neither set, and so is
+    # "/api/identifications" (authenticated, and lists the caller's drafts).
     "/api/contributors/{user_id}",
     "/api/contributors/{user_id}/annotations",
     # The public activity feed on /contributors.

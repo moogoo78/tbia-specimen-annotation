@@ -50,6 +50,8 @@ export interface OccurrenceDetail extends OccurrenceRow {
    *  Empty for every source without a rule — the gallery then just shows `media`. */
   media_sizes: MediaSize[];
   annotations: Annotation[];
+  /** Determinations people have made of this specimen (never drafts). */
+  identifications: Identification[];
   /** Most recent AI transcription request for this record (null = never queued). */
   transcribe: TranscribeState | null;
 }
@@ -97,7 +99,6 @@ export interface FacetResult {
   taxon_rank: FacetValue[];
   basis_of_record: FacetValue[];
   type_status: FacetValue[];
-  dataset_name: FacetValue[];
   completeness: {
     missing_coordinates: number;
     missing_date: number;
@@ -531,3 +532,33 @@ export interface ReportRecord {
 }
 
 export interface ReportFilters { status?: string; field?: string; tbia_dataset_id?: string }
+
+/** One determination of a specimen — DwC's Identification class. A person's
+ *  judgement, never a transcription (backend/app/models.py `Identification`).
+ *  Same workflow and naming rules as an `Annotation`. */
+export interface IdentificationTerms {
+  scientific_name: string;
+  taxon_rank: string | null;
+  identification_qualifier: string | null;
+  verbatim_identification: string | null;
+  identified_by: string | null;
+  identified_by_id: string | null;
+  date_identified: string | null;
+  identification_references: string | null;
+  identification_remarks: string | null;
+}
+
+export interface Identification extends IdentificationTerms {
+  id: number;
+  occurrence_id: string;
+  dataset_name: string | null;
+  status: string;
+  license: string;
+  contributor_id: number;
+  /** null = not for publication (the contributor has not opted in). */
+  contributor_name: string | null;
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  created: string | null;
+  modified: string | null;
+}

@@ -170,6 +170,11 @@ async def occurrence_detail(occ_id: str):
     except Exception:
         record["annotations"] = []
         record["transcribe"] = None
+    try:
+        from ..identifications_store import list_for_occurrence as identifications_for
+        record["identifications"] = identifications_for(occ_id)
+    except Exception:
+        record["identifications"] = []
     return record
 
 

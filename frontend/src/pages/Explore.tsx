@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -78,6 +78,22 @@ export function Explore() {
   const [showFacets, setShowFacets] = useState(true);
   // Split view: collapse the record list so the detail pane gets the full width.
   const [splitListOpen, setSplitListOpen] = useState(true);
+  // Focusing a record (split view → annotate) gives it the whole width: the
+  // list *and* the filter sidebar go. Leaving restores the sidebar to however
+  // it was, so someone who had already closed the filters doesn't get them
+  // forced back open. Every control that hides or shows the list goes through
+  // these two, so the collapse arrows and the record's own button agree.
+  const facetsBeforeFocus = useRef<boolean | null>(null);
+  const focusRecord = () => {
+    if (facetsBeforeFocus.current === null) facetsBeforeFocus.current = showFacets;
+    setShowFacets(false);
+    setSplitListOpen(false);
+  };
+  const unfocusRecord = () => {
+    if (facetsBeforeFocus.current !== null) setShowFacets(facetsBeforeFocus.current);
+    facetsBeforeFocus.current = null;
+    setSplitListOpen(true);
+  };
   const [activeId, setActiveId] = useState<string | undefined>();
   // Collector chips show names, but only ids are in the URL — a shared link
   // carries no labels — so they are resolved on arrival and remembered here.
@@ -346,7 +362,7 @@ export function Explore() {
               <div style={{ width: 380, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.panel, display: "flex", flexDirection: "column", minHeight: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", padding: "3px 6px", borderBottom: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>
                   <div style={{ flex: 1 }} />
-                  <button onClick={() => setSplitListOpen(false)} title={tr("view.collapseList")} style={collapseBtn}>
+                  <button onClick={focusRecord} title={tr("view.collapseList")} style={collapseBtn}>
                     <Icon name="back" size={12} />
                   </button>
                 </div>
@@ -357,13 +373,19 @@ export function Explore() {
               </div>
             ) : (
               <div style={{ width: 26, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.panelAlt, display: "flex", justifyContent: "center", paddingTop: 4 }}>
-                <button onClick={() => setSplitListOpen(true)} title={tr("view.expandList")} style={collapseBtn}>
+                <button onClick={unfocusRecord} title={tr("view.expandList")} style={collapseBtn}>
                   <Icon name="caretR" size={12} />
                 </button>
               </div>
             )}
             {activeRowId
-              ? <RecordDetailView key={activeRowId} id={activeRowId} embedded />
+              /* The list being open *is* preview mode: scanning rows, the pane
+                 shows the record alone. Focusing hides the list and brings the
+                 work column in; showing the list again goes back to preview. */
+              ? <RecordDetailView key={activeRowId} id={activeRowId} embedded
+                  preview={splitListOpen}
+                  onFocus={focusRecord}
+                  onUnfocus={unfocusRecord} />
               : <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: t.fgSubtle, fontSize: 12, background: t.panelAlt }}>{tr("search.results")}: 0</div>}
           </>
         ) : (

@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from .. import auth, duck
 from ..db import get_session
-from ..models import LICENSE_URIS, Annotation, User
+from ..models import LICENSE_URIS, Annotation, Identification, User
 
 router = APIRouter(prefix="/api/export", tags=["export"])
 
@@ -143,4 +143,105 @@ async def export_provider(
         iter([buf.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ── Identifications ────────────────────────────────────────────────────────
+# One row per determination, under DwC's own term names: a provider loads this
+# into an Identification History extension, so the header should need no
+# mapping table. Same snapshot rule, same attribution rule as the deltas above.
+IDENT_EXPORT_COLUMNS = [
+    "identification_id", "tbia_id", "occurrenceID", "catalogNumber",
+    "scientificName", "taxonRank", "identificationQualifier", "verbatimIdentification",
+    "identifiedBy", "identifiedByID", "dateIdentified",
+    "identificationReferences", "identificationRemarks",
+    "status", "contributor", "reviewed_at", "license", "license_uri",
+]
+
+# Our column -> DwC term, for the identification's own fields.
+_IDENT_DWC = {
+    "scientific_name": "scientificName",
+    "taxon_rank": "taxonRank",
+    "identification_qualifier": "identificationQualifier",
+    "verbatim_identification": "verbatimIdentification",
+    "identified_by": "identifiedBy",
+    "identified_by_id": "identifiedByID",
+    "date_identified": "dateIdentified",
+    "identification_references": "identificationReferences",
+    "identification_remarks": "identificationRemarks",
+}
+
+
+async def _ident_rows_federated(dataset_name: str, statuses: list[str]) -> list[dict]:
+    placeholders = ", ".join(["?"] * len(statuses))
+    cols = ", ".join(f'i.{c} AS "{d}"' for c, d in _IDENT_DWC.items())
+    sql = f"""
+        SELECT i.id AS identification_id, i.occurrence_id AS tbia_id,
+               o.occurrence_id AS "occurrenceID", o.catalog_number AS "catalogNumber",
+               {cols},
+               i.status, u.display_name AS contributor, i.reviewed_at, i.license
+        FROM ann.identifications i
+        JOIN occurrence o ON o.id = i.occurrence_id
+        LEFT JOIN ann.users u ON u.id = i.contributor_id
+        WHERE i.dataset_name = ? AND i.status IN ({placeholders})
+        ORDER BY i.reviewed_at DESC NULLS LAST, i.id DESC
+    """
+    return await duck.query(sql, [dataset_name, *statuses])
+
+
+def _ident_rows_python(db: Session, dataset_name: str, statuses: list[str]) -> list[dict]:
+    idents = db.execute(
+        select(Identification).where(
+            Identification.dataset_name == dataset_name,
+            Identification.status.in_(statuses),
+        )
+    ).scalars().all()
+    out = []
+    for i in idents:
+        rec = duck._run("SELECT catalog_number, occurrence_id FROM occurrence WHERE id = ?",
+                        [i.occurrence_id])
+        occ = rec[0] if rec else {}
+        u = db.get(User, i.contributor_id)
+        row = {
+            "identification_id": i.id,
+            "tbia_id": i.occurrence_id,
+            "occurrenceID": occ.get("occurrence_id"),
+            "catalogNumber": occ.get("catalog_number"),
+            "status": i.status,
+            "contributor": u.display_name if u else None,
+            "reviewed_at": i.reviewed_at.isoformat() if i.reviewed_at else None,
+            "license": i.license,
+        }
+        row.update({d: getattr(i, c) for c, d in _IDENT_DWC.items()})
+        out.append(row)
+    return out
+
+
+@router.get("/identifications")
+async def export_identifications(
+    dataset_name: str,
+    statuses: str = "accepted,merged",
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    db: Session = Depends(get_session),
+    user: User = Depends(auth.require_role("reviewer")),
+):
+    status_list = [s.strip() for s in statuses.split(",") if s.strip()]
+    if duck.annotations_attached():
+        rows = await _ident_rows_federated(dataset_name, status_list)
+    else:
+        rows = _ident_rows_python(db, dataset_name, status_list)
+    rows = _with_license_uri(rows)
+
+    if format == "json":
+        return {"dataset_name": dataset_name, "count": len(rows), "identifications": rows}
+
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=IDENT_EXPORT_COLUMNS)
+    writer.writeheader()
+    for r in rows:
+        writer.writerow({k: r.get(k) for k in IDENT_EXPORT_COLUMNS})
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="tbia_identifications_export.csv"'},
     )

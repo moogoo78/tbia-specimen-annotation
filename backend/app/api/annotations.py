@@ -1,17 +1,13 @@
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import auth, duck, extract, notify, pipeline, policy, search
+from .. import auth, duck, extract, notify, pipeline, policy, search, workflow
 from ..annotations_store import _serialize
 from ..config import settings
 from ..contributions_store import attach_records, status_counts
 from ..db import get_session
 from ..models import (
-    DEFAULT_LICENSE,
-    LICENSES,
     Annotation,
     TranscribeRequest,
     User,
@@ -30,10 +26,6 @@ from ..schemas import (
 )
 
 router = APIRouter(prefix="/api", tags=["annotations"])
-
-REVIEW_STATUSES = {"accepted", "rejected", "merged"}
-CONTRIB_STATUSES = {"draft", "submitted"}
-
 
 def _out(db: Session, a: Annotation) -> dict:
     return _serialize(a, public_name(db.get(User, a.contributor_id)))
@@ -225,14 +217,8 @@ async def create_annotation(
     )
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")
-    if body.status not in CONTRIB_STATUSES:
-        raise HTTPException(status_code=400, detail="status must be draft or submitted")
-    # An unstated licence is the contributor's own default, not a platform guess.
-    license = body.license or user.default_license or DEFAULT_LICENSE
-    if license not in LICENSES:
-        raise HTTPException(
-            status_code=400, detail=f"license must be one of {', '.join(LICENSES)}"
-        )
+    workflow.check_create_status(body.status)
+    license = workflow.resolve_license(body.license, user)
 
     ann = Annotation(
         occurrence_id=occ_id,
@@ -267,56 +253,18 @@ def update_annotation(
     if ann is None:
         raise HTTPException(status_code=404, detail="Annotation not found")
 
-    is_owner = ann.contributor_id == user.id
-    is_reviewer = user.role in ("reviewer", "admin")
-
-    # Content edits: owner may edit while still pending; reviewers may always edit.
+    # The rules (who may edit, relicense, review) are workflow.py's, shared
+    # with identifications so the two kinds of contribution cannot drift apart.
     if body.proposed_value is not None or body.note is not None:
-        if not (is_reviewer or (is_owner and ann.status in CONTRIB_STATUSES)):
-            raise HTTPException(status_code=403, detail="Cannot edit this annotation")
+        workflow.check_content_edit(ann, user)
         if body.proposed_value is not None:
             ann.proposed_value = body.proposed_value
         if body.note is not None:
             ann.note = body.note
-
-    # Relicensing is the contributor's alone — at any time, in any status.
-    #
-    # A reviewer may edit a *value*; that is the job. Restating the terms someone
-    # else released their work under is not, so this is the one edit the reviewer
-    # role does not inherit — not even for an admin.
-    #
-    # There is no status past which it freezes, which is iNaturalist's rule and
-    # the right one: what cannot be revoked is the copy a provider already took,
-    # not the record. An export states the terms in force when it ran, that
-    # delivered file keeps them, and a later change applies to exports from here
-    # on. Freezing the row instead would confuse "you cannot take back what you
-    # gave" with "you may never change your mind", and only the first is true.
     if body.license is not None:
-        if not is_owner:
-            raise HTTPException(
-                status_code=403, detail="Only the contributor may set the licence"
-            )
-        if body.license not in LICENSES:
-            raise HTTPException(
-                status_code=400, detail=f"license must be one of {', '.join(LICENSES)}"
-            )
-        ann.license = body.license
-
-    # Status transitions.
+        workflow.apply_license(ann, body.license, user)
     if body.status is not None:
-        if body.status in REVIEW_STATUSES:
-            if not is_reviewer:
-                raise HTTPException(status_code=403, detail="Reviewer role required")
-            ann.reviewed_by = user.id
-            ann.reviewed_at = datetime.now(timezone.utc)
-        elif body.status == "submitted":
-            if not (is_owner or is_reviewer):
-                raise HTTPException(status_code=403, detail="Not your annotation")
-        elif body.status == "draft":
-            raise HTTPException(status_code=400, detail="Cannot revert to draft")
-        else:
-            raise HTTPException(status_code=400, detail=f"Unknown status {body.status}")
-        ann.status = body.status
+        workflow.apply_status(ann, body.status, user)
 
     db.commit()
     db.refresh(ann)

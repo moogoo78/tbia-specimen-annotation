@@ -286,6 +286,17 @@ export const api = {
     request<import("./types").Annotation>(`/annotations/${annId}`, {
       method: "PATCH", body: JSON.stringify(body),
     }),
+  createIdentification: (id: string, body: Record<string, unknown>) =>
+    request<import("./types").Identification>(`/occurrences/${id}/identifications`, {
+      method: "POST", body: JSON.stringify(body),
+    }),
+  updateIdentification: (identId: number, body: Record<string, unknown>) =>
+    request<import("./types").Identification>(`/identifications/${identId}`, {
+      method: "PATCH", body: JSON.stringify(body),
+    }),
+  myIdentifications: (p: { status?: string; limit?: number; offset?: number } = {}) =>
+    request<{ total: number; items: import("./types").Identification[] }>(
+      `/identifications?mine=true&${pageParams(p)}`),
   // Items carry their specimen (`Contribution`, not `Annotation`) so the
   // dashboard can group by the record rather than list fields with no subject.
   listAnnotations: (params: Record<string, string>) =>

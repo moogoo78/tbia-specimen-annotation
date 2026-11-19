@@ -7,8 +7,9 @@ import { Icon } from "../design/Icon";
 import { api } from "../api/client";
 import type { ExtractedField, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
-import { Button, CompletenessDots, GroupTag, SourceTag, Spinner, StatusPill } from "../components/ui";
+import { Button, CompletenessDots, GroupTag, SourceTag, Spinner, StatusPill, WorkPanel, fieldGrid } from "../components/ui";
 import { MediaGallery } from "../components/MediaGallery";
+import { IdentificationPanel, TAXON_RANK_OPTIONS } from "../components/IdentificationPanel";
 import { LICENSES, LICENSE_LABELS, LICENSE_URIS, SHOW_LICENSE_UI, asLicense, licenseLabel } from "../licenses";
 import type { License } from "../licenses";
 import { contributorLabel, isAnonymous } from "../contributors";
@@ -30,10 +31,6 @@ const TYPE_STATUS_OPTIONS = [
   "PARATYPE", "PARALECTOTYPE", "NEOTYPE", "EPITYPE", "ALLOTYPE", "COTYPE", "TOPOTYPE",
 ];
 const COORD_SYS_OPTIONS = ["TWD67", "TWD97"];
-const TAXON_RANK_OPTIONS = [
-  "kingdom", "phylum", "class", "order", "family",
-  "genus", "species", "subspecies", "variety", "form",
-];
 
 const ANNOTATABLE_GROUPS: { labelKey: string; fields: FieldDef[] }[] = [
   { labelKey: "annotate.grpCollection", fields: [
@@ -119,7 +116,17 @@ export function RecordDetail() {
 }
 
 // Reusable record body. `embedded` (split pane) hides the back link.
-export function RecordDetailView({ id, embedded }: { id: string; embedded?: boolean }) {
+//
+// `preview` is Explore's split pane while its result list is open: the pane is
+// narrow and the reader is scanning, so the record shows only itself — no work
+// column. `onFocus` is how they say "this one": Explore hides the list and the
+// same component comes back without `preview`, wide, with the annotation and
+// identification panels. `onUnfocus` returns to scanning. Two props rather than
+// a mode flag so the full /record page, which passes neither, needs no change.
+export function RecordDetailView({ id, embedded, preview, onFocus, onUnfocus }: {
+  id: string; embedded?: boolean; preview?: boolean;
+  onFocus?: () => void; onUnfocus?: () => void;
+}) {
   const { t: tr } = useTranslation();
   // While an AI transcription request is queued, poll so the panel flips to
   // "processed" (and the new AI annotations appear) without a manual reload —
@@ -131,18 +138,27 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
   });
 
   // Draggable divider between the read-only fields (left) and the media +
-  // annotation column (right). Width persists across records/sessions.
-  const ANNOT_MIN = 320, ANNOT_MAX = 820;
-  const [annotW, setAnnotW] = useState(() => {
-    const s = Number(localStorage.getItem("tbia_annot_w"));
-    return Number.isFinite(s) && s >= ANNOT_MIN ? Math.min(s, ANNOT_MAX) : 360;
+  // work column (right). Kept as a *fraction* of the record view, not pixels:
+  // the work column is where the page is used, so it takes the larger share by
+  // default and keeps that share on any screen — and in Explore's split view,
+  // where the same component sits in a much narrower pane. Persists per viewer
+  // (a new key: the old pixel width defaulted to a cramped 360).
+  const FRAC_MIN = 0.3, FRAC_MAX = 0.75, FRAC_DEFAULT = 0.56;
+  const [annotFrac, setAnnotFrac] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem("tbia_annot_frac"));
+      if (Number.isFinite(v) && v >= FRAC_MIN && v <= FRAC_MAX) return v;
+    } catch { /* storage unavailable */ }
+    return FRAC_DEFAULT;
   });
-  const drag = useRef<{ x: number; w: number } | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; frac: number; width: number } | null>(null);
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!drag.current) return;
-      const next = drag.current.w - (e.clientX - drag.current.x);  // right column grows as you drag left
-      setAnnotW(Math.max(ANNOT_MIN, Math.min(ANNOT_MAX, next)));
+      // right column grows as you drag left
+      const next = drag.current.frac - (e.clientX - drag.current.x) / drag.current.width;
+      setAnnotFrac(Math.max(FRAC_MIN, Math.min(FRAC_MAX, next)));
     };
     const onUp = () => {
       if (!drag.current) return;
@@ -154,12 +170,24 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
     window.addEventListener("mouseup", onUp);
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
   }, []);
-  useEffect(() => { localStorage.setItem("tbia_annot_w", String(annotW)); }, [annotW]);
+  useEffect(() => {
+    try { localStorage.setItem("tbia_annot_frac", annotFrac.toFixed(3)); } catch { /* storage unavailable */ }
+  }, [annotFrac]);
   const startDrag = (e: React.MouseEvent) => {
-    drag.current = { x: e.clientX, w: annotW };
+    drag.current = { x: e.clientX, frac: annotFrac, width: bodyRef.current?.clientWidth || window.innerWidth };
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
   };
+
+  // Set by the preview's "Add identification": focus the record, then open the
+  // identification form and bring it into view. Same component instance across
+  // preview → focus (Explore keeps the key), so this survives the switch.
+  const [identIntent, setIdentIntent] = useState(false);
+  // The work column holds two different tasks, one at a time: filling a gap
+  // from what the label says, and making a determination. They have different
+  // forms, different histories and different exports, so they get a tab each
+  // rather than one panel stacked under the other.
+  const [workTab, setWorkTab] = useState<"gaps" | "ident">("gaps");
 
   if (q.isLoading || !q.data) return <Spinner />;
   const r = q.data;
@@ -182,6 +210,11 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
             <CompletenessDots row={r} size={8} />
             <span style={{ flex: 1 }} />
             <span style={{ fontSize: 10, color: t.fgSubtle, fontFamily: t.mono }}>{String(r.id)}</span>
+            {!preview && onUnfocus && (
+              <Button small onClick={onUnfocus} title={tr("detail.unfocusHint")}>
+                <Icon name="back" size={11} />{tr("detail.unfocus")}
+              </Button>
+            )}
           </div>
           {/* The identification gap is the one this platform exists to close, so
               it is the one place the enrichment has to be visible without
@@ -214,9 +247,54 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
         </div>
       </div>
 
-      <div style={{ display: "flex", padding: 12, flex: 1, overflow: "auto", minHeight: 0 }}>
+      {/* In preview the work column is hidden, so say what there is to do and
+          offer the way in where the eye already is — not only as a button in
+          the header's corner. */}
+      {preview && onFocus && (() => {
+        const gaps = [
+          !r.has_identification && tr("facet.missing_identification"),
+          !r.has_coordinates && tr("facet.missing_coordinates"),
+          !r.has_date && tr("facet.missing_date"),
+        ].filter(Boolean) as string[];
+        const n = r.annotations.length + (r.identifications?.length ?? 0);
+        return (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10, padding: "8px 16px",
+            background: t.accentSoft, borderBottom: `1px solid ${t.borderSoft}`,
+          }}>
+            <Icon name="spark" size={14} />
+            <div style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.45 }}>
+              <div style={{ fontWeight: 600, color: t.fg }}>
+                {gaps.length ? tr("detail.focusCtaGaps", { n: gaps.length }) : tr("detail.focusCtaNone")}
+              </div>
+              <div style={{ fontSize: 11, color: t.fgMuted }}>
+                {gaps.join(" · ")}
+                {n > 0 && <>{gaps.length ? " — " : ""}{tr("detail.focusCtaDone", { n })}</>}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 5, flexShrink: 0 }}>
+              <FocusButton onClick={() => { setWorkTab("gaps"); onFocus(); }} />
+              <button onClick={() => { setWorkTab("ident"); setIdentIntent(true); onFocus(); }} title={tr("detail.identifyHint")} style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "4px 12px",
+                background: t.panel, color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 2,
+                cursor: "pointer", fontFamily: t.sans, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+              }}>
+                + {tr("ident.add")}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      <div ref={bodyRef} style={{ display: "flex", padding: 12, flex: 1, overflow: "auto", minHeight: 0 }}>
         {/* left column: record fields */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10, paddingRight: 12 }}>
+        <div style={{ flex: 1, minWidth: 260, display: "flex", flexDirection: "column", gap: 10, paddingRight: preview ? 0 : 12 }}>
+          {/* The specimen first, beside the forms: the label is what both the
+              transcription and the determination are read from. */}
+          <Section title={`${tr("detail.media")} · ${r.media.length}`}>
+            {/* No `references` here: the header's SourceLinks already links out. */}
+            <MediaGallery urls={r.media} sizes={r.media_sizes} />
+          </Section>
           <Section title={tr("detail.taxonomy")}><Taxonomy r={r} /></Section>
           <Section title={tr("detail.event")}>
             <CollectorField recordedBy={r.recorded_by as string} />
@@ -238,24 +316,69 @@ export function RecordDetailView({ id, embedded }: { id: string; embedded?: bool
           </Section>
         </div>
 
+        {!preview && <>
         {/* draggable divider — drag left to widen the annotation column */}
         <div onMouseDown={startDrag} title={tr("detail.resize")} style={{
           width: 8, flexShrink: 0, cursor: "col-resize", alignSelf: "stretch",
           display: "flex", justifyContent: "center", position: "relative",
         }}>
-          <div style={{ width: 2, background: t.border }} />
+          <div style={{ width: 1, background: t.borderSoft }} />
         </div>
 
-        {/* right column: media + annotation */}
-        <div style={{ width: annotW, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, paddingLeft: 12 }}>
-          <Section title={`${tr("detail.media")} · ${r.media.length}`}>
-            {/* No `references` here: the header's SourceLinks already links out. */}
-            <MediaGallery urls={r.media} sizes={r.media_sizes} />
-          </Section>
-          <AnnotationPanel record={r} />
+        {/* right column: the work — fill the gaps, or identify */}
+        <div style={{ flex: `0 0 ${(annotFrac * 100).toFixed(1)}%`, minWidth: 340, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 10, paddingLeft: 12 }}>
+          <WorkTabs tab={workTab} onTab={setWorkTab}
+            nGaps={r.annotations.length} nIdent={r.identifications?.length ?? 0} />
+          {workTab === "gaps"
+            ? <AnnotationPanel record={r} />
+            : <IdentificationPanel record={r} autoOpen={identIntent} onAutoOpened={() => setIdentIntent(false)} />}
         </div>
+        </>}
       </div>
     </div>
+  );
+}
+
+/** Switch between the two tasks in the work column. Counts are what each
+ *  task already holds on this record, so neither hides that work exists. */
+function WorkTabs({ tab, onTab, nGaps, nIdent }: {
+  tab: "gaps" | "ident"; onTab: (t: "gaps" | "ident") => void; nGaps: number; nIdent: number;
+}) {
+  const { t: tr } = useTranslation();
+  const item = (key: "gaps" | "ident", icon: "spark" | "check", label: string, n: number) => {
+    const on = tab === key;
+    return (
+      <button key={key} data-work-tab={key} onClick={() => onTab(key)} aria-pressed={on} style={{
+        flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+        padding: "8px 10px", cursor: "pointer", fontFamily: t.sans, fontSize: 12,
+        border: "none", borderBottom: `2px solid ${on ? t.accent : "transparent"}`,
+        background: on ? t.panel : "transparent", color: on ? t.fg : t.fgMuted, fontWeight: on ? 600 : 400,
+      }}>
+        <Icon name={icon} size={12} />{label}
+        {n > 0 && <span style={{ fontFamily: t.mono, fontSize: 10, color: on ? t.accent : t.fgSubtle }}>{n}</span>}
+      </button>
+    );
+  };
+  return (
+    <div role="tablist" style={{ display: "flex", border: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>
+      {item("gaps", "spark", tr("annotate.title"), nGaps)}
+      {item("ident", "check", tr("ident.title"), nIdent)}
+    </div>
+  );
+}
+
+/** The way from Explore's preview into annotating: accent-filled, not the
+ *  neutral dark of a form's submit, because it is the page's call to action. */
+function FocusButton({ onClick }: { onClick: () => void }) {
+  const { t: tr } = useTranslation();
+  return (
+    <button onClick={onClick} title={tr("detail.focusHint")} style={{
+      display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px",
+      background: t.accent, color: "#fff", border: "none", borderRadius: 2, cursor: "pointer",
+      fontFamily: t.sans, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0,
+    }}>
+      <Icon name="spark" size={13} />{tr("detail.focus")} →
+    </button>
   );
 }
 
@@ -682,21 +805,17 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
 
   if (!user) {
     return (
-      <Section title={tr("detail.annotations")}>
+      <WorkPanel>
         <div style={{ fontSize: 12, color: t.fgMuted }}>
           <Link to="/login" style={{ color: t.accent }}>{tr("annotate.loginToAnnotate")} →</Link>
         </div>
         <History annotations={record.annotations} isReviewer={false} onReview={() => {}} />
-      </Section>
+      </WorkPanel>
     );
   }
 
   return (
-    <div style={{ background: t.panel, border: `1px solid ${t.border}` }}>
-      <div style={{ padding: "4px 8px", background: t.accentSoft, borderBottom: `1px solid ${t.borderSoft}`, fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: t.accent, display: "flex", alignItems: "center", gap: 5 }}>
-        <Icon name="spark" size={11} />{tr("annotate.title")}
-      </div>
-      <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+    <WorkPanel>
         {/* Submitting used to say nothing at all. This is the confirmation and
             the way to the rest of your work, in the one place a contributor is
             certainly looking. The record's own history below still shows the
@@ -758,11 +877,12 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
             })}
           </div>
 
-          {/* every field in the active class */}
+          {/* every field in the active class, in as many columns as fit */}
+          <div style={{ ...fieldGrid, marginBottom: 8 }}>
           {ANNOTATABLE_GROUPS.find((g) => g.labelKey === activeGroup)!.fields.map((fd) => {
             const orig = originalFor(record, fd.name);
             return (
-              <div key={fd.name} style={{ marginBottom: 8 }}>
+              <div key={fd.name} style={{ minWidth: 0, gridColumn: fd.widget === "textarea" ? "1 / -1" : undefined }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 3 }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: t.fgMuted }}>{tr(`fields.${fd.name}`, fd.name)}</span>
                   {serializeField(fd, values) !== "" && (
@@ -822,6 +942,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
               </div>
             );
           })}
+          </div>
 
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tr("annotate.note")} style={inputStyle} />
 
@@ -859,8 +980,7 @@ function AnnotationPanel({ record }: { record: OccurrenceDetail }) {
         <History annotations={record.annotations} isReviewer={isReviewer} userId={user.id}
           onReview={(annId, status) => reviewMut.mutate({ annId, status })}
           onRelicense={(annId, license) => relicenseMut.mutate({ annId, license })} />
-      </div>
-    </div>
+    </WorkPanel>
   );
 }
 
@@ -880,6 +1000,11 @@ function AiAssist({ record, onProposal }: {
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
   const [open, setOpen] = useState<"queue" | "paste" | null>(null);
+  // Collapsed by default: it is a way *into* the form, not the form, and its
+  // explanation is the longest thing in the work column. A transcription's
+  // state still shows in the header, and its proposals list outside this box
+  // (ProposalList), so collapsing it never hides a result.
+  const [expanded, setExpanded] = useState(false);
   const [pasteRaw, setPasteRaw] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -949,11 +1074,28 @@ function AiAssist({ record, onProposal }: {
   };
 
   return (
-    <div style={{ border: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>
-      <div style={{ padding: "6px 8px", borderBottom: `1px solid ${t.borderSoft}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600 }}>
-          <Icon name="spark" size={12} />{tr("annotate.aiTitle")}
-        </div>
+    <div style={{ border: `1px solid ${t.borderSoft}` }}>
+      <button onClick={() => setExpanded((x) => !x)} aria-expanded={expanded} style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 6, padding: "7px 8px",
+        border: "none", background: "transparent", cursor: "pointer", fontFamily: t.sans,
+        color: t.fg, textAlign: "left",
+      }}>
+        <Icon name={expanded ? "caretD" : "caretR"} size={10} />
+        <Icon name="spark" size={12} />
+        <span style={{ fontSize: 12, fontWeight: 600 }}>{tr("annotate.aiTitle")}</span>
+        <span style={{ flex: 1 }} />
+        {q && (() => {
+          const tone = q.status === "failed" ? t.danger : q.status === "done" ? t.ok : t.warn;
+          return (
+            <span style={{ fontSize: 10, color: tone, display: "inline-flex", alignItems: "center", gap: 3 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 3, background: tone }} />
+              {tr(q.status === "failed" ? "annotate.qFailed" : q.status === "done" ? "annotate.qDone" : "annotate.qPending")}
+            </span>
+          );
+        })()}
+      </button>
+      {expanded && <>
+      <div style={{ padding: "0 8px 6px", borderBottom: `1px solid ${t.borderSoft}` }}>
         <div style={{ fontSize: 10, color: t.fgMuted, lineHeight: 1.6, marginTop: 3 }}>{tr("annotate.aiWhat")}</div>
         {/* The walkthrough, from where the work actually happens. New tab on
             purpose: this panel sits above a half-filled annotation form (and,
@@ -977,6 +1119,8 @@ function AiAssist({ record, onProposal }: {
 
       <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ fontSize: 10, color: t.fgSubtle }}>{tr("annotate.aiPickHint")}</div>
+        {/* Side by side when there is room; an opened option takes the full row. */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 6, alignItems: "start" }}>
 
         {/* route A — the platform's own AI: queued for the batch worker, or,
             for an admin, run in the request they just made */}
@@ -1074,8 +1218,9 @@ function AiAssist({ record, onProposal }: {
             </>
           )}
         </OptionCard>
+        </div>
       </div>
-
+      </>}
     </div>
   );
 }
@@ -1124,7 +1269,7 @@ function OptionCard({ n, title, what, cta, open, onToggle, disabled, meta, child
   onToggle: () => void; disabled?: boolean; meta?: string; children: React.ReactNode;
 }) {
   return (
-    <div style={{ border: `1px solid ${open ? t.accent : t.borderSoft}`, background: t.panel, opacity: disabled && !open ? 0.55 : 1 }}>
+    <div style={{ border: `1px solid ${open ? t.accent : t.borderSoft}`, background: t.panel, opacity: disabled && !open ? 0.55 : 1, gridColumn: open ? "1 / -1" : undefined }}>
       <button onClick={onToggle} style={{
         width: "100%", textAlign: "left", display: "flex", gap: 7, padding: "7px 8px",
         border: "none", background: "transparent", cursor: "pointer", fontFamily: t.sans,

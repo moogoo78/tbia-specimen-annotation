@@ -179,6 +179,47 @@ first is off by default, so a new account is never named without asking.
   the ORCID-verified name is what makes that attribution checkable against an
   iD. A contributor who wants no attribution anywhere releases under `CC0-1.0`.
 
+## Identifications
+
+A **determination** of the specimen — DwC's *Identification* class — is a different thing
+from transcribing the label, and is stored differently. The form above records what the
+label *says*, one field per `annotations` row, and may be seeded by AI. An identification
+records what a person *determines the specimen to be*, and its terms belong together
+(`identifiedBy` and `dateIdentified` describe *that* name), so one submission is one row in
+`identifications` (`backend/app/models.py:Identification`, annotation store). There is no
+AI path into it.
+
+| column | DwC term | |
+| --- | --- | --- |
+| `scientific_name` | `scientificName` | **required** |
+| `taxon_rank` | `taxonRank` | same rank list as the form |
+| `identification_qualifier` | `identificationQualifier` | `cf.`, `aff.`, `sp.`, … (free text) |
+| `verbatim_identification` | `verbatimIdentification` | the name as written |
+| `identified_by` | `identifiedBy` | UI prefills the signed-in ORCID name; editable |
+| `identified_by_id` | `identifiedByID` | UI prefills `https://orcid.org/<iD>`; editable |
+| `date_identified` | `dateIdentified` | ISO 8601: `YYYY`, `YYYY-MM`, `YYYY-MM-DD`, or an interval `a/b`; anything else is a 400 |
+| `identification_references` | `identificationReferences` | `\|`-separated |
+| `identification_remarks` | `identificationRemarks` | |
+
+`isAcceptedIdentification` and `identificationVerificationStatus` are deliberately not
+stored; a reviewer's verdict is the row's `status`.
+
+- **Same workflow, one definition.** Status lifecycle, who may edit, relicense and review
+  are `backend/app/workflow.py`, called by both `PATCH /annotations/{id}` and
+  `PATCH /identifications/{id}` — so the two kinds of contribution cannot drift apart.
+  Licence resolves from `user.default_license` when absent, exactly as for an annotation.
+- **Same publication rules.** Drafts never leave their author: they are absent from
+  `GET /api/occurrences/{id}` (`identifications_store.list_for_occurrence`) and from other
+  users' `GET /api/identifications`; `/me` lists them and submits them. Names go through
+  `public_name`.
+- **Routes.** `POST /api/occurrences/{id}/identifications`, `PATCH /api/identifications/{id}`,
+  `GET /api/identifications?mine=&occurrence_id=&status=` (authenticated, uncached).
+- **Export.** `GET /api/export/identifications?dataset_name=&statuses=accepted,merged&format=json|csv`
+  (reviewer), one row per determination under DwC's own term names plus `tbia_id`,
+  `occurrenceID`, `catalogNumber`, `contributor` (the ORCID name, as in the provider
+  export), `license`, `license_uri`.
+- Not yet counted in the ranking, contributor pages or the institution report.
+
 ## Roles and permissions
 
 `ROLES = ("contributor", "reviewer", "admin")` (`backend/app/models.py:21`). Assigned

@@ -109,6 +109,32 @@ class AnnotationOut(BaseModel):
     modified: datetime
 
 
+# ── Identifications (DwC Identification class) ─────────────────────────────
+class IdentificationFields(BaseModel):
+    """The determination itself. Every field except the name is optional —
+    a determination with only a name is still one, and DwC requires no more."""
+    scientific_name: str | None = None
+    taxon_rank: str | None = None
+    identification_qualifier: str | None = None
+    verbatim_identification: str | None = None
+    identified_by: str | None = None
+    identified_by_id: str | None = None
+    date_identified: str | None = None
+    identification_references: str | None = None
+    identification_remarks: str | None = None
+
+
+class IdentificationCreate(IdentificationFields):
+    scientific_name: str  # required on create
+    status: str = "submitted"
+    license: str | None = None  # absent -> the contributor's default
+
+
+class IdentificationUpdate(IdentificationFields):
+    status: str | None = None
+    license: str | None = None
+
+
 # ── AI extraction ──────────────────────────────────────────────────────────
 class ExtractedField(BaseModel):
     field: str

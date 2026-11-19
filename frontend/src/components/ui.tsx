@@ -1,5 +1,6 @@
 import { t, toneFor } from "../design/tokens";
 import { Icon } from "../design/Icon";
+import type { IconName } from "../design/Icon";
 import { useTranslation } from "react-i18next";
 
 export function GroupTag({ group }: { group?: string | null }) {
@@ -129,3 +130,31 @@ export function SourceTag({ source, confidence }: { source: string; confidence?:
     </span>
   );
 }
+
+/** The record page's working panels (Fill the gaps, Identifications): quiet
+ *  chrome on purpose. They sit beside the specimen, and the specimen's own data
+ *  and image are what the eye should land on; a filled, coloured header bar
+ *  per panel made the tools louder than the thing being worked on. */
+export function WorkPanel({ title, icon, count, children, ...rest }: {
+  /** Omit when something outside already names the panel (the record page's work tabs). */
+  title?: string; icon?: IconName; count?: number; children: React.ReactNode;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <section {...rest} style={{ background: t.panel, border: `1px solid ${t.borderSoft}` }}>
+      {title && <div style={{
+        display: "flex", alignItems: "center", gap: 6, padding: "9px 14px 0",
+        fontSize: 10, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", color: t.fgSubtle,
+      }}>
+        {icon && <Icon name={icon} size={11} />}
+        {title}
+        {count != null && count > 0 && <span style={{ fontFamily: t.mono, fontWeight: 400 }}>· {count}</span>}
+      </div>}
+      <div style={{ padding: title ? "8px 14px 14px" : 14, display: "flex", flexDirection: "column", gap: 10 }}>{children}</div>
+    </section>
+  );
+}
+
+/** Fields that flow into as many columns as the panel is wide. */
+export const fieldGrid: React.CSSProperties = {
+  display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", columnGap: 14, rowGap: 8,
+};

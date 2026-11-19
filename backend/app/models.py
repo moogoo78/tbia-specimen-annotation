@@ -184,6 +184,54 @@ Index("idx_ann_occ_status", Annotation.occurrence_id, Annotation.status)
 Index("idx_ann_contrib_modified", Annotation.contributor_id, Annotation.modified)
 
 
+class Identification(Base):
+    """One determination of a specimen — DwC's Identification class.
+
+    Not an `Annotation`, because a determination is one act whose terms belong
+    together: `identified_by` and `date_identified` describe *this* name, and
+    splitting them into one row per field (as transcription does) would let a
+    review accept the name and reject who named it. So it is one row, carrying
+    the same workflow an annotation does — status lifecycle, licence, contributor
+    — under the same rules (`app/workflow.py` is the one definition of them).
+
+    It is a person's judgement, never a transcription: there is no AI path into
+    this table. What a label *says* stays `annotationScientificName`; this is
+    what someone *determines* the specimen to be. Annotation store, because it
+    is user work and nothing could re-seed it."""
+
+    __tablename__ = "identifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    occurrence_id: Mapped[str] = mapped_column(String(64), index=True)
+    dataset_name: Mapped[str | None] = mapped_column(String(512), index=True)
+
+    # The taxon being determined (DwC Taxon terms carried on the identification).
+    scientific_name: Mapped[str] = mapped_column(Text)
+    taxon_rank: Mapped[str | None] = mapped_column(String(32))
+    identification_qualifier: Mapped[str | None] = mapped_column(String(64))  # cf., aff.
+    # DwC Identification terms.
+    verbatim_identification: Mapped[str | None] = mapped_column(Text)
+    identified_by: Mapped[str | None] = mapped_column(Text)
+    identified_by_id: Mapped[str | None] = mapped_column(Text)  # e.g. an ORCID URI
+    date_identified: Mapped[str | None] = mapped_column(String(32))  # ISO 8601, partial ok
+    identification_references: Mapped[str | None] = mapped_column(Text)
+    identification_remarks: Mapped[str | None] = mapped_column(Text)
+
+    status: Mapped[str] = mapped_column(String(16), default="submitted", index=True)
+    license: Mapped[str] = mapped_column(String(32), default=DEFAULT_LICENSE)
+
+    contributor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    created: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    modified: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+Index("idx_ident_occ_status", Identification.occurrence_id, Identification.status)
+Index("idx_ident_contrib_modified", Identification.contributor_id, Identification.modified)
+
+
 class TranscribeRequest(Base):
     """A contributor scheduling a record for (AI) transcription — and, once it
     has run, the transcription itself.
