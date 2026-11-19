@@ -1,4 +1,4 @@
-.PHONY: install backend-install frontend-install prepare inspect build-db seed seed-collectors sync-collectors seed-sampling-events api web test build dump-annotations clean
+.PHONY: install backend-install frontend-install prepare inspect build-db seed seed-collectors sync-collectors seed-sampling-events seed-taicol api web test build dump-annotations clean
 
 PY := backend/.venv/bin/python
 PIP := backend/.venv/bin/pip
@@ -64,6 +64,11 @@ sync-collectors:
 # SQLite. Idempotent -- re-run after correcting a transcription.
 seed-sampling-events:
 	cd backend && .venv/bin/python -m app.seed_sampling_events
+
+# TaiCOL release -> reference store, for the identification name picker.
+# Newest TaiCOL_taxon_YYYYMMDD.csv in data/ or tmp/; its date is the version cited.
+seed-taicol:
+	cd backend && .venv/bin/python -m app.seed_taicol
 
 # Run the API on :8000 (the Vite dev server proxies /api here).
 api:

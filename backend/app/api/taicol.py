@@ -31,3 +31,19 @@ async def taxon(taxon_id: str):
     if t is None:
         raise HTTPException(status_code=404, detail="No such TaiCOL taxon")
     return t
+
+
+@router.get("/tree")
+def tree(parent: str | None = Query(default=None, pattern=r"^t\d{7}$")):
+    """One level of the TaiCOL tree (roots without `parent`). Local release only:
+    503 until `make seed-taicol` has run, which the form reads as "no tree"."""
+    nodes = taicol.tree(parent)
+    if nodes is None:
+        raise HTTPException(status_code=503, detail="TaiCOL release not loaded (make seed-taicol)")
+    return nodes
+
+
+@router.get("/release")
+def release():
+    """Which TaiCOL release the picker answers from (null = live fallback)."""
+    return taicol.release()

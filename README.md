@@ -40,6 +40,7 @@ make install               # python venv + npm install
 make seed                  # SQLite schema + demo users
 make seed-collectors       # collector index, parsed out of recorded_by
 make seed-sampling-events  # the curated survey chronology behind /history
+make seed-taicol           # TaiCOL release (data/ or tmp/TaiCOL_taxon_*.csv) for the name picker
 make api                   # terminal 1: FastAPI on :8000
 make web                   # terminal 2: Vite dev server on :5173
 ```

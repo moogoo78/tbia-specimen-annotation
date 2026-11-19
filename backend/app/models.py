@@ -393,3 +393,52 @@ class SamplingEventActor(RefBase):
     position: Mapped[int] = mapped_column(Integer, default=0)  # source order
 
     event: Mapped[SamplingEvent] = relationship(back_populates="actors")
+
+
+class TaicolTaxon(RefBase):
+    """One TaiCOL taxon, from a release CSV (``app/seed_taicol.py``).
+
+    Reference data, rebuilt wholesale by ``make seed-taicol`` — which is why it
+    is in the reference store: losing it costs a re-seed, never user work. It
+    backs the identification form's name picker (search + tree, ``app/taicol.py``),
+    so the form depends on a dated TaiCOL release rather than on TaiCOL's live,
+    undocumented autocomplete.
+
+    The CSV carries each taxon's kingdom…genus but no parent id; ``parent_id`` is
+    derived at seed time and set only for the ranks the tree shows (``in_tree``).
+    Minor ranks (subfamily, tribe, section…) are searchable but not tree nodes —
+    the tree is kingdom → phylum → class → order → family → genus → species →
+    infraspecific, the same shape as Explore's.
+    """
+
+    __tablename__ = "taicol_taxon"
+
+    taxon_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    name_id: Mapped[int | None] = mapped_column(Integer)
+    simple_name: Mapped[str] = mapped_column(String(255), index=True)
+    name_author: Mapped[str] = mapped_column(String(255), default="")
+    rank: Mapped[str] = mapped_column(String(32), index=True)  # lower case, DwC-ish
+    common_name_c: Mapped[str] = mapped_column(String(255), default="")
+    alternative_name_c: Mapped[str] = mapped_column(Text, default="")
+    kingdom: Mapped[str] = mapped_column(String(64), default="")
+    family: Mapped[str] = mapped_column(String(128), default="")
+    family_c: Mapped[str] = mapped_column(String(128), default="")
+    # Lower-cased simple name + Chinese names, for substring search.
+    search: Mapped[str] = mapped_column(Text, default="")
+    parent_id: Mapped[str | None] = mapped_column(String(16), index=True)
+    in_tree: Mapped[bool] = mapped_column(Boolean, default=False)
+    n_children: Mapped[int] = mapped_column(Integer, default=0)   # tree children
+    n_species: Mapped[int] = mapped_column(Integer, default=0)    # species at or below
+    updated_at: Mapped[str] = mapped_column(String(16), default="")
+
+
+class TaicolRelease(RefBase):
+    """Which TaiCOL release ``taicol_taxon`` holds — one row. Its version is what
+    an identification's ``name_according_to`` cites."""
+
+    __tablename__ = "taicol_release"
+
+    version: Mapped[str] = mapped_column(String(32), primary_key=True)  # "2026-10-30"
+    source_file: Mapped[str] = mapped_column(String(255), default="")
+    n_taxa: Mapped[int] = mapped_column(Integer, default=0)
+    loaded_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

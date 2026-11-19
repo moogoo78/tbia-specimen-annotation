@@ -65,6 +65,8 @@ STATIC_ROUTES = frozenset({
     # same for every caller, and it changes on TaiCOL's schedule, not ours.
     "/api/taicol/suggest",
     "/api/taicol/taxon/{taxon_id}",
+    "/api/taicol/tree",
+    "/api/taicol/release",
 })
 
 # Cacheable briefly: correct now, but moves as people annotate. A minute of

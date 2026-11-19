@@ -75,11 +75,12 @@ Build the DBs **on your laptop** (don't run the ~2 M-row ingest on the small
 box) and copy them up:
 
 ```bash
-# on your laptop — all four, in this order
+# on your laptop — all five, in this order
 make prepare                 # completeness flags on the DuckDB store
 make seed                    # SQLite schema + demo user rows
 make seed-collectors         # ~17k collectors + their recorded_by aliases
 make seed-sampling-events    # the 37-entry survey chronology (/history)
+make seed-taicol             # TaiCOL release for the identification name picker
 
 scp data/tbia.duckdb data/annotations.sqlite data/reference.sqlite ubuntu@<elastic-ip>:$APP/data/
 ```
@@ -91,6 +92,14 @@ ships a database whose tables exist and are empty — `/collectors` and `/histor
 then render blank rather than erroring, which is easy to miss until someone asks
 why a page has no data. `curl /api/health` reports `reference_attached` for
 exactly this reason.
+
+`make seed-taicol` needs a TaiCOL taxon export (`TaiCOL_taxon_YYYYMMDD.csv`,
+~35 MB, not in git) in `data/` or `tmp/`; it takes the newest by filename and cites
+that date as the release version. Skipping it does not break the form: name
+suggestions fall back to live TaiCOL and the tree button is simply not offered.
+`curl /api/taicol/release` says which release is loaded (`null` = none). A new
+release is a re-run of the seeder plus the edge purge in step 7 — the TaiCOL routes
+are edge-cached.
 
 > **The `scp` of `annotations.sqlite` is for the FIRST deploy only.** Once the
 > site is live that file holds every ORCID account and every annotation, and

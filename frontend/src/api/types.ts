@@ -558,7 +558,20 @@ export interface TaicolSuggestion {
   name: string;
   name_parts: { text: string; italic: boolean }[];
   common_names: string[];
+  /** Present when answered from the loaded release (not the live fallback). */
+  rank?: string;
+  family?: string;
+  family_c?: string;
 }
+
+/** One node of the TaiCOL tree (local release only). */
+export interface TaicolNode extends TaicolSuggestion {
+  rank: string;
+  n_children: number;
+  n_species: number;
+}
+
+export interface TaicolRelease { version: string; source_file: string; n_taxa: number; }
 
 /** The TaiCOL taxon a person picked, with the two DwC terms already built. */
 export interface TaicolTaxon {
@@ -574,6 +587,9 @@ export interface TaicolTaxon {
   scientific_name_id: string | null;
   name_according_to: string;
   taxon_uri: string;
+  /** Ancestor ids, root first — empty on the live fallback. */
+  path: string[];
+  source: "release" | "live";
 }
 
 export interface Identification extends IdentificationTerms {

@@ -289,6 +289,9 @@ export const api = {
   taicolSuggest: (q: string, lang: "zh-hant" | "en-us") =>
     request<import("./types").TaicolSuggestion[]>(
       `/taicol/suggest?${new URLSearchParams({ q, lang })}`),
+  taicolTree: (parent?: string) =>
+    request<import("./types").TaicolNode[]>(`/taicol/tree${parent ? `?parent=${encodeURIComponent(parent)}` : ""}`),
+  taicolRelease: () => request<import("./types").TaicolRelease | null>(`/taicol/release`),
   taicolTaxon: (taxonId: string) =>
     request<import("./types").TaicolTaxon>(`/taicol/taxon/${encodeURIComponent(taxonId)}`),
   createIdentification: (id: string, body: Record<string, unknown>) =>

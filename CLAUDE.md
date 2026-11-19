@@ -26,8 +26,9 @@ Occurrence data is **read-only**; enrichment lives only as annotations. Hence tw
     row per DwC determination (not per field); its workflow rules are shared with
     annotations through `app/workflow.py` — see *Identifications* in `docs/annotation-schema.md`.
   - `data/reference.sqlite` — `collectors`, `collector_alias`, `sampling_event`,
-    `sampling_event_actor` (`RefBase` / `RefSessionLocal`). ~2.5 MB, and every row is
-    rebuilt by `make seed-collectors` / `make seed-sampling-events`, so the file is
+    `sampling_event_actor`, `taicol_taxon`, `taicol_release` (`RefBase` /
+    `RefSessionLocal`). ~30 MB (TaiCOL is most of it), and every row is
+    rebuilt by `make seed-collectors` / `make seed-sampling-events` / `make seed-taicol`, so the file is
     disposable — delete it and re-seed. A seeder therefore **cannot** reach user work:
     it is writing a different file. Which `Base` a model inherits is what decides
     which file it lands in, and **no ForeignKey may cross the two**.

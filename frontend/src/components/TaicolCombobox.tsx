@@ -6,10 +6,13 @@
 // identification. Editing the text after a pick drops that link — the id
 // described the picked name, not whatever the field says now.
 import { useEffect, useId, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { api } from "../api/client";
+import { Icon } from "../design/Icon";
 import type { TaicolSuggestion, TaicolTaxon } from "../api/types";
+import { TaicolTree } from "./TaicolTree";
 
 export function TaicolCombobox({ value, onText, picked, onPick, inputStyle }: {
   value: string;
@@ -27,6 +30,11 @@ export function TaicolCombobox({ value, onText, picked, onPick, inputStyle }: {
   const [resolving, setResolving] = useState(false);
   const typed = useRef(false);  // only search on the person's typing, not on a pick filling the field
   const wrap = useRef<HTMLDivElement>(null);
+  // Browse instead of type. Only offered when a TaiCOL release is loaded — the
+  // live fallback has no tree.
+  const [treeOpen, setTreeOpen] = useState(false);
+  const rel = useQuery({ queryKey: ["taicol-release"], queryFn: () => api.taicolRelease(), staleTime: Infinity });
+  const hasTree = !!rel.data;
 
   useEffect(() => {
     if (!typed.current) return;
@@ -45,7 +53,7 @@ export function TaicolCombobox({ value, onText, picked, onPick, inputStyle }: {
   // Close on a press outside, as a native select would.
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
-      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
+      if (wrap.current && !wrap.current.contains(e.target as Node)) { setOpen(false); setTreeOpen(false); }
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
@@ -53,6 +61,7 @@ export function TaicolCombobox({ value, onText, picked, onPick, inputStyle }: {
 
   const choose = async (s: TaicolSuggestion) => {
     setOpen(false);
+    setTreeOpen(false);
     typed.current = false;
     onText(s.name);
     setResolving(true);
@@ -71,17 +80,19 @@ export function TaicolCombobox({ value, onText, picked, onPick, inputStyle }: {
     if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => (a + 1) % items.length); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => (a - 1 + items.length) % items.length); }
     else if (e.key === "Enter") { e.preventDefault(); choose(items[active]); }
-    else if (e.key === "Escape") { setOpen(false); }
+    else if (e.key === "Escape") { setOpen(false); setTreeOpen(false); }
   };
 
   return (
     <div ref={wrap} style={{ position: "relative" }}>
+      <div style={{ display: "flex" }}>
       <input
         role="combobox" aria-expanded={open} aria-controls={listId} aria-autocomplete="list"
         aria-activedescendant={open && items[active] ? `${listId}-${active}` : undefined}
         value={value}
         onChange={(e) => {
           typed.current = true;
+          setTreeOpen(false);
           onText(e.target.value);
           if (picked && e.target.value.trim() !== picked.scientific_name) onPick(null);
         }}
@@ -89,8 +100,33 @@ export function TaicolCombobox({ value, onText, picked, onPick, inputStyle }: {
         onKeyDown={onKey}
         placeholder={tr("ident.namePlaceholder")}
         // Latin names read italic; a Chinese query does not.
-        style={{ ...inputStyle, fontStyle: value && !/[\u3400-\u9fff]/.test(value) ? "italic" : "normal" }}
+        style={{ ...inputStyle, flex: 1, minWidth: 0, fontStyle: value && !/[\u3400-\u9fff]/.test(value) ? "italic" : "normal" }}
       />
+      {hasTree && (
+        <button type="button" onClick={() => { setOpen(false); setTreeOpen((o) => !o); }} aria-expanded={treeOpen}
+          title={tr("ident.treeBrowse")} style={{
+            display: "flex", alignItems: "center", gap: 4, padding: "0 9px", flexShrink: 0, cursor: "pointer",
+            border: `1px solid ${t.border}`, borderLeft: "none", fontFamily: t.sans, fontSize: 11,
+            background: treeOpen ? t.accentSoft : t.panel, color: treeOpen ? t.accent : t.fgMuted,
+          }}>
+          <Icon name="rows" size={11} />{tr("ident.treeBrowse")}
+          <Icon name={treeOpen ? "caretU" : "caretD"} size={9} />
+        </button>
+      )}
+      </div>
+
+      {treeOpen && (
+        <div style={{
+          position: "absolute", zIndex: 20, top: "100%", left: 0, right: 0, maxHeight: 360, overflowY: "auto",
+          background: t.panel, border: `1px solid ${t.border}`, borderTop: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+        }}>
+          <TaicolTree openPath={picked?.path ?? []} selectedId={picked?.taxon_id}
+            onPick={(n) => choose(n)} />
+          <div style={{ padding: "3px 8px", fontSize: 9, color: t.fgSubtle, borderTop: `1px solid ${t.borderSoft}`, position: "sticky", bottom: 0, background: t.panel }}>
+            {tr("ident.taicolRelease", { v: rel.data?.version })}
+          </div>
+        </div>
+      )}
 
       {open && (
         <ul id={listId} role="listbox" style={{
@@ -113,11 +149,13 @@ export function TaicolCombobox({ value, onText, picked, onPick, inputStyle }: {
               <span style={{ fontSize: 11, color: t.fgMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                 {s.common_names.join("、")}
               </span>
-              <span style={{ fontFamily: t.mono, fontSize: 9, color: t.fgSubtle }}>{s.taxon_id}</span>
+              <span style={{ fontFamily: t.mono, fontSize: 9, color: t.fgSubtle, whiteSpace: "nowrap" }}>
+                {[s.rank, s.family && s.rank !== "family" ? s.family : null].filter(Boolean).join(" · ") || s.taxon_id}
+              </span>
             </li>
           ))}
           <li style={{ padding: "3px 8px", fontSize: 9, color: t.fgSubtle, borderTop: `1px solid ${t.borderSoft}` }}>
-            {tr("ident.taicolSource")}
+            {rel.data ? tr("ident.taicolRelease", { v: rel.data.version }) : tr("ident.taicolSource")}
           </li>
         </ul>
       )}
