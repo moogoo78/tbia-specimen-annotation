@@ -12,8 +12,11 @@ type ArrayKey = "bio_group" | "kingdom_c" | "county" | "taxon_rank"
   | "basis_of_record" | "type_status" | "dataset_name";
 type FlagKey = "missing_coordinates" | "missing_date" | "missing_identification" | "has_media";
 
-const SECTIONS: ArrayKey[] = [
-  "bio_group", "kingdom_c", "county", "taxon_rank", "basis_of_record", "type_status", "dataset_name",
+// No `dataset_name` section: it duplicated Collection institution above (both
+// pick datasets). The filter itself still works, so an old link keeps its chip.
+type SectionKey = Exclude<ArrayKey, "dataset_name">;
+const SECTIONS: SectionKey[] = [
+  "bio_group", "kingdom_c", "county", "taxon_rank", "basis_of_record", "type_status",
 ];
 const FLAGS: FlagKey[] = ["missing_identification", "missing_coordinates", "missing_date", "has_media"];
 
@@ -39,7 +42,7 @@ export function FacetPanel({ facets, filters, onToggle, onToggleFlag, onClear,
   const { t: tr } = useTranslation();
   const [open, setOpen] = useState<Record<string, boolean>>({
     source: true, taxon: true, catalog: true, collector: false, record_number: false, completeness: true, bio_group: true,
-    county: true, taxon_rank: false, basis_of_record: false, kingdom_c: false, type_status: false, dataset_name: false,
+    county: true, taxon_rank: false, basis_of_record: false, kingdom_c: false, type_status: false,
   });
   const [srcOpen, setSrcOpen] = useState<Record<string, boolean>>({});
 

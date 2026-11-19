@@ -47,7 +47,9 @@ FACET_COLUMNS = {
     "taxon_rank": "taxon_rank",
     "basis_of_record": "basis_of_record",
     "type_status": "type_status",
-    "dataset_name": "dataset_name",
+    # No dataset_name: Explore's Collection institution tree (registry) is the
+    # source picker, and a second dataset list duplicated it. The *filter* on
+    # dataset_name stays (build_where), only the facet rollup is gone.
 }
 
 # A facet value meaning "the column is empty" (NULL or ''). It travels as an
@@ -432,7 +434,7 @@ async def facets(f: Filters, *, top: int = 20) -> dict:
     out: dict[str, Any] = {}
 
     for name, col in FACET_COLUMNS.items():
-        limit = 50 if name in ("dataset_name", "county") else top
+        limit = 50 if name == "county" else top
         joiner = " AND " if where else " WHERE "
         if name in NONE_FACETS:
             # Empties fold into one NONE_VALUE row instead of being dropped.
