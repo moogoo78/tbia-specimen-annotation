@@ -258,6 +258,19 @@ export const api = {
     request<import("./types").ExtractResponse>(`/occurrences/${id}/extract-paste`, {
       method: "POST", body: JSON.stringify({ raw }),
     }),
+  // Admin-only: users and their identifier flag (backend api/users.py).
+  adminUsers: (p: { q?: string; identifiers?: boolean; limit?: number; offset?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (p.q) qs.set("q", p.q);
+    if (p.identifiers) qs.set("identifiers", "true");
+    if (p.limit) qs.set("limit", String(p.limit));
+    if (p.offset) qs.set("offset", String(p.offset));
+    return request<{ total: number; items: import("./types").AdminUser[] }>(`/admin/users?${qs}`);
+  },
+  setIdentifier: (id: number, is_identifier: boolean) =>
+    request<import("./types").AdminUser>(`/admin/users/${id}`, {
+      method: "PATCH", body: JSON.stringify({ is_identifier }),
+    }),
   transcribeConfig: () =>
     request<import("./types").TranscribeConfig>("/transcribe/config"),
   // Admin-only: move the route for everyone (403 otherwise).

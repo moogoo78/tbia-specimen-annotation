@@ -51,6 +51,20 @@ def _clean(name: str, value: str | None) -> str | None:
     return value
 
 
+def _require_according_to(scientific_name_id: str | None, name_according_to: str | None) -> None:
+    """A submitted determination says whose concept of the name it uses.
+
+    Picked from TaiCOL, that is TaiCOL's release (filled by the picker). Typed
+    by hand, the contributor has to say — a flora, a monograph, a checklist —
+    because a bare name with no source is the ambiguity a provider cannot
+    resolve. Drafts may leave it for later, like any other unfinished field."""
+    if not scientific_name_id and not (name_according_to or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="name_according_to is required when the name was not picked from TaiCOL",
+        )
+
+
 def _out(db: Session, i: Identification) -> dict:
     return serialize(i, public_name(db.get(User, i.contributor_id)))
 
@@ -62,6 +76,8 @@ async def create_identification(
     user: User = Depends(auth.current_user),
     db: Session = Depends(get_session),
 ):
+    if not workflow.can_identify(user):
+        raise HTTPException(status_code=403, detail="Identifier status required")
     record = await duck.query_one("SELECT dataset_name FROM occurrence WHERE id = ?", [occ_id])
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")
@@ -71,8 +87,8 @@ async def create_identification(
     values = {f: _clean(f, getattr(body, f)) for f in IDENT_FIELDS}
     if not values["scientific_name"]:
         raise HTTPException(status_code=400, detail="scientific_name is required")
-    if not values["scientific_name_id"]:
-        values["name_according_to"] = None  # provenance only travels with an id
+    if body.status == "submitted":
+        _require_according_to(values["scientific_name_id"], values["name_according_to"])
 
     ident = Identification(
         occurrence_id=occ_id,
@@ -101,12 +117,15 @@ def update_identification(
 
     # Absent = untouched; "" = clear (except the name, which a determination needs).
     sent = {f: getattr(body, f) for f in IDENT_FIELDS if getattr(body, f) is not None}
-    # A new name without a new id is a hand-typed name: the old TaiCOL id and
-    # its provenance described the previous name, so they go with it.
+    # A new name without a new id is a hand-typed name: the old TaiCOL id
+    # described the previous name, so it goes — and so does the TaiCOL citation
+    # that came with it, unless a new nameAccordingTo is sent alongside. A
+    # hand-typed row's own citation is the contributor's and is left alone.
     if ("scientific_name" in sent and "scientific_name_id" not in sent
-            and (sent["scientific_name"] or "").strip() != (ident.scientific_name or "")):
+            and (sent["scientific_name"] or "").strip() != (ident.scientific_name or "")
+            and ident.scientific_name_id):
         sent["scientific_name_id"] = ""
-        sent["name_according_to"] = ""
+        sent.setdefault("name_according_to", "")
     if sent:
         workflow.check_content_edit(ident, user)
         for f, v in sent.items():
@@ -117,6 +136,8 @@ def update_identification(
     if body.license is not None:
         workflow.apply_license(ident, body.license, user)
     if body.status is not None:
+        if body.status == "submitted":
+            _require_according_to(ident.scientific_name_id, ident.name_according_to)
         workflow.apply_status(ident, body.status, user)
 
     db.commit()

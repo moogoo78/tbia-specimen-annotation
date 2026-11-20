@@ -139,6 +139,13 @@ function MyIdentifications({ userId }: { userId: number }) {
       <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 8px" }}>
         {tr("ident.mine")} <span style={{ fontFamily: t.mono, fontWeight: 400, color: t.fgMuted }}>· {list.data?.total ?? 0}</span>
       </h3>
+      {update.isError && (
+        // e.g. a hand-typed draft submitted without nameAccordingTo: say why,
+        // and where to fix it, rather than leaving the click to do nothing.
+        <div style={{ padding: "6px 10px", marginBottom: 6, border: `1px solid ${t.danger}`, color: t.danger, fontSize: 11 }}>
+          {tr("annotate.submitFailed")} — {(update.error as Error).message}
+        </div>
+      )}
       <div style={{ background: t.panel, border: `1px solid ${t.border}`, padding: "4px 12px" }}>
         {list.isLoading ? <Spinner /> : items.map((i) => (
           <div key={i.id}>

@@ -245,7 +245,10 @@ export interface DevLoginConfig { enabled: boolean; users: DevUser[]; }
 // `display_name` is ORCID's and is refreshed from it at every sign-in;
 // `public_display_name` is the name the user chose to be published under,
 // null meaning "use the ORCID one". Only the pair's *result* is ever public.
-export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; public_display_name?: string | null; role: string; show_in_ranking?: boolean; default_license?: string; }
+export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; public_display_name?: string | null; role: string; is_identifier?: boolean; show_in_ranking?: boolean; default_license?: string; }
+
+// A user as the admin user list shows it (GET /api/admin/users).
+export interface AdminUser { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; is_identifier: boolean; }
 
 // A row of the public volunteer ranking. `name` is null unless the volunteer
 // opted in — render `Contributor #<user_id>` in that case.

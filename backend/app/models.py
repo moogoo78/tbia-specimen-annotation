@@ -74,6 +74,11 @@ class User(Base):
     # exactly as before. Only ever read through `public_name`.
     public_display_name: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="contributor")
+    # A flag beside the role, not a fourth role: an identifier may be a
+    # contributor or a reviewer. It is what lets someone record a determination
+    # (models.Identification) — transcribing a label needs no standing, saying
+    # what the specimen *is* does. Granted only by an admin (api/users.py).
+    is_identifier: Mapped[bool] = mapped_column(Boolean, default=False)
     pw_hash: Mapped[str | None] = mapped_column(String(255))
     # Opt-in to being named *anywhere the site says who contributed* — the
     # ranking, the dashboard's annotation list, a record's history, the

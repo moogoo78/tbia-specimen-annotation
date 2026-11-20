@@ -46,6 +46,12 @@ def is_reviewer(user: User) -> bool:
     return user.role in ("reviewer", "admin")
 
 
+def can_identify(user: User) -> bool:
+    """Recording a determination takes the identifier flag (admins always may).
+    Independent of the role: a contributor or a reviewer may hold it."""
+    return bool(user.is_identifier) or user.role == "admin"
+
+
 def check_content_edit(row: Any, user: User) -> None:
     """Owner may edit while still pending; reviewers may always edit."""
     owner = row.contributor_id == user.id

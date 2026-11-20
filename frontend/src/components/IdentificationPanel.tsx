@@ -66,6 +66,12 @@ export function determinationName(i: Pick<IdentificationTerms, "scientific_name"
   return [parts[0], q, ...parts.slice(1)].join(" ");
 }
 
+/** Recording a determination takes the identifier flag, beside whatever role
+ *  the user has; admins always may (backend workflow.can_identify). */
+export function canIdentify(user: { role: string; is_identifier?: boolean } | null | undefined): boolean {
+  return !!user && (!!user.is_identifier || user.role === "admin");
+}
+
 export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
   record: OccurrenceDetail;
   /** Scroll to the form and focus it (Explore's preview "Add identification"). */
@@ -115,7 +121,10 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
       scientific_name: tx ? tx.scientific_name : s.scientific_name,
       taxon_rank: tx?.taxon_rank ?? s.taxon_rank,
       scientific_name_id: tx?.scientific_name_id ?? null,
-      name_according_to: tx?.scientific_name_id ? tx.name_according_to : null,
+      // Picked: TaiCOL's citation, fixed. Unpicked: clear it only if it was
+      // TaiCOL's — a citation the contributor typed themselves stays theirs.
+      name_according_to: tx?.scientific_name_id ? tx.name_according_to
+        : s.scientific_name_id ? null : s.name_according_to,
     }));
   };
   const reset = () => { setPicked(null); setDraft(emptyDraft(user?.display_name ?? "", user?.orcid)); };
@@ -148,7 +157,12 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
 
   const isReviewer = user?.role === "reviewer" || user?.role === "admin";
   const idents = record.identifications ?? [];
-  const canSubmit = draft.scientific_name.trim() !== "" && !createMut.isPending;
+  // nameAccordingTo: TaiCOL's when the name was picked (locked), else the
+  // contributor must name a source before submitting. A draft can wait.
+  const fromTaicol = !!draft.scientific_name_id;
+  const hasAccording = fromTaicol || (draft.name_according_to ?? "").trim() !== "";
+  const canDraft = draft.scientific_name.trim() !== "" && !createMut.isPending;
+  const canSubmit = canDraft && hasAccording;
 
   return (
     <div ref={rootRef}>
@@ -167,6 +181,17 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
           <div style={{ fontSize: 12 }}>
             <Link to="/login" style={{ color: t.accent }}>{tr("ident.loginToIdentify")} →</Link>
           </div>
+        ) : !canIdentify(user) ? (
+          <div data-ident-locked style={{
+            display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 10px", fontSize: 12, lineHeight: 1.5,
+            background: t.panelAlt, border: `1px solid ${t.borderSoft}`, color: t.fgMuted,
+          }}>
+            <Icon name="user" size={12} />
+            <div>
+              <div style={{ fontWeight: 600, color: t.fg }}>{tr("ident.needsIdentifier")}</div>
+              <div style={{ fontSize: 11 }}>{tr("ident.needsIdentifierHint")}</div>
+            </div>
+          </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {createMut.isError && (
@@ -178,6 +203,18 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
             <Row label={tr("ident.scientificName")} term="scientificName" required style={{ gridColumn: "1 / -1" }}>
               <TaicolCombobox value={draft.scientific_name} onText={(v) => set("scientific_name", v)}
                 picked={picked} onPick={pick} inputStyle={inputStyle} />
+            </Row>
+            <Row label={tr("ident.nameAccordingTo")} term="nameAccordingTo" required={!fromTaicol}
+              style={{ gridColumn: "1 / -1" }}>
+              <input value={draft.name_according_to ?? ""} readOnly={fromTaicol} aria-readonly={fromTaicol}
+                onChange={(e) => set("name_according_to", e.target.value)}
+                placeholder={tr("ident.nameAccordingToHint")}
+                style={fromTaicol
+                  ? { ...inputStyle, color: t.fgMuted, background: t.borderSoft, cursor: "not-allowed", fontSize: 11 }
+                  : inputStyle} />
+              <div style={{ fontSize: 10, color: t.fgSubtle, marginTop: 3, lineHeight: 1.5 }}>
+                {fromTaicol ? tr("ident.nameAccordingToLocked") : tr("ident.nameAccordingToNeeded")}
+              </div>
             </Row>
             <div style={{ display: "flex", gap: 6, minWidth: 0 }}>
               <Row label={tr("ident.qualifier")} term="identificationQualifier" style={{ width: 96, flexShrink: 0, minWidth: 0 }}>
@@ -230,7 +267,7 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
 
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <Button primary small disabled={!canSubmit} onClick={() => createMut.mutate("submitted")}>{tr("ident.submit")}</Button>
-              <Button small disabled={!canSubmit} onClick={() => createMut.mutate("draft")}>{tr("annotate.saveDraft")}</Button>
+              <Button small disabled={!canDraft} onClick={() => createMut.mutate("draft")}>{tr("annotate.saveDraft")}</Button>
               <div style={{ flex: 1 }} />
               {/* Always-open form, so nothing to close: this resets it to the
                   prefilled "me, today" state instead. */}

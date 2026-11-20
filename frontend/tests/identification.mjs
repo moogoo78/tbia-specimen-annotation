@@ -93,6 +93,8 @@ async function main() {
       await page.fill("dateIdentified", "", 2);
       await page.fill("identificationReferences", "Moss Flora of Taiwan");
       await page.fill("identificationRemarks", MARKER);
+      // Hand-typed name: a source is required before it can be submitted.
+      await page.fill("nameAccordingTo", "Moss Flora of Taiwan (2011)");
       await page.button("Save draft");
       await sleep(1000);
       check("draft receipt shown", (await page.text()).includes("Identification saved as draft"));
@@ -123,6 +125,9 @@ async function main() {
       await page.eval(`document.querySelector('[data-work-tab="ident"]').click()`);
       await sleep(400);
       check("card reads as a det. slip", (await page.text()).includes("det. Ada Curator, 2026-11"));
+      // A reviewer without the identifier flag reviews but cannot add one.
+      check("no form without the identifier flag",
+        await page.eval(`!!document.querySelector("[data-ident-locked]") && !document.querySelector("[data-ident-panel] [role=combobox]")`));
       await page.eval(`(() => {
         const card = [...${ROOT}.querySelectorAll("div")].reverse()
           .find((d) => d.textContent.includes("Meteorium cf. buchananii") && d.textContent.includes("Accept"));
@@ -132,6 +137,17 @@ async function main() {
       const pub = await fetch(`${WEB}/api/occurrences/${occ}`).then((r) => r.json());
       const row = pub.identifications.find((i) => i.identification_remarks === MARKER);
       check("accepted", row?.status === "accepted", row?.status);
+    });
+    await test("an admin sees the identifiers on /me", async () => {
+      await page.devLogin("admin@tbia.test");
+      await page.goto("/me");
+      await sleep(1500);
+      const row = await page.eval(`(() => {
+        const box = document.querySelector("[data-identifier-admin]");
+        const l = box && [...box.querySelectorAll("label")].find((x) => x.textContent.includes("Ada Curator"));
+        return l ? l.querySelector("input").checked : null;
+      })()`);
+      check("curator listed as identifier", row === true, row);
     });
     await page.screenshot(process.env.IDENT_SHOT || "/dev/null");
   } finally {

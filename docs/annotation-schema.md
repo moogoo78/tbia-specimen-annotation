@@ -201,7 +201,7 @@ AI path into it.
 | `identification_references` | `identificationReferences` | `\|`-separated |
 | `identification_remarks` | `identificationRemarks` | |
 | `scientific_name_id` | `scientificNameID` | TaiCOL name URI `https://taicol.tw/name/{name_id}`; only when picked |
-| `name_according_to` | `nameAccordingTo` | `TaiCOL (Catalogue of Life in Taiwan), https://taicol.tw/taxon/{taxon_id}, version {updated_at}`; only with an id |
+| `name_according_to` | `nameAccordingTo` | picked from TaiCOL: `TaiCOL (Catalogue of Life in Taiwan), https://taicol.tw/taxon/{taxon_id}, version {release}`, filled and locked; typed by hand: the contributor's source (a flora, monograph, checklist), **required to submit** |
 
 `isAcceptedIdentification` and `identificationVerificationStatus` are deliberately not
 stored; a reviewer's verdict is the row's `status`.
@@ -215,7 +215,10 @@ name saves with no id.
 Picking a suggestion fills the name and rank and attaches `scientific_name_id` +
 `name_according_to`; editing the name afterwards drops them, in the form and on
 `PATCH` (a new name without a new id clears both). The server accepts only a TaiCOL
-name URI as `scientific_name_id`, and drops `name_according_to` sent without one.
+name URI as `scientific_name_id`. **A name without an id must say whose concept it
+follows**: `name_according_to` is required to submit (on create as `submitted`, and on
+`PATCH … status=submitted`), not to save a draft. Unlinking a picked name clears TaiCOL's
+citation; a citation the contributor typed is never overwritten except by a pick.
 
 - **Answered from a dated TaiCOL release.** `make seed-taicol` loads TaiCOL's taxon
   export (`TaiCOL_taxon_YYYYMMDD.csv`, newest in `data/` or `tmp/`) into the reference
@@ -267,12 +270,36 @@ request, so a change takes effect immediately.
 | Set the licence on **anyone else's** | ❌ | ❌ | ❌ |
 | Set `accepted` / `rejected` / `merged` | ❌ | ✅ | ✅ |
 | Export accepted deltas | ❌ | ✅ | ✅ |
+| Add an **identification** | identifier flag | identifier flag | ✅ |
+| Grant / withdraw the identifier flag | ❌ | ❌ | ✅ |
+
+### The identifier flag
+
+`users.is_identifier` is a **flag beside the role, not a fourth role**: a contributor or a
+reviewer may hold it, and an admin may always identify without it
+(`workflow.can_identify`). It gates exactly one act — `POST /api/occurrences/{id}/identifications`,
+403 `Identifier status required` otherwise — because transcribing what a label says needs
+no standing, while saying what the specimen *is* does. Reviewing identifications stays with
+the reviewer role, so a reviewer without the flag accepts or rejects them but cannot add one.
+
+- **Only an admin sets it**, from the *Identifiers* panel on `/me`
+  (`GET /api/admin/users?q=&identifiers=`, `PATCH /api/admin/users/{id}` with
+  `{"is_identifier": bool}`; `backend/app/api/users.py`). `PATCH /api/auth/me` does not
+  accept it. Nothing else about a user is editable there — `role` still has no surface.
+- **Off by default**, including for every user who existed before the flag (the
+  `ADD COLUMN` backfills `0`). The demo curator holds it and the demo reviewer does not.
+- **Withdrawing it stops new identifications only.** Existing rows keep their status, and
+  their owner may still edit a pending one or submit a draft under the ordinary rules.
+- The record page shows a non-identifier a note in place of the form and drops its
+  *+ Add identification* button (`canIdentify` in `IdentificationPanel.tsx`) — UI only;
+  the API is the authority.
 
 Enforced in exactly two places — `require_role("reviewer")` on export
 (`backend/app/api/export.py`) and the `is_reviewer` / `is_owner` branches of
 `PATCH /annotations/{id}` (`backend/app/api/annotations.py`), which is also
 where the licence rule above lives, as the one edit a reviewer does *not*
-inherit. Every other endpoint takes any authenticated user.
+inherit — plus the identifier flag on creating an identification, below.
+Every other endpoint takes any authenticated user.
 
 Note:
 - **`admin` grants one thing beyond `reviewer`: the AI transcription route.**
@@ -282,7 +309,7 @@ Note:
   click spends a vision call inside their own request, so it is a spending
   decision rather than a review one. `POST /occurrences/{id}/transcribe-now`
   follows from it: an admin always, everyone else exactly while that route is
-  `now`. There is still no user management and no delete.
+  `now`. Beyond the identifier flag there is no user management and no delete.
 - The frontend mirrors the single boundary with
   `isReviewer = role === "reviewer" || role === "admin"` — export button
   (`frontend/src/pages/Dashboard.tsx:35`) and the accept / reject / mark-merged

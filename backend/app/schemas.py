@@ -16,6 +16,7 @@ class UserOut(BaseModel):
     # The name the user chose to be published under; null = use `display_name`.
     public_display_name: str | None = None
     role: str
+    is_identifier: bool = False
     show_in_ranking: bool = False
     default_license: str = DEFAULT_LICENSE
 

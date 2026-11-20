@@ -23,6 +23,8 @@ BODY = {
     "date_identified": "2026-11",
     "identification_references": "Flora of Taiwan 2nd ed. | TaiCOL",
     "identification_remarks": "compared with type images",
+    # Hand-typed name (no TaiCOL id), so the contributor names the source.
+    "name_according_to": "Flora of Taiwan, 2nd ed. (2003)",
 }
 
 
@@ -67,7 +69,8 @@ def test_create_stores_every_term(client, made):
 def test_only_the_name_is_required(client, made):
     cur = auth_header(client, CURATOR)
     res = client.post(f"/api/occurrences/{OCC}/identifications", headers=cur,
-                      json={"scientific_name": "  Pocillopora  ", "identified_by": " "})
+                      json={"scientific_name": "  Pocillopora  ", "identified_by": " ",
+                            "name_according_to": "Veron 2000"})
     assert res.status_code == 200, res.text
     made.append(res.json()["id"])
     assert res.json()["scientific_name"] == "Pocillopora"
@@ -229,11 +232,30 @@ def test_only_taicol_ids_are_accepted(client, made):
     assert res.status_code == 400
 
 
-def test_provenance_without_an_id_is_dropped(client, made):
+def test_hand_typed_name_needs_name_according_to(client, made):
     cur = auth_header(client, CURATOR)
-    res = _create(client, cur, made, name_according_to=ACCORDING)
+    # Submitted without a source: refused.
+    assert _create(client, cur, made, name_according_to="").status_code == 400
+    assert _create(client, cur, made, name_according_to="   ").status_code == 400
+    # Kept as given when supplied, with no TaiCOL id.
+    res = _create(client, cur, made, name_according_to="Flora of Taiwan, 2nd ed. (2003)")
     assert res.status_code == 200
-    assert res.json()["name_according_to"] is None
+    assert res.json()["scientific_name_id"] is None
+    assert res.json()["name_according_to"] == "Flora of Taiwan, 2nd ed. (2003)"
+    # A draft may leave it for later — but cannot be submitted until it is filled.
+    did = _create(client, cur, made, name_according_to="", status="draft").json()["id"]
+    assert client.patch(f"/api/identifications/{did}", headers=cur,
+                        json={"status": "submitted"}).status_code == 400
+    res = client.patch(f"/api/identifications/{did}", headers=cur,
+                       json={"name_according_to": "Lu & Yang 2022", "status": "submitted"})
+    assert res.status_code == 200 and res.json()["status"] == "submitted"
+
+
+def test_picked_name_needs_no_hand_citation(client, made):
+    cur = auth_header(client, CURATOR)
+    res = _create(client, cur, made, scientific_name="Begonia formosana",
+                  scientific_name_id=TAICOL_ID, name_according_to=ACCORDING)
+    assert res.status_code == 200 and res.json()["name_according_to"] == ACCORDING
 
 
 def test_retyping_the_name_clears_the_taicol_id(client, made):

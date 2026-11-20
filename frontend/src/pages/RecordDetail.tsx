@@ -9,7 +9,7 @@ import type { ExtractedField, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
 import { Button, CompletenessDots, GroupTag, SourceTag, Spinner, StatusPill, WorkPanel, catalogLabel, fieldGrid } from "../components/ui";
 import { MediaGallery } from "../components/MediaGallery";
-import { IdentificationPanel, TAXON_RANK_OPTIONS } from "../components/IdentificationPanel";
+import { IdentificationPanel, TAXON_RANK_OPTIONS, canIdentify } from "../components/IdentificationPanel";
 import { LICENSES, LICENSE_LABELS, LICENSE_URIS, SHOW_LICENSE_UI, asLicense, licenseLabel } from "../licenses";
 import type { License } from "../licenses";
 import { contributorLabel, isAnonymous } from "../contributors";
@@ -127,6 +127,7 @@ export function RecordDetailView({ id, embedded, preview, onFocus, onUnfocus }: 
   id: string; embedded?: boolean; preview?: boolean;
   onFocus?: () => void; onUnfocus?: () => void;
 }) {
+  const { user } = useAuth();
   const { t: tr } = useTranslation();
   // While an AI transcription request is queued, poll so the panel flips to
   // "processed" (and the new AI annotations appear) without a manual reload —
@@ -274,13 +275,15 @@ export function RecordDetailView({ id, embedded, preview, onFocus, onUnfocus }: 
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 5, flexShrink: 0 }}>
               <FocusButton onClick={() => { setWorkTab("gaps"); onFocus(); }} />
-              <button onClick={() => { setWorkTab("ident"); setIdentIntent(true); onFocus(); }} title={tr("detail.identifyHint")} style={{
+              {/* Signed out, it leads to sign-in; signed in without the flag
+                  there is nothing to add, so no button. */}
+              {(!user || canIdentify(user)) && <button onClick={() => { setWorkTab("ident"); setIdentIntent(true); onFocus(); }} title={tr("detail.identifyHint")} style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "4px 12px",
                 background: t.panel, color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 2,
                 cursor: "pointer", fontFamily: t.sans, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
               }}>
                 + {tr("ident.add")}
-              </button>
+              </button>}
             </div>
           </div>
         );

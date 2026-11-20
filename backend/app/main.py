@@ -72,7 +72,7 @@ def _mount_routers() -> None:
     # Annotation / auth / export / collector routers are added as modules land.
     for modname in ("auth", "annotations", "contributions", "export", "collectors",
                     "volunteers", "sampling_events", "stories", "species", "reports",
-                    "taxa", "identifications", "taicol"):
+                    "taxa", "identifications", "taicol", "users"):
         try:
             mod = __import__(f"app.api.{modname}", fromlist=["router"])
             app.include_router(mod.router)
