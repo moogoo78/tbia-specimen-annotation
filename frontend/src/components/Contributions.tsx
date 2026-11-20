@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
-import { StatusPill } from "./ui";
+import { catalogLabel, StatusPill } from "./ui";
 import { licenseLabel } from "../licenses";
 import { contributorLabel, isAnonymous } from "../contributors";
 import type { Contribution } from "../api/types";
@@ -187,10 +187,10 @@ export function RecordHeading({ rows }: { rows: Contribution[] }) {
         minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         fontSize: 12, fontStyle: named ? "italic" : "normal", color: named ? t.fg : t.fgMuted,
       }}>
-        {first.scientific_name || first.catalog_number || first.occurrence_id}
+        {first.scientific_name || catalogLabel(first) || first.occurrence_id}
       </span>
-      {named && first.catalog_number && (
-        <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgSubtle }}>{first.catalog_number}</span>
+      {named && catalogLabel(first) && (
+        <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgSubtle }}>{catalogLabel(first)}</span>
       )}
       <div style={{ flex: 1 }} />
       <span style={{ fontSize: 10, color: t.fgSubtle, whiteSpace: "nowrap" }}>

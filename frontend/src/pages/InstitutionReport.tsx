@@ -7,7 +7,7 @@ import { Icon } from "../design/Icon";
 import { api, getToken } from "../api/client";
 import type { Annotation, InstitutionReport as Report, ReportFilters, ReportRecord } from "../api/types";
 import { useAuth } from "../auth";
-import { Button, SourceTag, Spinner, StatusPill } from "../components/ui";
+import { catalogLabel, Button, SourceTag, Spinner, StatusPill } from "../components/ui";
 import { MediaViewer } from "../components/MediaGallery";
 import { contributorLabel, isAnonymous } from "../contributors";
 import { licenseLabel } from "../licenses";
@@ -321,7 +321,7 @@ function RecordList({ items, total, loading, offset, selected, filters, onSelect
                 <div style={{ fontSize: 12, fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {r.scientific_name || <span style={{ fontStyle: "normal", color: t.fgSubtle }}>—</span>}
                 </div>
-                <div style={{ fontSize: 10, fontFamily: t.mono, color: t.fgMuted }}>{r.catalog_number || r.occurrence_id}</div>
+                <div style={{ fontSize: 10, fontFamily: t.mono, color: t.fgMuted }}>{catalogLabel(r) || r.occurrence_id}</div>
                 <div style={{ display: "flex", gap: 6, marginTop: 2, flexWrap: "wrap" }}>
                   {STATUSES.filter((st) => r.by_status[st] > 0).map((st) => (
                     <span key={st} style={{ fontSize: 10, color: TONE[st], fontFamily: t.mono }}>
@@ -414,7 +414,7 @@ function ReviewPane({ id, code, isReviewer, onMove }: {
     <div style={{ padding: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
         <span style={{ fontSize: 15, fontStyle: "italic", fontWeight: 600 }}>{r.scientific_name || "—"}</span>
-        <span style={{ fontSize: 11, fontFamily: t.mono, color: t.fgMuted }}>{r.catalog_number}</span>
+        <span style={{ fontSize: 11, fontFamily: t.mono, color: t.fgMuted }}>{catalogLabel(r)}</span>
         <span style={{ fontSize: 11, color: t.fgSubtle }}>{r.dataset_name}</span>
         <span style={{ flex: 1 }} />
         <Link to={`/record/${r.id}`} style={{ fontSize: 11, color: t.accent }}>{tr("report.openRecord")} →</Link>

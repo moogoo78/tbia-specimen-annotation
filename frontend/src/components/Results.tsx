@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { t } from "../design/tokens";
 import { api } from "../api/client";
 import type { OccurrenceRow } from "../api/types";
-import { CompletenessDots, GroupTag, TypeTag } from "./ui";
+import { catalogLabel, CompletenessDots, GroupTag, TypeTag } from "./ui";
 import { exploreUrl } from "../pages/exploreUrl";
 
 // Collector name as a link: resolves the raw recorded_by to a collector on click
@@ -63,7 +63,7 @@ export function TableView({ rows, activeId, onSelect }: {
             }}>
               <Cell><CompletenessDots row={r} /></Cell>
               <Cell><GroupTag group={r.bio_group} /></Cell>
-              <Cell mono>{r.catalog_number || "—"}</Cell>
+              <Cell mono>{catalogLabel(r) || "—"}</Cell>
               <Cell mono>{r.record_number || "—"}</Cell>
               <Cell><i>{r.scientific_name || "—"}</i> <span style={{ color: t.fgMuted, fontSize: 10 }}>{r.name_author}</span></Cell>
               <Cell muted>{r.common_name_c || "—"}</Cell>
@@ -111,7 +111,7 @@ export function SplitList({ rows, activeId, onSelect }: {
               <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 1 }}>
                 <GroupTag group={r.bio_group} />
                 <TypeTag value={r.type_status} />
-                <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted, marginLeft: "auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{r.catalog_number || "—"}</span>
+                <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted, marginLeft: "auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{catalogLabel(r) || "—"}</span>
               </div>
               <div style={{ fontSize: 12, lineHeight: 1.2, marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 <i style={{ fontWeight: 500 }}>{r.scientific_name || "—"}</i>
@@ -183,7 +183,7 @@ export function GridView({ rows, activeId, onSelect }: {
               <div style={{ position: "absolute", bottom: 4, right: 4 }}><CompletenessDots row={r} /></div>
             </div>
             <div style={{ padding: "4px 6px 5px", minWidth: 0 }}>
-              <div style={{ fontFamily: t.mono, fontSize: 9, color: t.fgMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.catalog_number || "—"}</div>
+              <div style={{ fontFamily: t.mono, fontSize: 9, color: t.fgMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{catalogLabel(r) || "—"}</div>
               <div style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><i>{r.scientific_name || "—"}</i></div>
               <div style={{ fontSize: 10, color: t.fgMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.common_name_c || r.family || "—"}</div>
               <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.standard_date || "—"} · {r.county || "—"}</div>

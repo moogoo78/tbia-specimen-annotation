@@ -1,6 +1,8 @@
 export interface OccurrenceRow {
   id: string;
   catalog_number: string | null;
+  /** "HAST:147549" — the citable form, built server-side (search.CATALOG_REF_EXPR). */
+  catalog_ref?: string | null;
   scientific_name: string | null;
   name_author: string | null;
   common_name_c: string | null;
@@ -153,6 +155,8 @@ export interface Annotation {
 export interface Contribution extends Annotation {
   scientific_name: string | null;
   catalog_number: string | null;
+  /** "HAST:147549" — the citable form, built server-side (search.CATALOG_REF_EXPR). */
+  catalog_ref?: string | null;
 }
 
 /** One contributor's public standing. `name` null means the name is withheld
@@ -519,6 +523,8 @@ export interface InstitutionReport {
 export interface ReportRecord {
   occurrence_id: string;
   catalog_number: string | null;
+  /** "HAST:147549" — the citable form, built server-side (search.CATALOG_REF_EXPR). */
+  catalog_ref?: string | null;
   scientific_name: string | null;
   dataset_name: string | null;
   tbia_dataset_id: string | null;

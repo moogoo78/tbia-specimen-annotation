@@ -153,7 +153,6 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
   return (
     <div ref={rootRef}>
     <WorkPanel data-ident-panel>
-        <div style={{ fontSize: 11, color: t.fgSubtle, lineHeight: 1.5 }}>{tr("ident.what")}</div>
 
         {receipt && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", background: t.accentSoft, border: `1px solid ${t.border}`, fontSize: 11 }}>
@@ -194,10 +193,6 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
                 </select>
               </Row>
             </div>
-            <Row label={tr("ident.verbatim")} term="verbatimIdentification">
-              <input value={draft.verbatim_identification ?? ""} onChange={(e) => set("verbatim_identification", e.target.value)}
-                placeholder={tr("ident.verbatimHint")} style={inputStyle} />
-            </Row>
             <Row label={tr("ident.identifiedBy")} term="identifiedBy">
               <input value={draft.identified_by ?? ""} onChange={(e) => set("identified_by", e.target.value)} style={inputStyle} />
             </Row>
@@ -285,9 +280,6 @@ export function IdentificationCard({ i, isReviewer, userId, onUpdate }: {
           <a href={i.scientific_name_id} target="_blank" rel="noreferrer noopener" style={{ color: t.accent }}>TaiCOL ↗</a>
           {i.name_according_to && <span title="nameAccordingTo"> · {i.name_according_to.replace(/^TaiCOL \(Catalogue of Life in Taiwan\), /, "")}</span>}
         </div>
-      )}
-      {i.verbatim_identification && (
-        <div style={{ color: t.fgSubtle, fontSize: 10 }}>{tr("ident.verbatim")}: “{i.verbatim_identification}”</div>
       )}
       {i.identification_references && (
         <div style={{ color: t.fgSubtle, fontSize: 10 }}>{tr("ident.references")}: {i.identification_references}</div>

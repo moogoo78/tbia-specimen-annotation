@@ -21,6 +21,7 @@ from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from . import duck
+from .search import CATALOG_REF_COL
 from .models import Annotation
 
 #: Reviewed into the provider export. "Accepted" on screen means both.
@@ -106,12 +107,14 @@ async def attach_records(rows: list[dict[str, Any]]) -> None:
     for r in rows:
         r["scientific_name"] = None
         r["catalog_number"] = None
+        r["catalog_ref"] = None
     ids = sorted({r["occurrence_id"] for r in rows if r.get("occurrence_id")})
     if not ids:
         return
     placeholders = ", ".join(["?"] * len(ids))
     found = await duck.query(
-        f"SELECT id, scientific_name, catalog_number FROM occurrence WHERE id IN ({placeholders})",
+        f"SELECT id, scientific_name, catalog_number, {CATALOG_REF_COL} "
+        f"FROM occurrence WHERE id IN ({placeholders})",
         list(ids),
     )
     by_id = {o["id"]: o for o in found}
@@ -120,3 +123,4 @@ async def attach_records(rows: list[dict[str, Any]]) -> None:
         if o:
             r["scientific_name"] = o["scientific_name"]
             r["catalog_number"] = o["catalog_number"]
+            r["catalog_ref"] = o["catalog_ref"]

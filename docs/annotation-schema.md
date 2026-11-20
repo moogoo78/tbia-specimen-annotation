@@ -194,7 +194,7 @@ AI path into it.
 | `scientific_name` | `scientificName` | **required** |
 | `taxon_rank` | `taxonRank` | same rank list as the form |
 | `identification_qualifier` | `identificationQualifier` | `cf.`, `aff.`, `sp.`, … (free text) |
-| `verbatim_identification` | `verbatimIdentification` | the name as written |
+| `verbatim_identification` | `verbatimIdentification` | not offered in the form (the column and API field remain) |
 | `identified_by` | `identifiedBy` | UI prefills the signed-in ORCID name; editable |
 | `identified_by_id` | `identifiedByID` | UI prefills `https://orcid.org/<iD>`; editable |
 | `date_identified` | `dateIdentified` | ISO 8601: `YYYY`, `YYYY-MM`, `YYYY-MM-DD`, or an interval `a/b`; anything else is a 400 |

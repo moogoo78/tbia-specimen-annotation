@@ -7,7 +7,7 @@ import { Icon } from "../design/Icon";
 import { api } from "../api/client";
 import type { ExtractedField, OccurrenceDetail } from "../api/types";
 import { useAuth } from "../auth";
-import { Button, CompletenessDots, GroupTag, SourceTag, Spinner, StatusPill, WorkPanel, fieldGrid } from "../components/ui";
+import { Button, CompletenessDots, GroupTag, SourceTag, Spinner, StatusPill, WorkPanel, catalogLabel, fieldGrid } from "../components/ui";
 import { MediaGallery } from "../components/MediaGallery";
 import { IdentificationPanel, TAXON_RANK_OPTIONS } from "../components/IdentificationPanel";
 import { LICENSES, LICENSE_LABELS, LICENSE_URIS, SHOW_LICENSE_UI, asLicense, licenseLabel } from "../licenses";
@@ -205,7 +205,7 @@ export function RecordDetailView({ id, embedded, preview, onFocus, onUnfocus }: 
             <GroupTag group={r.bio_group} />
             <span style={{ fontFamily: t.mono, fontSize: 11, color: t.fgMuted, fontWeight: 600 }}
               title={enrich["catalogNumber"] ? `${tr("detail.wasValue")} ${r.catalog_number || "∅"}` : undefined}>
-              {enrich["catalogNumber"]?.proposed_value || r.catalog_number}
+              {enrich["catalogNumber"]?.proposed_value || catalogLabel(r)}
             </span>
             <CompletenessDots row={r} size={8} />
             <span style={{ flex: 1 }} />
@@ -359,13 +359,60 @@ function WorkTabs({ tab, onTab, nGaps, nIdent }: {
       </button>
     );
   };
+  // What the selected task is for, said where the eye lands first — right under
+  // its tab, not as fine print inside the form. The two tasks are easy to mix up
+  // (both can end in a scientific name), so each says what it is *not* as well.
+  const intro = tab === "gaps"
+    ? { icon: "spark" as const, title: tr("annotate.introTitle"), text: tr("annotate.introText") }
+    : { icon: "check" as const, title: tr("ident.introTitle"), text: tr("ident.introText") };
+  // Read once, then it is just space: each intro can be hidden, per tab, and
+  // that is remembered in this browser only (a convenience, not a setting).
+  // The ⓘ on the tab bar brings it back.
+  const [hidden, setHidden] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(INTRO_KEY) || "{}"); } catch { return {}; }
+  });
+  const setHide = (key: string, v: boolean) => setHidden((h) => {
+    const next = { ...h, [key]: v };
+    try { localStorage.setItem(INTRO_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+    return next;
+  });
+  const isHidden = !!hidden[tab];
   return (
-    <div role="tablist" style={{ display: "flex", border: `1px solid ${t.borderSoft}`, background: t.panelAlt }}>
-      {item("gaps", "spark", tr("annotate.title"), nGaps)}
-      {item("ident", "check", tr("ident.title"), nIdent)}
+    <div style={{ border: `1px solid ${t.borderSoft}` }}>
+      <div role="tablist" style={{ display: "flex", background: t.panelAlt }}>
+        {item("gaps", "spark", tr("annotate.title"), nGaps)}
+        {item("ident", "check", tr("ident.title"), nIdent)}
+        {isHidden && (
+          <button onClick={() => setHide(tab, false)} title={tr("detail.introShow")} aria-label={tr("detail.introShow")}
+            data-intro-show style={{
+              flexShrink: 0, width: 32, border: "none", borderLeft: `1px solid ${t.borderSoft}`,
+              background: "transparent", color: t.accent, cursor: "pointer", fontSize: 14, fontFamily: t.sans,
+            }}>ⓘ</button>
+        )}
+      </div>
+      {!isHidden && <div data-work-intro={tab} style={{
+        display: "flex", gap: 10, padding: "11px 14px", background: t.accentSoft,
+        borderLeft: `3px solid ${t.accent}`,
+      }}>
+        <span style={{ color: t.accent, marginTop: 2, flexShrink: 0 }}><Icon name={intro.icon} size={15} /></span>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: t.fg, marginBottom: 3 }}>{intro.title}</div>
+          <div style={{ fontSize: 12, color: t.fgMuted, lineHeight: 1.6 }}>{intro.text}</div>
+        </div>
+        <button onClick={() => setHide(tab, true)} title={tr("detail.introHide")} aria-label={tr("detail.introHide")}
+          data-intro-hide style={{
+            alignSelf: "flex-start", flexShrink: 0, display: "flex", alignItems: "center", gap: 3,
+            border: "none", background: "transparent", color: t.fgMuted, cursor: "pointer",
+            fontFamily: t.sans, fontSize: 11, padding: "2px 0",
+          }}>
+          <Icon name="x" size={10} />{tr("detail.introHideShort")}
+        </button>
+      </div>}
     </div>
   );
 }
+
+const INTRO_KEY = "tbia_work_intro_hidden";
 
 /** The way from Explore's preview into annotating: accent-filled, not the
  *  neutral dark of a form's submit, because it is the page's call to action. */
@@ -388,8 +435,10 @@ function FocusButton({ onClick }: { onClick: () => void }) {
 function SourceLinks({ id, references }: { id: string; references?: string | null }) {
   const { t: tr, i18n } = useTranslation();
   const tbia = `https://tbiadata.tw/${i18n.language === "en" ? "en-us" : "zh-hant"}/occurrence/${encodeURIComponent(id)}/`;
-  // Provider data: only an http(s) URL becomes a link, and it is labelled with
-  // its host so it is plain where the click goes.
+  // Provider data (DwC `references`): only an http(s) URL becomes a link. It is
+  // labelled by what it is — the record's reference at its source — rather than
+  // by its host, which is often a resolver (n2t.net) or a mirror (gbif.org) and
+  // says little; the host stays in the tooltip so the destination is still plain.
   let ref: URL | null = null;
   try {
     const u = references ? new URL(references.trim()) : null;
@@ -402,9 +451,9 @@ function SourceLinks({ id, references }: { id: string; references?: string | nul
         TBIA ↗
       </a>
       {ref && (
-        <a href={ref.href} target="_blank" rel="noreferrer noopener" title={tr("detail.viewAtSource")}
-          style={a}>
-          {ref.hostname.replace(/^www\./, "")} ↗
+        <a href={ref.href} target="_blank" rel="noreferrer noopener"
+          title={`${tr("detail.viewAtSource")} (${ref.hostname.replace(/^www\./, "")})`} style={a}>
+          {tr("detail.sourceLink")} ↗
         </a>
       )}
     </div>

@@ -22,6 +22,36 @@ TABLE = "occurrence"
 DATE_EXPR = "CAST(standard_date AS DATE)"
 DATE_COL = f"{DATE_EXPR} AS standard_date"
 
+# The catalog number as people cite it: "HAST:147549", "TAI:53", "TNM:S092141".
+# One definition, in SQL, so every surface (list rows, the record, reports,
+# contributions) prints the same reference — and it is the form the catalog
+# lookup (`parse_catalog_refs`) reads back. The code is the collection's own
+# acronym (`dataset_code`) when it is one, else TBIA's partner code
+# (`institution_code`); GBIF mirrors have neither per row, unless registry.json
+# gives the dataset a `code`. No prefix when the number already carries one
+# ("TAIMH001396", "NMMB-P042102", "USNM 1339863"). `catalog_number` itself is
+# left as the provider ships it — the export sends that, not this.
+_ACRONYM = "'[A-Za-z][A-Za-z0-9-]{0,15}'"
+
+
+def catalog_ref_expr(t: str = "") -> str:
+    """The expression, with columns qualified by `t` ("o.") for a joined query."""
+    code = f"""(CASE
+  WHEN regexp_full_match(coalesce({t}dataset_code, ''), {_ACRONYM}) THEN {t}dataset_code
+  WHEN coalesce({t}institution_code, '') NOT IN ('GBIF', 'OTHER')
+   AND regexp_full_match(coalesce({t}institution_code, ''), {_ACRONYM}) THEN {t}institution_code
+END)"""
+    return f"""(CASE
+  WHEN nullif(trim({t}catalog_number), '') IS NULL THEN NULL
+  WHEN {code} IS NULL
+    OR starts_with(upper({t}catalog_number), upper({code}))
+    OR regexp_matches({t}catalog_number, '^[A-Za-z]{{2,}}[-:. ]') THEN {t}catalog_number
+  ELSE {code} || ':' || {t}catalog_number END)"""
+
+
+CATALOG_REF_EXPR = catalog_ref_expr()
+CATALOG_REF_COL = f"{CATALOG_REF_EXPR} AS catalog_ref"
+
 # Columns returned in list/grid/table rows (kept lean for ~1.8M-row scans).
 LIST_COLUMNS = [
     "id", "catalog_number", "scientific_name", "name_author", "common_name_c",
@@ -29,7 +59,7 @@ LIST_COLUMNS = [
     "standard_latitude", "standard_longitude", DATE_COL, "year", "type_status",
     "dataset_name", "institution_code", "institution_name", "recorded_by", "record_number",
     "has_coordinates", "has_date", "has_identification", "has_media",
-    "completeness_score", "associated_media",
+    "completeness_score", "associated_media", CATALOG_REF_COL,
 ]
 
 # Free-text search target columns (substring/ILIKE; CJK + Latin).
@@ -469,7 +499,7 @@ async def facets(f: Filters, *, top: int = 20) -> dict:
 
 async def get_detail(occ_id: str) -> dict | None:
     row = await duck.query_one(
-        f"SELECT * REPLACE ({DATE_EXPR} AS standard_date) FROM {TABLE} WHERE id = ?",
+        f"SELECT * REPLACE ({DATE_EXPR} AS standard_date), {CATALOG_REF_COL} FROM {TABLE} WHERE id = ?",
         [occ_id],
     )
     if row is None:

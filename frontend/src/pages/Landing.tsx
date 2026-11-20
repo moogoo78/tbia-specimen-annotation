@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
 import { Icon } from "../design/Icon";
 import { api } from "../api/client";
-import { GroupTag, TypeTag } from "../components/ui";
+import { catalogLabel, GroupTag, TypeTag } from "../components/ui";
 import { emptyFilters, type Filters, type OccurrenceRow } from "../api/types";
 import { exploreUrl } from "./exploreUrl";
 
@@ -286,7 +286,7 @@ function QueueCard({ draw, hover, onHover }: {
           )}
         </div>
         <div style={{ fontFamily: t.mono, fontSize: 10, color: t.fgSubtle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {r.catalog_number || "—"}
+          {catalogLabel(r) || "—"}
         </div>
         <div style={{ fontSize: 15, lineHeight: 1.2 }}>
           {/* The identification queue draws rows that have no name yet — say so

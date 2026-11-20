@@ -158,3 +158,10 @@ export function WorkPanel({ title, icon, count, children, ...rest }: {
 export const fieldGrid: React.CSSProperties = {
   display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", columnGap: 14, rowGap: 8,
 };
+
+/** The catalog number as people cite it ("HAST:147549"), falling back to the
+ *  provider's own value. The rule lives server-side (`search.CATALOG_REF_EXPR`);
+ *  this only picks which field to print. */
+export function catalogLabel(r: { catalog_ref?: string | null; catalog_number?: string | null }): string | null {
+  return r.catalog_ref || r.catalog_number || null;
+}

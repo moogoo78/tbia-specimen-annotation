@@ -34,7 +34,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy import select
 
-from .. import auth, duck
+from .. import auth, duck, search
 from ..db import SessionLocal
 from ..models import LICENSE_URIS, STATUSES, Annotation, User, public_name
 from ..search import parse_media
@@ -93,7 +93,8 @@ async def _rows_federated(dataset_ids: list[str] | None) -> list[dict[str, Any]]
     extra = ", ".join(f"a.{c}" for c in _ANN_EXTRA)
     return await duck.query(
         f"""SELECT a.id, a.occurrence_id, a.field, a.status, a.contributor_id,
-                   a.modified, {extra}, {occ}, o.{_SOURCE_ID}
+                   a.modified, {extra}, {occ}, o.{_SOURCE_ID},
+                   {search.catalog_ref_expr("o.")} AS catalog_ref
             FROM ann.annotations a JOIN occurrence o ON o.id = a.occurrence_id
             WHERE {where}""",
         params,
@@ -113,7 +114,7 @@ async def _rows_python(dataset_ids: list[str] | None) -> list[dict[str, Any]]:
     if not ids:
         return []
     found = await duck.query(
-        f"SELECT id, {', '.join(_OCC_COLS)}, {_SOURCE_ID} FROM occurrence "
+        f"SELECT id, {', '.join(_OCC_COLS)}, {_SOURCE_ID}, {search.CATALOG_REF_COL} FROM occurrence "
         f"WHERE id IN ({', '.join(['?'] * len(ids))})",
         ids,
     )
@@ -126,7 +127,7 @@ async def _rows_python(dataset_ids: list[str] | None) -> list[dict[str, Any]]:
         # holds belongs to no institution.
         if o is None or (wanted is not None and o["tbia_dataset_id"] not in wanted):
             continue
-        out.append({**r, **{c: o[c] for c in (*_OCC_COLS, "source_occurrence_id")}})
+        out.append({**r, **{c: o[c] for c in (*_OCC_COLS, "source_occurrence_id", "catalog_ref")}})
     return out
 
 
@@ -277,6 +278,7 @@ async def report_records(
         items.append({
             "occurrence_id": occ_id,
             "catalog_number": head["catalog_number"],
+            "catalog_ref": head.get("catalog_ref"),
             "scientific_name": head["scientific_name"],
             "dataset_name": head["dataset_name"],
             "tbia_dataset_id": head["tbia_dataset_id"],
