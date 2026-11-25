@@ -91,6 +91,9 @@ class User(Base):
     # submitted with until its contributor changes it there.
     default_license: Mapped[str] = mapped_column(String(32), default=DEFAULT_LICENSE)
     created: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    # Stamped on each sign-in (ORCID callback, dev login). Null until the first
+    # one after the column existed. Shown to admins only (api/users.py).
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     annotations: Mapped[list["Annotation"]] = relationship(
         back_populates="contributor", foreign_keys="Annotation.contributor_id"

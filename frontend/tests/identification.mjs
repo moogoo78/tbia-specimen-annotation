@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The record page's Identification panel, driven in the real page: open the
- * form, fill the DwC terms, save a draft, submit it, and have a reviewer accept
+ * form, fill the DwC terms, submit it (there are no drafts), and have a reviewer accept
  * it — checking at each step what the public record and /me show.
  *
  * It **changes data** (it creates identifications), so it runs only with
@@ -76,7 +76,7 @@ async function main() {
   await page.eval(`localStorage.setItem("tbia_lang", "en")`);
   let occ;
   try {
-    await test("a contributor saves a draft identification", async () => {
+    await test("a contributor submits an identification", async () => {
       if (!(await page.devLogin("curator@tbia.test"))) { check("dev login is off — skipped", true); return; }
       const res = await page.api("/api/occurrences?limit=1&missing_identification=true");
       occ = res.items[0].id;
@@ -95,22 +95,10 @@ async function main() {
       await page.fill("identificationRemarks", MARKER);
       // Hand-typed name: a source is required before it can be submitted.
       await page.fill("nameAccordingTo", "Moss Flora of Taiwan (2011)");
-      await page.button("Save draft");
-      await sleep(1000);
-      check("draft receipt shown", (await page.text()).includes("Identification saved as draft"));
-      const pub = await fetch(`${WEB}/api/occurrences/${occ}`).then((r) => r.json());
-      check("draft is not on the public record",
-        !pub.identifications.some((i) => i.identification_remarks === MARKER));
-    });
-
-    await test("the draft is on /me and submits from there", async () => {
-      if (!occ) return;
-      await page.goto("/me");
-      await sleep(1500);
-      const t = await page.text();
-      check("listed under Your identifications", t.includes("Your identifications") && t.includes("Meteorium cf. buchananii"));
+      check("no draft button", !(await page.eval(`[...${ROOT}.querySelectorAll("button")].some((b) => b.textContent.trim() === "Save draft")`)));
       await page.button("Submit identification");
-      await sleep(800);
+      await sleep(1000);
+      check("submit receipt shown", (await page.text()).includes("Identification submitted"));
       const pub = await fetch(`${WEB}/api/occurrences/${occ}`).then((r) => r.json());
       const row = pub.identifications.find((i) => i.identification_remarks === MARKER);
       check("submitted row is public", row?.status === "submitted", row?.status);
@@ -138,16 +126,29 @@ async function main() {
       const row = pub.identifications.find((i) => i.identification_remarks === MARKER);
       check("accepted", row?.status === "accepted", row?.status);
     });
-    await test("an admin sees the identifiers on /me", async () => {
+    await test("an admin manages identifiers on /admin/users", async () => {
       await page.devLogin("admin@tbia.test");
       await page.goto("/me");
+      await sleep(1200);
+      check("/me links to the users page", await page.eval(`!!document.querySelector('[data-identifier-admin][href="/admin/users"]')`));
+      await page.goto("/admin/users");
       await sleep(1500);
-      const row = await page.eval(`(() => {
-        const box = document.querySelector("[data-identifier-admin]");
-        const l = box && [...box.querySelectorAll("label")].find((x) => x.textContent.includes("Ada Curator"));
-        return l ? l.querySelector("input").checked : null;
-      })()`);
-      check("curator listed as identifier", row === true, row);
+      const rowOf = (name) => `[...document.querySelectorAll("[data-user-row]")].find((r) => r.textContent.includes(${JSON.stringify(name)}))`;
+      check("curator ticked", await page.eval(`${rowOf("Ada Curator")}?.querySelector("[data-identifier-toggle]").checked`) === true);
+      const counts = await page.eval(`${rowOf("Ada Curator")}?.children[4].textContent`);
+      check("curator's identification counted", /\b[1-9]/.test(counts || ""), counts);
+      // Grant to the reviewer, see the record page open the form, then take it back.
+      await page.eval(`${rowOf("Rex Reviewer")}.querySelector("[data-identifier-toggle]").click()`);
+      await sleep(800);
+      check("reviewer granted", await page.eval(`${rowOf("Rex Reviewer")}.querySelector("[data-identifier-toggle]").checked`) === true);
+      await page.eval(`${rowOf("Ada Curator")}.click()`);
+      await sleep(1000);
+      const detail = await page.eval(`document.querySelector("[data-user-detail]")?.textContent || ""`);
+      check("detail opens with the user's facts", detail.includes("Ada Curator") && detail.includes("Recent identifications"));
+      check("selection is in the URL", (await page.eval("location.search")).includes("u="));
+      await page.eval(`${rowOf("Rex Reviewer")}.querySelector("[data-identifier-toggle]").click()`);
+      await sleep(800);
+      check("reviewer withdrawn", await page.eval(`${rowOf("Rex Reviewer")}.querySelector("[data-identifier-toggle]").checked`) === false);
     });
     await page.screenshot(process.env.IDENT_SHOT || "/dev/null");
   } finally {

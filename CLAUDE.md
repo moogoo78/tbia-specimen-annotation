@@ -26,7 +26,7 @@ Occurrence data is **read-only**; enrichment lives only as annotations. Hence tw
     row per DwC determination (not per field); its workflow rules are shared with
     annotations through `app/workflow.py` — see *Identifications* in `docs/annotation-schema.md`.
     Creating one takes `users.is_identifier`, a flag beside the role (contributor or reviewer
-    may hold it; admins always may), set only by an admin on `/me` — see *The identifier flag*.
+    may hold it; admins always may), set only by an admin on `/admin/users` — see *The identifier flag*.
   - `data/reference.sqlite` — `collectors`, `collector_alias`, `sampling_event`,
     `sampling_event_actor`, `taicol_taxon`, `taicol_release` (`RefBase` /
     `RefSessionLocal`). ~30 MB (TaiCOL is most of it), and every row is

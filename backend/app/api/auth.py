@@ -13,6 +13,8 @@ The ORCID client secret stays server-side; the browser never sees it.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -92,6 +94,7 @@ def _upsert_orcid_user(db: Session, orcid_id: str, name: str) -> User:
         db.add(user)
     elif name and user.display_name != name:
         user.display_name = name  # keep the name fresh from ORCID
+    user.last_login_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
     return user
@@ -189,4 +192,7 @@ def dev_login(body: DevLoginRequest, db: Session = Depends(get_session)):
     ).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="Unknown dev user")
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
     return TokenResponse(access_token=auth.create_token(user), user=UserOut.model_validate(user))

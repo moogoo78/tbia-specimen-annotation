@@ -129,7 +129,7 @@ class IdentificationFields(BaseModel):
 
 class IdentificationCreate(IdentificationFields):
     scientific_name: str  # required on create
-    status: str = "submitted"
+    status: str = "submitted"  # the only value: identifications have no drafts
     license: str | None = None  # absent -> the contributor's default
 
 

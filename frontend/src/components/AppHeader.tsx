@@ -265,6 +265,7 @@ function UserMenu({ open, onOpen }: { open: boolean; onOpen: (id: string | null)
             <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: t.mono, textTransform: "uppercase" }}>{user.role}</div>
           </div>
           <Link to="/me" role="menuitem" style={item}>{tr("nav.myContributions")}</Link>
+          {user.role === "admin" && <Link to="/admin/users" role="menuitem" style={item}>{tr("nav.adminUsers")}</Link>}
           <button
             onClick={() => { onOpen(null); logout(); }} role="menuitem"
             style={{ ...item, width: "100%", background: "transparent", border: "none", cursor: "pointer", fontFamily: t.sans }}

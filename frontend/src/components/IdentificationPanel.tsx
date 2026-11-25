@@ -81,7 +81,7 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(user?.display_name ?? "", user?.orcid));
-  const [receipt, setReceipt] = useState<"draft" | "submitted" | null>(null);
+  const [receipt, setReceipt] = useState(false);
   const [license, setLicense] = useState<License>(() => asLicense(user?.default_license));
   const touchedLicense = useRef(false);
   const profileLicense = asLicense(user?.default_license);
@@ -99,7 +99,7 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!autoOpen) return;
-    setReceipt(null);
+    setReceipt(false);
     // After the form has rendered, so the scroll lands on its full height.
     requestAnimationFrame(() => {
       // The work column's top, so its tabs stay in view above the form.
@@ -110,7 +110,7 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
   }, [autoOpen, onAutoOpened]);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["detail", record.id] });
-  const set = (k: keyof Draft, v: string) => { setReceipt(null); setDraft((s) => ({ ...s, [k]: v })); };
+  const set = (k: keyof Draft, v: string) => { setReceipt(false); setDraft((s) => ({ ...s, [k]: v })); };
   // The TaiCOL record behind the name, when it was picked rather than typed.
   // Its two DwC terms ride in the draft; the rest is only shown under the field.
   const [picked, setPicked] = useState<TaicolTaxon | null>(null);
@@ -130,20 +130,21 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
   const reset = () => { setPicked(null); setDraft(emptyDraft(user?.display_name ?? "", user?.orcid)); };
 
   const createMut = useMutation({
-    mutationFn: (status: "draft" | "submitted") => {
+    // No drafts: a determination is submitted in one go (backend api/identifications.py).
+    mutationFn: () => {
       const { y, mo, d, identified_by_id: _ignored, ...terms } = draft;
       // identifiedByID is not asked for: it is the signed-in contributor's
       // ORCID iD, sent only while "Identified by" still names them. Recording
       // someone else's determination must not carry *our* iD as theirs.
       const mine = user && (terms.identified_by ?? "").trim() === user.display_name.trim();
       return api.createIdentification(String(record.id), {
-        ...terms, date_identified: isoDate(y, mo, d), status,
+        ...terms, date_identified: isoDate(y, mo, d), status: "submitted",
         identified_by_id: mine && user.orcid ? `https://orcid.org/${user.orcid}` : null,
         ...(SHOW_LICENSE_UI ? { license } : {}),
       });
     },
-    onSuccess: (_res, status) => {
-      setReceipt(status);
+    onSuccess: () => {
+      setReceipt(true);
       reset();
       refresh();
       qc.invalidateQueries({ queryKey: ["myIdentifications"] });
@@ -158,11 +159,10 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
   const isReviewer = user?.role === "reviewer" || user?.role === "admin";
   const idents = record.identifications ?? [];
   // nameAccordingTo: TaiCOL's when the name was picked (locked), else the
-  // contributor must name a source before submitting. A draft can wait.
+  // contributor must name a source before submitting.
   const fromTaicol = !!draft.scientific_name_id;
   const hasAccording = fromTaicol || (draft.name_according_to ?? "").trim() !== "";
-  const canDraft = draft.scientific_name.trim() !== "" && !createMut.isPending;
-  const canSubmit = canDraft && hasAccording;
+  const canSubmit = draft.scientific_name.trim() !== "" && hasAccording && !createMut.isPending;
 
   return (
     <div ref={rootRef}>
@@ -171,7 +171,7 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
         {receipt && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", background: t.accentSoft, border: `1px solid ${t.border}`, fontSize: 11 }}>
             <Icon name="check" size={12} />
-            <span>{tr(receipt === "draft" ? "ident.draftSaved" : "ident.submitted")}</span>
+            <span>{tr("ident.submitted")}</span>
             <div style={{ flex: 1 }} />
             <Link to="/me" style={{ color: t.accent, textDecoration: "none", whiteSpace: "nowrap" }}>{tr("annotate.seeMine")} →</Link>
           </div>
@@ -266,12 +266,11 @@ export function IdentificationPanel({ record, autoOpen, onAutoOpened }: {
             )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <Button primary small disabled={!canSubmit} onClick={() => createMut.mutate("submitted")}>{tr("ident.submit")}</Button>
-              <Button small disabled={!canDraft} onClick={() => createMut.mutate("draft")}>{tr("annotate.saveDraft")}</Button>
+              <Button primary small disabled={!canSubmit} onClick={() => createMut.mutate()}>{tr("ident.submit")}</Button>
               <div style={{ flex: 1 }} />
               {/* Always-open form, so nothing to close: this resets it to the
                   prefilled "me, today" state instead. */}
-              <Button small onClick={() => { setReceipt(null); reset(); }}>{tr("ident.clear")}</Button>
+              <Button small onClick={() => { setReceipt(false); reset(); }}>{tr("ident.clear")}</Button>
             </div>
           </div>
         )}

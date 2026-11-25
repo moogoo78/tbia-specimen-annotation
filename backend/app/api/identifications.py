@@ -1,8 +1,11 @@
 """Identifications: a person's determination of a specimen (DwC Identification).
 
 Not transcription — nothing here reads a label or calls a model. Same workflow
-as an annotation (`app/workflow.py`): created as draft/submitted, reviewed to
-accepted/rejected/merged, licensed per row by its contributor alone.
+as an annotation (`app/workflow.py`) except that there are **no drafts**: an
+identification is created submitted, reviewed to accepted/rejected/merged, and
+licensed per row by its contributor alone. A determination is a short, complete
+statement made in one sitting — a half-finished one has nothing to wait for.
+Rows saved as drafts before that rule can still be submitted (PATCH status).
 """
 
 from __future__ import annotations
@@ -52,12 +55,12 @@ def _clean(name: str, value: str | None) -> str | None:
 
 
 def _require_according_to(scientific_name_id: str | None, name_according_to: str | None) -> None:
-    """A submitted determination says whose concept of the name it uses.
+    """A determination says whose concept of the name it uses.
 
     Picked from TaiCOL, that is TaiCOL's release (filled by the picker). Typed
     by hand, the contributor has to say — a flora, a monograph, a checklist —
     because a bare name with no source is the ambiguity a provider cannot
-    resolve. Drafts may leave it for later, like any other unfinished field."""
+    resolve."""
     if not scientific_name_id and not (name_according_to or "").strip():
         raise HTTPException(
             status_code=400,
@@ -81,14 +84,14 @@ async def create_identification(
     record = await duck.query_one("SELECT dataset_name FROM occurrence WHERE id = ?", [occ_id])
     if record is None:
         raise HTTPException(status_code=404, detail="Occurrence not found")
-    workflow.check_create_status(body.status)
+    if body.status != "submitted":
+        raise HTTPException(status_code=400, detail="identifications are submitted directly; there are no drafts")
     license = workflow.resolve_license(body.license, user)
 
     values = {f: _clean(f, getattr(body, f)) for f in IDENT_FIELDS}
     if not values["scientific_name"]:
         raise HTTPException(status_code=400, detail="scientific_name is required")
-    if body.status == "submitted":
-        _require_according_to(values["scientific_name_id"], values["name_according_to"])
+    _require_according_to(values["scientific_name_id"], values["name_according_to"])
 
     ident = Identification(
         occurrence_id=occ_id,

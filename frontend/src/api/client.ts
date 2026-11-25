@@ -259,14 +259,17 @@ export const api = {
       method: "POST", body: JSON.stringify({ raw }),
     }),
   // Admin-only: users and their identifier flag (backend api/users.py).
-  adminUsers: (p: { q?: string; identifiers?: boolean; limit?: number; offset?: number } = {}) => {
+  adminUsers: (p: { q?: string; identifiers?: boolean; role?: string; sort?: string; limit?: number; offset?: number } = {}) => {
     const qs = new URLSearchParams();
     if (p.q) qs.set("q", p.q);
     if (p.identifiers) qs.set("identifiers", "true");
+    if (p.role) qs.set("role", p.role);
+    if (p.sort) qs.set("sort", p.sort);
     if (p.limit) qs.set("limit", String(p.limit));
     if (p.offset) qs.set("offset", String(p.offset));
     return request<{ total: number; items: import("./types").AdminUser[] }>(`/admin/users?${qs}`);
   },
+  adminUser: (id: number) => request<import("./types").AdminUserDetail>(`/admin/users/${id}`),
   setIdentifier: (id: number, is_identifier: boolean) =>
     request<import("./types").AdminUser>(`/admin/users/${id}`, {
       method: "PATCH", body: JSON.stringify({ is_identifier }),

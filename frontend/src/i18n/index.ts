@@ -13,7 +13,7 @@ const en = {
   },
   // `data` and `participate` label the two dropdown groups in the header; the
   // rest are the destinations inside them.
-  nav: { home: "Home", browse: "Browse", explore: "Explore", data: "Data", participate: "Take part", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", myContributions: "My contributions", guide: "Guide", login: "Sign in", logout: "Sign out" },
+  nav: { home: "Home", browse: "Browse", explore: "Explore", data: "Data", participate: "Take part", species: "Species", institutions: "Institutions", collectors: "Collectors", story: "Data stories", history: "Survey history", volunteers: "Contributors", myContributions: "My contributions", adminUsers: "Users (admin)", guide: "Guide", login: "Sign in", logout: "Sign out" },
   story: {
     title: "Data stories",
     blurb: "Topics that read the collection as a narrative rather than a result set: who went where, when, and what of it can still be found in the store today. Each topic works from a published source and queries the specimen data live.",
@@ -271,6 +271,18 @@ const en = {
     focus: "Annotate", focusHint: "Hide the list and open the annotation and identification panels for this record",
     unfocus: "Back to list", unfocusHint: "Show the result list again (preview without the annotation panels)",
   },
+  admin: {
+    usersTitle: "Users", adminOnly: "This page is for admins.",
+    usersBlurb: "Every user, what they have contributed, and who may add identifications. Counts are accepted / all submitted (drafts excluded). Roles are shown, not edited here.",
+    usersCard: "Every user, their contributions, and the identifier flag.",
+    allRoles: "All roles", onlyIdentifiers: "Identifiers only",
+    colUser: "User", colRole: "Role", colIdentifier: "Identifier", colAnnotations: "Annotations",
+    colIdentifications: "Identifications", colJoined: "Joined", colLastLogin: "Last sign-in",
+    email: "Email", publicName: "Published as", notPublished: "Not published (opted out)",
+    yes: "yes", no: "no", close: "Close",
+    draftsCounted: "Drafts are counted but never shown: they are private to their author.",
+    publicPage: "Public contributor page", recentIdentifications: "Recent identifications",
+  },
   ident: {
     title: "Identifications",
     introTitle: "Your own identification of this specimen",
@@ -298,7 +310,7 @@ const en = {
     references: "References", referencesHint: "Floras, keys or papers used, separated by |",
     remarks: "Remarks",
     submit: "Submit identification", clear: "Clear",
-    submitted: "Identification submitted", draftSaved: "Identification saved as draft",
+    submitted: "Identification submitted",
     history: "Identification history", mine: "Your identifications",
   },
   annotate: {
@@ -390,10 +402,7 @@ const en = {
     adminTitle: "Administration",
     // Admin-only card: the system-wide AI transcription route.
     aiRouteTitle: "AI transcription route",
-    identifiersTitle: "Identifiers",
-    identifiersHint: "Who may add identifications. Independent of the role: a contributor or a reviewer can be an identifier. Withdrawing it stops new identifications only.",
     identifiersSearch: "Search name or ORCID iD…",
-    identifiersNone: "No identifiers yet. Search for a user to grant it.",
     identifiersNoMatch: "No matching users",
     aiRouteHint: "Applies to everyone, not just you. Queue: a click is saved for the batch worker and Discord is pinged. Now: every contributor's click calls the AI inside their own request — they wait around half a minute and the API is billed immediately.",
     aiRouteNowWarn: "Run-now is on for all contributors. Each click bills an AI call.",
@@ -642,7 +651,7 @@ const zh: typeof en = {
     short: "TBIA 標本標註平台",
     expansion: "整合標本標籤：標註、連結、探索",
   },
-  nav: { home: "首頁", browse: "瀏覽", explore: "探索", data: "資料", participate: "參與", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者", myContributions: "個人貢獻", guide: "使用說明", login: "登入", logout: "登出" },
+  nav: { home: "首頁", browse: "瀏覽", explore: "探索", data: "資料", participate: "參與", species: "物種", institutions: "典藏機構", collectors: "採集者", story: "資料說故事", history: "調查史", volunteers: "貢獻者", myContributions: "個人貢獻", adminUsers: "使用者管理", guide: "使用說明", login: "登入", logout: "登出" },
   story: {
     title: "資料說故事",
     blurb: "以敘事的方式閱讀典藏，而不只是查詢結果：誰在何時去了哪裡，以及今天在資料庫裡還找得到什麼。每則故事都以已出版的文獻為本，並即時查詢標本資料。",
@@ -892,6 +901,18 @@ const zh: typeof en = {
     focus: "標註", focusHint: "隱藏清單，開啟這筆紀錄的標註與鑑定面板",
     unfocus: "回到清單", unfocusHint: "重新顯示結果清單（預覽，不含標註面板）",
   },
+  admin: {
+    usersTitle: "使用者", adminOnly: "此頁僅供管理員使用。",
+    usersBlurb: "所有使用者、各自的貢獻，以及誰可以新增鑑定。數字為「已接受／全部已送出」（不含草稿）。角色僅供檢視，不在此修改。",
+    usersCard: "所有使用者、各自的貢獻，以及鑑定者資格。",
+    allRoles: "全部角色", onlyIdentifiers: "僅鑑定者",
+    colUser: "使用者", colRole: "角色", colIdentifier: "鑑定者", colAnnotations: "註記",
+    colIdentifications: "鑑定", colJoined: "加入日期", colLastLogin: "最近登入",
+    email: "電子郵件", publicName: "公開名稱", notPublished: "不公開（未同意）",
+    yes: "是", no: "否", close: "關閉",
+    draftsCounted: "草稿只計數、不顯示：草稿僅作者本人可見。",
+    publicPage: "公開貢獻者頁面", recentIdentifications: "最近的鑑定",
+  },
   ident: {
     title: "鑑定",
     introTitle: "你對這份標本的鑑定",
@@ -919,7 +940,7 @@ const zh: typeof en = {
     references: "參考文獻", referencesHint: "所依據的植物誌、檢索表或文獻，以 | 分隔",
     remarks: "鑑定備註",
     submit: "送出鑑定", clear: "清除",
-    submitted: "已送出鑑定", draftSaved: "已將鑑定存為草稿",
+    submitted: "已送出鑑定",
     history: "鑑定紀錄", mine: "我的鑑定",
   },
   annotate: {
@@ -1006,10 +1027,7 @@ const zh: typeof en = {
     nFields_one: "{{count}} 個欄位", nFields_other: "{{count}} 個欄位",
     adminTitle: "管理",
     aiRouteTitle: "AI 轉錄執行方式",
-    identifiersTitle: "鑑定者",
-    identifiersHint: "可以新增鑑定的使用者。與角色無關：貢獻者或審核者都可以是鑑定者。取消資格只會停止新增，已有的鑑定不受影響。",
     identifiersSearch: "搜尋姓名或 ORCID iD…",
-    identifiersNone: "尚無鑑定者。搜尋使用者以授予資格。",
     identifiersNoMatch: "找不到符合的使用者",
     aiRouteHint: "此設定適用於所有使用者，不只您自己。排入佇列：按下後僅記錄下來，交由批次程式處理並通知 Discord。立即執行：每位協作者按下時都會在自己的請求中直接呼叫 AI — 需等待約半分鐘，並立即產生 API 費用。",
     aiRouteNowWarn: "目前所有協作者都是立即執行，每次點擊都會產生 AI 費用。",

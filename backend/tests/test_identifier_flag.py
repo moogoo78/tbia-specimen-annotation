@@ -76,3 +76,46 @@ def test_me_patch_cannot_set_the_flag(client):
     h = auth_header(client, REVIEWER)
     client.patch("/api/auth/me", headers=h, json={"is_identifier": True})
     assert client.get("/api/auth/me", headers=h).json()["is_identifier"] is False
+
+
+def test_list_carries_counts_and_sorts(client, made):
+    adm = auth_header(client, ADMIN)
+    cur = auth_header(client, CURATOR)
+    sub = client.post(f"/api/occurrences/{OCC}/identifications", headers=cur, json=BODY).json()
+    made.append(sub["id"])
+    rows = client.get("/api/admin/users?sort=identifications", headers=adm).json()["items"]
+    top = rows[0]
+    # Most identifications first.
+    assert top["email"] == CURATOR and top["n_identifications"] >= 1
+    before = top["n_identifications"]
+    client.patch(f"/api/identifications/{sub['id']}", headers=auth_header(client, REVIEWER),
+                 json={"status": "accepted"})
+    top = client.get("/api/admin/users?sort=identifications", headers=adm).json()["items"][0]
+    assert top["n_identifications"] == before and top["n_identifications_accepted"] >= 1
+    names = [u["display_name"] for u in client.get("/api/admin/users?sort=-name", headers=adm).json()["items"]]
+    assert names == sorted(names, key=str.lower, reverse=True)
+    assert client.get("/api/admin/users?role=reviewer", headers=adm).json()["total"] == 1
+    assert client.get("/api/admin/users?sort=bogus", headers=adm).status_code == 422
+
+
+def test_detail(client, made):
+    adm = auth_header(client, ADMIN)
+    cur = auth_header(client, CURATOR)
+    sub = client.post(f"/api/occurrences/{OCC}/identifications", headers=cur, json=BODY).json()
+    made.append(sub["id"])
+    uid = _user_id(client, CURATOR)
+    d = client.get(f"/api/admin/users/{uid}", headers=adm).json()
+    assert d["user"]["email"] == CURATOR and d["user"]["is_identifier"] is True
+    assert d["identifications_by_status"].get("submitted", 0) >= 1
+    assert any(i["id"] == sub["id"] for i in d["recent_identifications"])
+    assert client.get(f"/api/admin/users/{uid}", headers=cur).status_code == 403
+    assert client.get("/api/admin/users/999999", headers=adm).status_code == 404
+
+
+def test_sign_in_is_stamped(client, monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(type(settings), "dev_login_enabled", property(lambda s: True))
+    assert client.post("/api/auth/dev-login", json={"email": REVIEWER}).status_code == 200
+    adm = auth_header(client, ADMIN)
+    u = client.get(f"/api/admin/users/{_user_id(client, REVIEWER)}", headers=adm).json()["user"]
+    assert u["last_login_at"] is not None

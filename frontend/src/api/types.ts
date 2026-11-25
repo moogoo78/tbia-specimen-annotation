@@ -248,7 +248,22 @@ export interface DevLoginConfig { enabled: boolean; users: DevUser[]; }
 export interface User { id: number; orcid?: string | null; email?: string | null; display_name: string; public_display_name?: string | null; role: string; is_identifier?: boolean; show_in_ranking?: boolean; default_license?: string; }
 
 // A user as the admin user list shows it (GET /api/admin/users).
-export interface AdminUser { id: number; orcid?: string | null; email?: string | null; display_name: string; role: string; is_identifier: boolean; }
+export interface AdminUser {
+  id: number; orcid?: string | null; email?: string | null; display_name: string;
+  public_display_name?: string | null; show_in_ranking: boolean; role: string; is_identifier: boolean;
+  created?: string | null; last_login_at?: string | null;
+  // Non-draft rows; "accepted" = accepted + merged.
+  n_annotations: number; n_annotations_accepted: number;
+  n_identifications: number; n_identifications_accepted: number;
+}
+export type AdminUserSort = "name" | "created" | "last_login" | "annotations" | "identifications";
+// GET /api/admin/users/{id}. Drafts are counted in the by-status maps, never listed.
+export interface AdminUserDetail {
+  user: AdminUser;
+  annotations_by_status: Record<string, number>;
+  identifications_by_status: Record<string, number>;
+  recent_identifications: Identification[];
+}
 
 // A row of the public volunteer ranking. `name` is null unless the volunteer
 // opted in — render `Contributor #<user_id>` in that case.

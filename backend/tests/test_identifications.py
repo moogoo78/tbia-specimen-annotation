@@ -139,10 +139,23 @@ def test_review_lifecycle(client, made):
                         json={"status": "draft"}).status_code == 400
 
 
-def test_drafts_stay_private(client, made):
+def test_no_drafts(client, made):
+    cur = auth_header(client, CURATOR)
+    res = _create(client, cur, made, status="draft")
+    assert res.status_code == 400 and "no drafts" in res.json()["detail"]
+
+
+def test_legacy_drafts_stay_private_until_submitted(client, made):
+    """Rows saved as drafts before the rule: still private, still submittable."""
+    from app.db import SessionLocal
+    from app.models import Identification
+
     cur = auth_header(client, CURATOR)
     rev = auth_header(client, REVIEWER)
-    draft = _create(client, cur, made, status="draft").json()["id"]
+    draft = _create(client, cur, made).json()["id"]
+    with SessionLocal() as db:
+        db.get(Identification, draft).status = "draft"
+        db.commit()
     for headers in ({}, cur):
         idents = client.get(f"/api/occurrences/{OCC}", headers=headers).json()["identifications"]
         assert draft not in {i["id"] for i in idents}
@@ -242,8 +255,14 @@ def test_hand_typed_name_needs_name_according_to(client, made):
     assert res.status_code == 200
     assert res.json()["scientific_name_id"] is None
     assert res.json()["name_according_to"] == "Flora of Taiwan, 2nd ed. (2003)"
-    # A draft may leave it for later — but cannot be submitted until it is filled.
-    did = _create(client, cur, made, name_according_to="", status="draft").json()["id"]
+    # A legacy draft without one cannot be submitted until it is filled.
+    from app.db import SessionLocal
+    from app.models import Identification
+    did = _create(client, cur, made).json()["id"]
+    with SessionLocal() as db:
+        row = db.get(Identification, did)
+        row.status, row.name_according_to = "draft", None
+        db.commit()
     assert client.patch(f"/api/identifications/{did}", headers=cur,
                         json={"status": "submitted"}).status_code == 400
     res = client.patch(f"/api/identifications/{did}", headers=cur,

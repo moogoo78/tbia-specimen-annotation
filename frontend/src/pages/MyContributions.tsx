@@ -118,8 +118,9 @@ export function MyContributions() {
   );
 }
 
-// Your determinations (DwC Identification), drafts included — this is the only
-// place a draft identification is ever listed, and where it gets submitted.
+// Your determinations (DwC Identification). They are submitted directly — there
+// are no drafts — except rows saved as drafts before that rule, which are listed
+// only here and still submit from their card.
 function MyIdentifications({ userId }: { userId: number }) {
   const { t: tr } = useTranslation();
   const qc = useQueryClient();
@@ -140,7 +141,7 @@ function MyIdentifications({ userId }: { userId: number }) {
         {tr("ident.mine")} <span style={{ fontFamily: t.mono, fontWeight: 400, color: t.fgMuted }}>· {list.data?.total ?? 0}</span>
       </h3>
       {update.isError && (
-        // e.g. a hand-typed draft submitted without nameAccordingTo: say why,
+        // e.g. a legacy draft submitted without nameAccordingTo: say why,
         // and where to fix it, rather than leaving the click to do nothing.
         <div style={{ padding: "6px 10px", marginBottom: 6, border: `1px solid ${t.danger}`, color: t.danger, fontSize: 11 }}>
           {tr("annotate.submitFailed")} — {(update.error as Error).message}

@@ -13,6 +13,7 @@ import { InstitutionReport } from "./pages/InstitutionReport";
 import { Volunteers } from "./pages/Volunteers";
 import { Contributor } from "./pages/Contributor";
 import { MyContributions } from "./pages/MyContributions";
+import { AdminUsers } from "./pages/AdminUsers";
 import { Collector } from "./pages/Collector";
 import { Collectors } from "./pages/Collectors";
 import { History } from "./pages/History";
@@ -52,6 +53,7 @@ export default function App() {
             board row lead. `/me` is the same shape for your own, plus drafts. */}
         <Route path="/contributors/:id" element={<Contributor />} />
         <Route path="/me" element={<MyContributions />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
         {/* The board was /volunteers (志工) until the rename; keep old links working. */}
         <Route path="/volunteers" element={<Navigate to="/contributors" replace />} />
         <Route path="/collectors" element={<Collectors />} />

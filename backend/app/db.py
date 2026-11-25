@@ -100,6 +100,8 @@ ADDED_COLUMNS = {
         ("default_license", "VARCHAR(32) DEFAULT 'CC-BY-NC-4.0'"),
         # Off for everyone who existed before the flag: an admin grants it.
         ("is_identifier", "BOOLEAN DEFAULT 0"),
+        # Null = not signed in since the column was added.
+        ("last_login_at", "DATETIME"),
     ],
     "annotations": [
         ("license", "VARCHAR(32) DEFAULT 'CC-BY-NC-4.0'"),

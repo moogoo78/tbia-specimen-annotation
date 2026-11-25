@@ -216,8 +216,8 @@ Picking a suggestion fills the name and rank and attaches `scientific_name_id` +
 `name_according_to`; editing the name afterwards drops them, in the form and on
 `PATCH` (a new name without a new id clears both). The server accepts only a TaiCOL
 name URI as `scientific_name_id`. **A name without an id must say whose concept it
-follows**: `name_according_to` is required to submit (on create as `submitted`, and on
-`PATCH … status=submitted`), not to save a draft. Unlinking a picked name clears TaiCOL's
+follows**: `name_according_to` is required on create, and on `PATCH … status=submitted`
+of a legacy draft. Unlinking a picked name clears TaiCOL's
 citation; a citation the contributor typed is never overwritten except by a pick.
 
 - **Answered from a dated TaiCOL release.** `make seed-taicol` loads TaiCOL's taxon
@@ -236,14 +236,18 @@ citation; a citation the contributor typed is never overwritten except by a pick
 - Suggestion labels arrive as HTML (`<i>…</i>`) and are parsed server-side into
   italic/roman runs plus common names; nothing from TaiCOL is rendered as markup.
 
+- **No drafts.** An identification is created `submitted` — `POST` with any other status
+  is a 400, and the form has no *Save draft*. A determination is a short, complete
+  statement made in one sitting; unlike a label transcription there is nothing to come
+  back to. Rows saved as drafts before this rule keep the old behaviour: private, listed
+  only on `/me`, and submittable from there (`PATCH status=submitted`).
 - **Same workflow, one definition.** Status lifecycle, who may edit, relicense and review
   are `backend/app/workflow.py`, called by both `PATCH /annotations/{id}` and
   `PATCH /identifications/{id}` — so the two kinds of contribution cannot drift apart.
   Licence resolves from `user.default_license` when absent, exactly as for an annotation.
-- **Same publication rules.** Drafts never leave their author: they are absent from
+- **Same publication rules.** Legacy drafts never leave their author: they are absent from
   `GET /api/occurrences/{id}` (`identifications_store.list_for_occurrence`) and from other
-  users' `GET /api/identifications`; `/me` lists them and submits them. Names go through
-  `public_name`.
+  users' `GET /api/identifications`. Names go through `public_name`.
 - **Routes.** `POST /api/occurrences/{id}/identifications`, `PATCH /api/identifications/{id}`,
   `GET /api/identifications?mine=&occurrence_id=&status=` (authenticated, uncached).
 - **Export.** `GET /api/export/identifications?dataset_name=&statuses=accepted,merged&format=json|csv`
@@ -282,14 +286,31 @@ reviewer may hold it, and an admin may always identify without it
 no standing, while saying what the specimen *is* does. Reviewing identifications stays with
 the reviewer role, so a reviewer without the flag accepts or rejects them but cannot add one.
 
-- **Only an admin sets it**, from the *Identifiers* panel on `/me`
-  (`GET /api/admin/users?q=&identifiers=`, `PATCH /api/admin/users/{id}` with
-  `{"is_identifier": bool}`; `backend/app/api/users.py`). `PATCH /api/auth/me` does not
-  accept it. Nothing else about a user is editable there — `role` still has no surface.
+- **Only an admin sets it**, on **`/admin/users`** (`frontend/src/pages/AdminUsers.tsx`,
+  linked from the admin section of `/me` and the account menu). `PATCH /api/auth/me` does
+  not accept it. Nothing else about a user is editable there — `role` is shown, and still
+  has no editing surface.
+
+### `/admin/users`
+
+Admin-only (`require_role("admin")`, `backend/app/api/users.py`):
+
+| endpoint | |
+| --- | --- |
+| `GET /api/admin/users?q=&role=&identifiers=&sort=&limit=&offset=` | `q` matches ORCID name, public name, iD or email. `sort` ∈ `name`, `created`, `last_login`, `annotations`, `identifications`; a leading `-` reverses it (counts and dates start most-first). Each row carries `n_annotations` / `n_identifications` (non-draft) and their `_accepted` (accepted + merged) counts. |
+| `GET /api/admin/users/{id}` | the same row, per-status counts for annotations and identifications **including drafts**, and the 20 latest non-draft identifications |
+| `PATCH /api/admin/users/{id}` | `{"is_identifier": bool}` — the only write |
+
+- **Drafts are counted, never listed — even for an admin.** *Drafts are private* means
+  their author's alone, and an exception for admins would make that promise conditional.
+- **`users.last_login_at`** is stamped on every ORCID callback and dev login. It is null
+  for anyone who has not signed in since the column was added, and only admins see it.
+- The page selects a user as `?u=<id>`, so a user's detail can be linked to. The public
+  contributions are a link away at `/contributors/<id>`.
 - **Off by default**, including for every user who existed before the flag (the
   `ADD COLUMN` backfills `0`). The demo curator holds it and the demo reviewer does not.
 - **Withdrawing it stops new identifications only.** Existing rows keep their status, and
-  their owner may still edit a pending one or submit a draft under the ordinary rules.
+  their owner may still edit a pending one under the ordinary rules.
 - The record page shows a non-identifier a note in place of the form and drops its
   *+ Add identification* button (`canIdentify` in `IdentificationPanel.tsx`) — UI only;
   the API is the authority.

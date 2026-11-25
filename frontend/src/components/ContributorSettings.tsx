@@ -5,6 +5,7 @@
 // another page to show them.
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { t } from "../design/tokens";
@@ -272,63 +273,21 @@ export function AdminSection({ role }: { role: string }) {
   );
 }
 
-// Admin: who may record identifications. The flag sits beside the role — a
-// contributor or a reviewer may hold it — and only an admin sets it
-// (backend api/users.py). Lists the current identifiers by default; search to
-// find anyone else.
+// Admin: who may record identifications, and everything else about users,
+// lives on /admin/users. This card is only the way there.
 export function IdentifierAdmin() {
   const { t: tr } = useTranslation();
-  const qc = useQueryClient();
-  const { user: me, refreshUser } = useAuth();
-  const [q, setQ] = useState("");
-  const term = q.trim();
-  const list = useQuery({
-    queryKey: ["admin-users", term],
-    queryFn: () => api.adminUsers(term ? { q: term, limit: 50 } : { identifiers: true, limit: 200 }),
-  });
-  const save = useMutation({
-    mutationFn: ({ id, on }: { id: number; on: boolean }) => api.setIdentifier(id, on),
-    onSuccess: (u) => {
-      qc.invalidateQueries({ queryKey: ["admin-users"] });
-      if (u.id === me?.id) refreshUser();  // your own flag moves your own form
-    },
-  });
-  const items = list.data?.items ?? [];
   return (
-    <div data-identifier-admin style={{
-      padding: "8px 10px", marginBottom: 14,
-      background: t.panel, border: `1px solid ${t.border}`, maxWidth: 620,
+    <Link to="/admin/users" data-identifier-admin style={{
+      display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", marginBottom: 14,
+      background: t.panel, border: `1px solid ${t.border}`, maxWidth: 620, textDecoration: "none", color: t.fg,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Icon name="user" size={12} />
-        <div style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>{tr("dash.identifiersTitle")}</div>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("dash.identifiersSearch")}
-          style={{ fontSize: 11, padding: "3px 6px", border: `1px solid ${t.border}`, fontFamily: t.sans, width: 200 }} />
+      <Icon name="user" size={12} />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12, fontWeight: 600 }}>{tr("admin.usersTitle")}</div>
+        <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 2, lineHeight: 1.5 }}>{tr("admin.usersCard")}</div>
       </div>
-      <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 4, lineHeight: 1.5 }}>{tr("dash.identifiersHint")}</div>
-      <div style={{ marginTop: 6, maxHeight: 280, overflowY: "auto", borderTop: `1px solid ${t.borderSoft}` }}>
-        {list.isLoading && <div style={{ padding: 6 }}><Spinner /></div>}
-        {!list.isLoading && items.length === 0 && (
-          <div style={{ padding: "6px 2px", fontSize: 11, color: t.fgSubtle }}>
-            {term ? tr("dash.identifiersNoMatch") : tr("dash.identifiersNone")}
-          </div>
-        )}
-        {items.map((u) => (
-          <label key={u.id} style={{
-            display: "flex", alignItems: "center", gap: 8, padding: "4px 2px",
-            borderBottom: `1px solid ${t.borderSoft}`, fontSize: 12, cursor: "pointer",
-          }}>
-            <input type="checkbox" checked={u.is_identifier} disabled={save.isPending}
-              onChange={(e) => save.mutate({ id: u.id, on: e.target.checked })} />
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {u.display_name}
-              <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgSubtle, marginLeft: 6 }}>{u.orcid ?? u.email ?? `#${u.id}`}</span>
-            </span>
-            <span style={{ fontFamily: t.mono, fontSize: 10, color: t.fgMuted }}>{u.role}</span>
-          </label>
-        ))}
-      </div>
-      {save.isError && <div style={{ fontSize: 11, color: t.danger, marginTop: 4 }}>{(save.error as Error).message}</div>}
-    </div>
+      <span style={{ color: t.accent, fontSize: 12 }}>→</span>
+    </Link>
   );
 }
