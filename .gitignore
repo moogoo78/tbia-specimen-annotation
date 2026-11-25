@@ -53,7 +53,14 @@ docs/drafts/promo-posts.zh-TW.md
 # figures go stale with the next export. Neither is needed to run or serve
 # anything, and the abstract is the conference's record, not this repo's.
 docs/tdwg-2026-abstract.md
+/tdwg-2026-abstract.md
 docs/drafts/tdwg-2026-talk.md
+
+# --- Progress changelogs (local working drafts) ---
+# Period summaries written for progress reports and meetings. They ship nowhere
+# on the site, so by the docs/drafts/ rule they are one author's working copy;
+# the commit log and the Trello 已完成 cards are the record.
+docs/drafts/changelog-*.md
 
 # --- Deploy automation (box-local) ---
 # The timer-driven deploy and its systemd units: how *this* box happens to
